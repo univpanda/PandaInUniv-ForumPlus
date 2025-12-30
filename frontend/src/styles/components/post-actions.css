@@ -1,0 +1,136 @@
+/* ==================== Edit/Delete Post Styles ==================== */
+
+/* Edit Button */
+.edit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.edit-btn:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-lighter);
+}
+
+/* Delete Button */
+.delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.delete-btn:hover {
+  color: var(--color-danger-light);
+  background: var(--color-danger-bg);
+}
+
+/* Undelete Button */
+.undelete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--color-success);
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.undelete-btn:hover {
+  background: var(--color-success-bg);
+  color: var(--color-success-dark);
+}
+
+/* Deleted Post Styling */
+/* Deleted post - user view (normal style, just italic text) */
+.post-card.deleted-post .deleted-content {
+  color: var(--color-text-light);
+  font-style: italic;
+}
+
+/* Deleted post - admin view (red styling) */
+.post-card.deleted-post.admin-view {
+  background: var(--color-danger-bg);
+  border: 1px dashed #fca5a5;
+}
+
+.post-card.deleted-post.admin-view .post-footer {
+  border-top-color: #fca5a5;
+}
+
+/* User-deleted indicator icon (clickable button) */
+.user-deleted-indicator {
+  display: flex;
+  align-items: center;
+  padding: 0.35rem 0.5rem;
+  color: var(--color-text-light);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.user-deleted-indicator:hover {
+  background: var(--color-bg-gray);
+  color: var(--color-text-muted);
+}
+
+/* Additional Comments */
+.additional-comments {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed #e2e8f0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.additional-comments > strong {
+  color: var(--color-text-muted);
+  font-weight: 500;
+  font-size: 0.8rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.additional-comment-item {
+  margin-bottom: 0.75rem;
+}
+
+.additional-comment-item:last-child {
+  margin-bottom: 0;
+}
+
+.additional-comment-item .comment-timestamp {
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+
+.additional-comments p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+/* Edited Indicator */
+.edited-indicator {
+  font-size: 0.75rem;
+  color: var(--color-text-light);
+  font-style: italic;
+}
+

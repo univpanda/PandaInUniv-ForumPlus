@@ -1,0 +1,27 @@
+/* Main CSS entry point - imports all stylesheets in correct order */
+
+/* 1. Variables must come first (defines CSS custom properties) */
+@import './variables.css';
+
+/* 2. Base styles (resets, utilities, error boundaries) */
+@import './base.css';
+
+/* 3. Layout (app shell, header, footer, main content) */
+@import './layout.css';
+
+/* 4. Core responsive adjustments */
+@import './responsive.css';
+
+/* 5. Shared components */
+@import './components/auth.css';
+@import './components/modal.css';
+@import './components/post-actions.css';
+@import './components/toast.css';
+
+/* 6. Page-specific styles */
+@import './pages/forum.css';
+@import './pages/users.css';
+@import './pages/terms.css';
+@import './pages/chat.css';
+@import './pages/polls.css';
+@import './pages/profile.css';

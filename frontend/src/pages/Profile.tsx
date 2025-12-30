@@ -1,0 +1,131 @@
+import { memo, useCallback } from 'react'
+import { FileText, MessageCircle, Eye, EyeOff, Bookmark } from 'lucide-react'
+import happyPanda from '../assets/happy-panda.png'
+import sadPanda from '../assets/sad-panda.png'
+import { useAuth } from '../hooks/useAuth'
+import { useUserProfile, useTogglePrivate } from '../hooks/useUserProfile'
+import { useUserProfileStats } from '../hooks/useProfileQueries'
+import { usePostBookmarks } from '../hooks/useBookmarkQueries'
+import { UsernameEditor } from '../components/auth/UsernameEditor'
+import { getAvatarUrl } from '../utils/format'
+import { LoadingSpinner } from '../components/ui'
+import type { SearchDiscussionEvent } from '../components/AuthButton'
+
+export const Profile = memo(function Profile() {
+  const { user } = useAuth()
+  const { data: profile } = useUserProfile(user?.id ?? null)
+  const { data: stats, isLoading: statsLoading } = useUserProfileStats(user?.id ?? null)
+  const { data: bookmarks } = usePostBookmarks(user?.id)
+  const togglePrivate = useTogglePrivate()
+
+  // Navigate to Discussion with search query
+  // 'threads' -> @username @op (only thread OPs)
+  // 'replies' -> @username @replies (only replies)
+  const handleSearchDiscussion = useCallback((filter: 'threads' | 'replies') => {
+    if (!profile?.username) return
+    const searchQuery = filter === 'threads'
+      ? `@${profile.username} @op`
+      : `@${profile.username} @replies`
+    const event = new CustomEvent<SearchDiscussionEvent>('searchDiscussion', {
+      detail: { searchQuery },
+    })
+    window.dispatchEvent(event)
+  }, [profile?.username])
+
+  // Navigate to Discussion with bookmarks view
+  const handleBookmarksClick = useCallback(() => {
+    const event = new CustomEvent<SearchDiscussionEvent>('searchDiscussion', {
+      detail: { searchQuery: '@bookmarked' },
+    })
+    window.dispatchEvent(event)
+  }, [])
+
+  if (!user) {
+    return null
+  }
+
+  const displayName = profile?.username || null
+  const avatarUrl = getAvatarUrl(profile?.avatar_url || null, displayName || user.email || 'User')
+
+  return (
+    <div className="profile-page">
+      <div className="profile-container">
+        {/* Avatar and Username */}
+        <div className="profile-header">
+          <img src={avatarUrl} alt="" className="profile-avatar" />
+          <div className="profile-username-section">
+            <UsernameEditor username={displayName ?? undefined} userId={user.id} />
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="profile-stats">
+          <h3 className="profile-section-title">Your Stats</h3>
+          {statsLoading ? (
+            <LoadingSpinner />
+          ) : (
+            <div className="profile-stats-grid">
+              <button className="profile-stat clickable" onClick={() => handleSearchDiscussion('threads')}>
+                <FileText size={20} />
+                <div className="profile-stat-info">
+                  <span className="profile-stat-value">{stats?.threadCount ?? 0}</span>
+                  <span className="profile-stat-label">Threads</span>
+                </div>
+              </button>
+              <button className="profile-stat clickable" onClick={() => handleSearchDiscussion('replies')}>
+                <MessageCircle size={20} />
+                <div className="profile-stat-info">
+                  <span className="profile-stat-value">{stats?.postCount ?? 0}</span>
+                  <span className="profile-stat-label">Replies</span>
+                </div>
+              </button>
+              <div className="profile-stat">
+                <img src={happyPanda} alt="" className="profile-stat-icon" />
+                <div className="profile-stat-info">
+                  <span className="profile-stat-value">{stats?.upvotesReceived ?? 0}</span>
+                  <span className="profile-stat-label">Upvotes</span>
+                </div>
+              </div>
+              <div className="profile-stat">
+                <img src={sadPanda} alt="" className="profile-stat-icon" />
+                <div className="profile-stat-info">
+                  <span className="profile-stat-value">{stats?.downvotesReceived ?? 0}</span>
+                  <span className="profile-stat-label">Downvotes</span>
+                </div>
+              </div>
+              <button className="profile-stat clickable" onClick={handleBookmarksClick}>
+                <Bookmark size={20} />
+                <div className="profile-stat-info">
+                  <span className="profile-stat-value">{bookmarks?.size ?? 0}</span>
+                  <span className="profile-stat-label">Bookmarks</span>
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Privacy Settings */}
+        <div className="profile-privacy">
+          <h3 className="profile-section-title">Privacy</h3>
+          <button
+            className={`profile-privacy-toggle ${profile?.is_private ? 'private' : 'public'}`}
+            onClick={() => user && togglePrivate.mutate(user.id)}
+            disabled={togglePrivate.isPending}
+          >
+            {profile?.is_private ? <EyeOff size={20} /> : <Eye size={20} />}
+            <div className="profile-privacy-info">
+              <span className="profile-privacy-status">
+                {profile?.is_private ? 'Private Profile' : 'Public Profile'}
+              </span>
+              <span className="profile-privacy-desc">
+                {profile?.is_private
+                  ? 'Other users cannot see your posts and stats'
+                  : 'Other users can see your posts and stats'}
+              </span>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+})

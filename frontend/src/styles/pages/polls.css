@@ -1,0 +1,418 @@
+/* ==================== POLL STYLES ==================== */
+
+/* Poll Creator (in thread form) */
+.poll-creator {
+  border-top: 1px solid var(--color-border);
+  padding-top: 1rem;
+}
+
+.poll-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  user-select: none;
+}
+
+.poll-toggle input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary);
+}
+
+.poll-toggle svg {
+  color: var(--color-text-muted);
+}
+
+.poll-creator-content {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.poll-section-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.poll-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.poll-option-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.poll-option-input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+}
+
+.poll-option-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.poll-option-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: var(--color-danger-bg-dark);
+  color: var(--color-danger);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-bg);
+}
+
+.poll-option-remove:hover {
+  background: #fecaca;
+}
+
+.poll-add-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px dashed #cbd5e1;
+  background: var(--color-bg-light);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.poll-add-option:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: #f0f9ff;
+}
+
+.poll-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.poll-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  background: var(--color-bg-light);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.poll-setting-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.poll-setting-inline input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+.poll-setting {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.poll-setting input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--color-primary);
+}
+
+/* Poll Display (embedded in original post) */
+.poll-display {
+  border-top: 1px solid var(--color-border);
+  padding-top: 1rem;
+  margin-top: 0.75rem;
+}
+
+.poll-display.poll-loading {
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.poll-display.poll-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.poll-retry-btn {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-primary);
+  background: transparent;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.poll-retry-btn:hover {
+  background: var(--color-primary);
+  color: white;
+}
+
+.poll-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.poll-header svg {
+  color: var(--color-primary);
+}
+
+.poll-badge {
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.125rem 0.5rem;
+  background: var(--color-primary-light);
+  color: #1d4ed8;
+  border-radius: var(--radius-full);
+}
+
+.poll-votes-count {
+  margin-left: auto;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.poll-timer {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #059669;
+  padding: 0.125rem 0.5rem;
+  background: #d1fae5;
+  border-radius: var(--radius-full);
+}
+
+.poll-timer.expired {
+  color: var(--color-danger);
+  background: var(--color-danger-bg-dark);
+}
+
+.poll-duration {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.poll-duration-input {
+  width: 4.5rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.poll-duration-input::-webkit-outer-spin-button,
+.poll-duration-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.poll-duration-input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.poll-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.poll-option-container {
+  width: 100%;
+}
+
+/* Voting view (radio/checkbox) */
+.poll-option-vote {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.poll-option-vote:hover {
+  border-color: var(--color-primary);
+  background: var(--color-bg-light);
+}
+
+.poll-option-vote.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-lighter);
+}
+
+.poll-option-vote input {
+  accent-color: var(--color-primary);
+}
+
+/* Results view */
+.poll-option-result {
+  position: relative;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.poll-option-result.voted {
+  border-color: var(--color-primary);
+}
+
+.poll-option-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--color-primary-light);
+  transition: width 0.3s ease;
+  z-index: 0;
+}
+
+.poll-option-result.voted .poll-option-bar {
+  background: #bfdbfe;
+}
+
+.poll-option-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.poll-option-text {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #1f2937;
+}
+
+.voted-check {
+  color: var(--color-primary);
+}
+
+.poll-option-percentage {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.poll-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.poll-vote-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: white;
+  cursor: pointer;
+  transition: var(--transition-bg);
+}
+
+.poll-vote-btn:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.poll-vote-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.poll-change-vote-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid var(--color-border-dark);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.poll-change-vote-btn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.poll-change-vote-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.poll-sign-in-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-light);
+  font-style: italic;
+}

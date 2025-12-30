@@ -1,0 +1,197 @@
+/* Terms and Conditions Page */
+.terms-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem;
+  padding-top: 3rem;
+}
+
+.terms-page .back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition-normal);
+  margin-bottom: 1.5rem;
+}
+
+.terms-page .back-button:hover {
+  background: var(--color-bg-light);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.terms-content {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  box-shadow: var(--shadow-xs);
+  border: 1px solid var(--color-border);
+}
+
+.terms-content h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: var(--color-text-dark);
+  margin: 0 0 0.5rem 0;
+}
+
+.terms-updated {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 2rem;
+}
+
+.terms-content section {
+  margin-bottom: 2rem;
+}
+
+.terms-content section:last-of-type {
+  margin-bottom: 1.5rem;
+}
+
+.terms-content h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 0.75rem 0;
+}
+
+.terms-content p {
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+}
+
+.terms-content ul {
+  margin: 0.5rem 0 1rem 0;
+  padding-left: 1.5rem;
+  color: var(--color-text-secondary);
+}
+
+.terms-content li {
+  margin-bottom: 0.5rem;
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.terms-content strong {
+  color: var(--color-text);
+}
+
+.terms-footer {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.terms-footer p {
+  font-weight: 500;
+  color: var(--color-text);
+  text-align: center;
+}
+
+/* Footer link styles */
+.footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.footer-links .footer-separator {
+  color: var(--color-border-dark);
+}
+
+.footer-links button {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0;
+  transition: var(--transition-color);
+}
+
+.footer-links button:hover {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+}
+
+/* Delete account link in Terms page */
+.delete-account-link {
+  background: none;
+  border: none;
+  color: var(--color-danger);
+  font-size: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  transition: var(--transition-color);
+}
+
+.delete-account-link:hover {
+  color: #b91c1c;
+}
+
+.delete-account-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: 0.25rem;
+}
+
+.delete-confirm-text {
+  color: var(--color-danger);
+  font-weight: 500;
+}
+
+.delete-confirm-btn {
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-xs);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: var(--transition-normal);
+}
+
+.delete-confirm-btn.cancel {
+  background: var(--color-bg-gray);
+  color: var(--color-text-muted);
+}
+
+.delete-confirm-btn.cancel:hover {
+  background: var(--color-border);
+}
+
+.delete-confirm-btn.confirm {
+  background: var(--color-danger);
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.delete-confirm-btn.confirm:hover {
+  background: var(--color-danger-hover);
+}
+
+.delete-confirm-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.delete-confirm-btn .spin {
+  animation: spin 1s linear infinite;
+}
+
