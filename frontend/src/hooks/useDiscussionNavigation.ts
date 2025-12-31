@@ -36,7 +36,7 @@ const getStoredNavState = (): StoredNavState => {
 }
 
 // Save nav state to localStorage
-const saveNavState = (view: View, thread: Thread | null, post: Post | null) => {
+const saveNavState = (view: View, thread: SelectedThread, post: SelectedPost) => {
   const state: StoredNavState = { view, thread, post }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
