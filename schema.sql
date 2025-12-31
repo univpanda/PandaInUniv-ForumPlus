@@ -2097,14 +2097,20 @@ $$;
 
 -- Notifications table
 -- Aggregates votes AND replies to a specific post (one notification per post)
+-- Stores current counts and baseline counts (from last dismissal) to calculate "new" activity
 CREATE TABLE IF NOT EXISTS notifications (
   id SERIAL PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
   post_id INTEGER NOT NULL REFERENCES forum_posts(id) ON DELETE CASCADE,
   thread_id INTEGER NOT NULL REFERENCES forum_threads(id) ON DELETE CASCADE,
+  -- Current total counts
   reply_count INTEGER DEFAULT 0,
   upvotes INTEGER DEFAULT 0,
   downvotes INTEGER DEFAULT 0,
+  -- Baseline counts (set when notification is dismissed, used to calculate "new" counts)
+  baseline_reply_count INTEGER DEFAULT 0,
+  baseline_upvotes INTEGER DEFAULT 0,
+  baseline_downvotes INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, post_id)
@@ -2118,6 +2124,9 @@ ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view own notifications" ON notifications
   FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own notifications" ON notifications
+  FOR UPDATE USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can delete own notifications" ON notifications
   FOR DELETE USING (auth.uid() = user_id);
@@ -2214,14 +2223,13 @@ CREATE TRIGGER trigger_notify_on_vote_update
   FOR EACH ROW
   EXECUTE FUNCTION notify_on_vote();
 
--- Trigger: handle vote deletion (update counts, remove notification only if no votes AND no replies)
+-- Trigger: handle vote deletion (update counts only, never delete - baseline system handles visibility)
 CREATE OR REPLACE FUNCTION notify_on_vote_delete()
 RETURNS TRIGGER AS $$
 DECLARE
   v_post_author_id UUID;
   v_current_upvotes INTEGER;
   v_current_downvotes INTEGER;
-  v_reply_count INTEGER;
 BEGIN
   SELECT author_id INTO v_post_author_id
   FROM forum_posts WHERE id = OLD.post_id;
@@ -2233,21 +2241,10 @@ BEGIN
   INTO v_current_upvotes, v_current_downvotes
   FROM post_votes WHERE post_id = OLD.post_id;
 
-  -- Get current reply count from notification
-  SELECT COALESCE(reply_count, 0) INTO v_reply_count
-  FROM notifications
+  -- Update counts (don't delete - baseline system handles visibility)
+  UPDATE notifications
+  SET upvotes = v_current_upvotes, downvotes = v_current_downvotes, updated_at = NOW()
   WHERE user_id = v_post_author_id AND post_id = OLD.post_id;
-
-  -- If no more votes AND no replies, remove notification
-  IF v_current_upvotes = 0 AND v_current_downvotes = 0 AND COALESCE(v_reply_count, 0) = 0 THEN
-    DELETE FROM notifications
-    WHERE user_id = v_post_author_id AND post_id = OLD.post_id;
-  ELSE
-    -- Update counts
-    UPDATE notifications
-    SET upvotes = v_current_upvotes, downvotes = v_current_downvotes, updated_at = NOW()
-    WHERE user_id = v_post_author_id AND post_id = OLD.post_id;
-  END IF;
 
   RETURN OLD;
 EXCEPTION WHEN OTHERS THEN
@@ -2262,17 +2259,30 @@ CREATE TRIGGER trigger_notify_on_vote_delete
   FOR EACH ROW
   EXECUTE FUNCTION notify_on_vote_delete();
 
--- Get notification count
+-- Get notification count (only counts notifications with new activity)
+-- Note: Uses "greater than baseline" comparison, meaning notifications only show when
+-- totals EXCEED what user last saw. If votes decrease then increase back, user won't
+-- see notification until total exceeds their last-seen value. This is intentional -
+-- user cares about "more popular than before" not "any interaction happened".
 CREATE OR REPLACE FUNCTION get_notification_count()
 RETURNS BIGINT
 LANGUAGE sql
 SECURITY DEFINER
 STABLE
 AS $$
-  SELECT COUNT(*) FROM notifications WHERE user_id = auth.uid();
+  SELECT COUNT(*) FROM notifications
+  WHERE user_id = auth.uid()
+    AND (
+      reply_count > baseline_reply_count OR
+      upvotes > baseline_upvotes OR
+      downvotes > baseline_downvotes
+    );
 $$;
 
--- Get notifications with post/thread data
+-- Get notifications with full post data for PostCard display
+-- Returns delta counts (current - baseline) as "new" activity counts
+-- Only returns notifications where there's new activity (any delta > 0)
+DROP FUNCTION IF EXISTS get_notifications(integer, integer);
 CREATE OR REPLACE FUNCTION get_notifications(
   p_limit INTEGER DEFAULT 50,
   p_offset INTEGER DEFAULT 0
@@ -2284,9 +2294,16 @@ RETURNS TABLE (
   thread_title TEXT,
   post_content TEXT,
   post_parent_id INTEGER,
-  reply_count INTEGER,
-  upvotes INTEGER,
-  downvotes INTEGER,
+  post_author_id UUID,
+  post_author_name TEXT,
+  post_author_avatar TEXT,
+  post_created_at TIMESTAMPTZ,
+  post_likes BIGINT,
+  post_dislikes BIGINT,
+  post_reply_count BIGINT,
+  new_reply_count INTEGER,
+  new_upvotes INTEGER,
+  new_downvotes INTEGER,
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ,
   total_count BIGINT
@@ -2297,9 +2314,15 @@ AS $$
 DECLARE
   v_total BIGINT;
 BEGIN
+  -- Count only notifications with new activity
   SELECT COUNT(*) INTO v_total
   FROM notifications n
-  WHERE n.user_id = auth.uid();
+  WHERE n.user_id = auth.uid()
+    AND (
+      n.reply_count > n.baseline_reply_count OR
+      n.upvotes > n.baseline_upvotes OR
+      n.downvotes > n.baseline_downvotes
+    );
 
   RETURN QUERY
   SELECT
@@ -2307,37 +2330,55 @@ BEGIN
     n.post_id,
     n.thread_id,
     t.title,
-    LEFT(p.content, 200),
+    p.content,
     p.parent_id,
-    n.reply_count,
-    n.upvotes,
-    n.downvotes,
+    p.author_id,
+    u.username,
+    u.avatar_url,
+    p.created_at,
+    (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = 1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p.id),
+    (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = -1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p.id),
+    (SELECT COUNT(*) FROM forum_posts r WHERE r.parent_id = p.id AND COALESCE(r.is_deleted, FALSE) = FALSE),
+    -- Delta counts (new activity since last dismissal)
+    (n.reply_count - n.baseline_reply_count)::INTEGER,
+    (n.upvotes - n.baseline_upvotes)::INTEGER,
+    (n.downvotes - n.baseline_downvotes)::INTEGER,
     n.created_at,
     n.updated_at,
     v_total
   FROM notifications n
   JOIN forum_posts p ON p.id = n.post_id
   JOIN forum_threads t ON t.id = n.thread_id
+  JOIN user_profiles u ON u.id = p.author_id
   WHERE n.user_id = auth.uid()
+    AND (
+      n.reply_count > n.baseline_reply_count OR
+      n.upvotes > n.baseline_upvotes OR
+      n.downvotes > n.baseline_downvotes
+    )
   ORDER BY n.updated_at DESC
   LIMIT p_limit OFFSET p_offset;
 END;
 $$;
 
--- Dismiss a single notification
+-- Dismiss a single notification (sets baseline = current, so "new" counts become 0)
 CREATE OR REPLACE FUNCTION dismiss_notification(p_notification_id INTEGER)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-  DELETE FROM notifications
+  UPDATE notifications
+  SET
+    baseline_reply_count = reply_count,
+    baseline_upvotes = upvotes,
+    baseline_downvotes = downvotes
   WHERE id = p_notification_id AND user_id = auth.uid();
   RETURN FOUND;
 END;
 $$;
 
--- Dismiss all notifications
+-- Dismiss all notifications (sets baseline = current for all)
 CREATE OR REPLACE FUNCTION dismiss_all_notifications()
 RETURNS INTEGER
 LANGUAGE plpgsql
@@ -2346,7 +2387,12 @@ AS $$
 DECLARE
   v_count INTEGER;
 BEGIN
-  DELETE FROM notifications WHERE user_id = auth.uid();
+  UPDATE notifications
+  SET
+    baseline_reply_count = reply_count,
+    baseline_upvotes = upvotes,
+    baseline_downvotes = downvotes
+  WHERE user_id = auth.uid();
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RETURN v_count;
 END;

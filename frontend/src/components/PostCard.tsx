@@ -143,11 +143,12 @@ export const PostCard = memo(function PostCard({
 
   // Show more/less for long content
   const CONTENT_LIMIT = 2000
-  const isLongContent = post.content.length > CONTENT_LIMIT
+  const safeContent = post.content ?? ''
+  const isLongContent = safeContent.length > CONTENT_LIMIT
   const [isExpanded, setIsExpanded] = useState(false)
   const displayContent = isLongContent && !isExpanded
-    ? post.content.slice(0, CONTENT_LIMIT) + '...'
-    : post.content
+    ? safeContent.slice(0, CONTENT_LIMIT) + '...'
+    : safeContent
 
   return (
     <div

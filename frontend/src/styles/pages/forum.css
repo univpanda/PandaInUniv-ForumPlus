@@ -1971,67 +1971,51 @@
   color: var(--text-secondary);
 }
 
-.notifications-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.notification-item {
-  display: flex;
-  gap: 1rem;
-  padding: 1rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: var(--transition-fast);
-}
-
-.notification-item:hover {
-  background: var(--surface-hover);
-  border-color: var(--border-hover);
-}
-
-.notification-icon {
-  flex-shrink: 0;
-  display: flex;
-  align-items: flex-start;
-  padding-top: 2px;
-  color: var(--color-primary);
-}
-
-.notification-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.notification-message {
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: 0.25rem;
-}
-
-.notification-context {
+/* Notification badges row */
+.notification-badges {
   display: flex;
   gap: 0.75rem;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
   margin-bottom: 0.5rem;
 }
 
-.notification-thread {
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.notification-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
 }
 
-.notification-date {
-  flex-shrink: 0;
+.notification-badge.likes {
+  background: rgba(34, 197, 94, 0.1);
+  color: rgb(34, 197, 94);
 }
 
-.notification-preview {
+.notification-badge.dislikes {
+  background: rgba(239, 68, 68, 0.1);
+  color: rgb(239, 68, 68);
+}
+
+.notification-panda-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Notification date in thread info */
+.author-post-thread-info .notification-date {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
+/* Post preview in notification - simplified card */
+.notification-post-preview {
+  padding: 0.75rem 1rem;
+}
+
+.notification-post-preview .post-content {
   font-size: 0.875rem;
   color: var(--text-secondary);
   overflow: hidden;
@@ -2039,7 +2023,7 @@
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 @media (max-width: 640px) {
@@ -2047,13 +2031,8 @@
     padding: 1rem;
   }
 
-  .notification-context {
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .notification-thread {
-    max-width: 100%;
+  .notification-badges {
+    flex-wrap: wrap;
   }
 }
 

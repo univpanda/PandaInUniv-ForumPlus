@@ -1,14 +1,20 @@
 import { useState, useCallback, useEffect } from 'react'
-import type { Thread, Post } from '../types'
+import type { Thread, Post, ThreadStub, PostStub } from '../types'
 
 export type View = 'list' | 'thread' | 'replies'
+
+/** Thread can be full or stub when navigating by ID */
+export type SelectedThread = Thread | ThreadStub | null
+
+/** Post can be full or stub when navigating by ID */
+export type SelectedPost = Post | PostStub | null
 
 const STORAGE_KEY = 'discussionNav'
 
 interface StoredNavState {
   view: View
-  thread: Thread | null
-  post: Post | null
+  thread: SelectedThread
+  post: SelectedPost
 }
 
 // Parse stored state from localStorage
@@ -45,8 +51,8 @@ export function useDiscussionNavigation({
   // Initialize from stored state
   const [initialized] = useState(() => getStoredNavState())
   const [view, setView] = useState<View>(initialized.view)
-  const [selectedThread, setSelectedThread] = useState<Thread | null>(initialized.thread)
-  const [selectedPost, setSelectedPost] = useState<Post | null>(initialized.post)
+  const [selectedThread, setSelectedThread] = useState<SelectedThread>(initialized.thread)
+  const [selectedPost, setSelectedPost] = useState<SelectedPost>(initialized.post)
 
   // Persist state changes to localStorage
   useEffect(() => {
@@ -90,24 +96,31 @@ export function useDiscussionNavigation({
     setView('thread')
   }, [])
 
-  // Navigate to thread by ID (for notifications) - creates minimal thread object
+  // Navigate to thread by ID (for notifications) - creates stub object
   const openThreadById = useCallback((threadId: number) => {
-    // Create a minimal thread object - the actual data will be fetched by queries
-    setSelectedThread({ id: threadId, title: '' } as Thread)
+    // Create a stub - actual data will be fetched and resolved by queries
+    const stub: ThreadStub = { id: threadId }
+    setSelectedThread(stub)
     setView('thread')
   }, [])
 
-  // Navigate to replies view by IDs (for notifications) - creates minimal objects
+  // Navigate to replies view by IDs (for notifications) - creates stub objects
   const openRepliesById = useCallback((threadId: number, postId: number) => {
-    // Create minimal objects - actual data will be fetched by queries
-    setSelectedThread({ id: threadId, title: '' } as Thread)
-    setSelectedPost({ id: postId } as Post)
+    // Create stubs - actual data will be fetched and resolved by queries
+    const threadStub: ThreadStub = { id: threadId }
+    const postStub: PostStub = { id: postId }
+    setSelectedThread(threadStub)
+    setSelectedPost(postStub)
     setView('replies')
   }, [])
 
   // Update selected post optimistically (for voting)
+  // Only updates if we have a full Post, not a stub
   const updateSelectedPost = useCallback((updater: (post: Post) => Post) => {
-    setSelectedPost((prev) => (prev ? updater(prev) : null))
+    setSelectedPost((prev) => {
+      if (!prev || !('content' in prev)) return prev  // Skip if null or stub
+      return updater(prev)
+    })
   }, [])
 
   return {

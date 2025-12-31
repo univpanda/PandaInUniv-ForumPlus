@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import {
   useBookmarks,
   usePostBookmarks,
@@ -11,14 +11,14 @@ import {
 import { useDiscussionPagination } from './useDiscussionPagination'
 import { useThreadListData } from './useThreadListData'
 import { usePostViewData } from './usePostViewData'
-import type { View } from './useDiscussionNavigation'
+import type { View, SelectedThread, SelectedPost } from './useDiscussionNavigation'
 import type { SortBy, ReplySortBy, SearchMode } from './useDiscussionFilters'
-import type { Thread, Post, BookmarkedPost } from '../types'
+import type { BookmarkedPost } from '../types'
 
 interface UseDiscussionPostsProps {
   view: View
-  selectedThread: Thread | null
-  selectedPost: Post | null
+  selectedThread: SelectedThread
+  selectedPost: SelectedPost
   sortBy: SortBy
   replySortBy: ReplySortBy
   isBookmarksView: boolean
@@ -72,13 +72,16 @@ export function useDiscussionPosts({
     authorUsername !== null || postType !== 'all' || isDeleted || isFlagged ||
     (searchMode === 'posts' && searchText !== null)
 
+  // Stable empty set fallback (prevents new object creation on each render)
+  const emptySet = useMemo(() => new Set<number>(), [])
+
   // Bookmarks query (thread bookmarks)
   const bookmarksQuery = useBookmarks(userId)
-  const bookmarks = bookmarksQuery.data ?? new Set<number>()
+  const bookmarks = bookmarksQuery.data ?? emptySet
 
   // Post bookmarks query
   const postBookmarksQuery = usePostBookmarks(userId)
-  const postBookmarks = postBookmarksQuery.data ?? new Set<number>()
+  const postBookmarks = postBookmarksQuery.data ?? emptySet
 
   // Thread list data (paginated threads - not used in bookmarks view or posts search mode)
   const threadListData = useThreadListData({
@@ -174,10 +177,12 @@ export function useDiscussionPosts({
     // Data
     threads: threadListData.threads,
     posts: postViewData.rawPosts,
+    postsById: postViewData.postsById,
     bookmarks,
     postBookmarks,
     bookmarkedPosts: bookmarkedPostsQuery.data?.posts ?? ([] as BookmarkedPost[]),
     originalPost: postViewData.originalPost,
+    resolvedSelectedPost: postViewData.resolvedSelectedPost,
     replies: postViewData.replies,
     sortedSubReplies: postViewData.sortedSubReplies,
     postsSearchData: postViewData.postsSearchData,

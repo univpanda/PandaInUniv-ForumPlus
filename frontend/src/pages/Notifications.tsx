@@ -1,5 +1,7 @@
-import { useState, useCallback } from 'react'
-import { Bell } from 'lucide-react'
+import { useState, useCallback, useMemo } from 'react'
+import { Bell, MessageCircle } from 'lucide-react'
+import happyPanda from '../assets/happy-panda.png'
+import sadPanda from '../assets/sad-panda.png'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
 import {
@@ -8,30 +10,39 @@ import {
   useDismissAllNotifications,
 } from '../hooks/useNotificationQueries'
 import { Pagination } from '../components/Pagination'
+import { PostCard } from '../components/PostCard'
 import { EmptyState } from '../components/ui'
 import { formatRelativeTime } from '../utils/format'
 import { PAGE_SIZE } from '../utils/constants'
-import type { Notification } from '../types'
+import type { Notification, Post } from '../types'
 
 interface NotificationsProps {
   onNavigateToPost: (notification: Notification) => void
 }
 
-function getNotificationMessage(notification: Notification): string {
-  // Aggregated: replies + votes on your post
-  const parts: string[] = []
-  if (notification.reply_count > 0) {
-    parts.push(`${notification.reply_count} ${notification.reply_count === 1 ? 'reply' : 'replies'}`)
+// Convert notification to Post for PostCard display
+function notificationToPost(notification: Notification): Post {
+  return {
+    id: notification.post_id,
+    thread_id: notification.thread_id,
+    parent_id: notification.post_parent_id,
+    author_id: notification.post_author_id,
+    author_name: notification.post_author_name || 'Unknown',
+    author_avatar: notification.post_author_avatar,
+    content: notification.post_content || '',
+    created_at: notification.post_created_at,
+    edited_at: null,
+    likes: notification.post_likes || 0,
+    dislikes: notification.post_dislikes || 0,
+    user_vote: null,
+    reply_count: notification.post_reply_count || 0,
+    is_flagged: false,
+    flag_reason: null,
+    is_deleted: false,
+    deleted_by: null,
+    is_author_deleted: false,
+    additional_comments: null,
   }
-  if (notification.upvotes > 0) {
-    parts.push(`${notification.upvotes} ${notification.upvotes === 1 ? 'like' : 'likes'}`)
-  }
-  if (notification.downvotes > 0) {
-    parts.push(`${notification.downvotes} ${notification.downvotes === 1 ? 'dislike' : 'dislikes'}`)
-  }
-  return parts.length > 0
-    ? `Your post received ${parts.join(' and ')}`
-    : 'Activity on your post'
 }
 
 export function Notifications({ onNavigateToPost }: NotificationsProps) {
@@ -47,18 +58,20 @@ export function Notifications({ onNavigateToPost }: NotificationsProps) {
   const totalCount = data?.totalCount || 0
   const totalPages = Math.ceil(totalCount / PAGE_SIZE.POSTS)
 
+  // Memoize notification-to-post conversions to prevent PostCard re-renders
+  const notificationPosts = useMemo(
+    () => notifications.map((n) => ({ notification: n, post: notificationToPost(n) })),
+    [notifications]
+  )
+
   const handleNotificationClick = useCallback(
-    async (notification: Notification) => {
-      try {
-        // Dismiss the notification first
-        await dismissNotification.mutateAsync(notification.id)
-      } catch {
-        showError('Failed to dismiss notification')
-      }
-      // Navigate to the post regardless of dismiss success
+    (notification: Notification) => {
+      // Navigate immediately for better UX - don't block on dismiss
       onNavigateToPost(notification)
+      // Dismiss in background - errors are non-critical since user already navigated
+      dismissNotification.mutate(notification.id)
     },
-    [dismissNotification, onNavigateToPost, showError]
+    [dismissNotification, onNavigateToPost]
   )
 
   const handleDismissAll = useCallback(() => {
@@ -105,42 +118,64 @@ export function Notifications({ onNavigateToPost }: NotificationsProps) {
 
       {isLoading ? (
         <div className="notifications-loading">Loading...</div>
-      ) : notifications.length === 0 ? (
+      ) : notificationPosts.length === 0 ? (
         <EmptyState
           icon={Bell}
           description="No notifications yet. You'll be notified when someone interacts with your posts."
         />
       ) : (
-        <div className="notifications-list">
-          {notifications.map((notification) => (
-            <div
-              key={notification.id}
-              className="notification-item"
-              onClick={() => handleNotificationClick(notification)}
-            >
-              <div className="notification-icon">
-                <Bell size={16} />
-              </div>
-              <div className="notification-content">
-                <div className="notification-message">
-                  {getNotificationMessage(notification)}
-                </div>
-                <div className="notification-context">
-                  <span className="notification-thread">
-                    in: {notification.thread_title}
+        <div className="author-posts-list">
+          {notificationPosts.map(({ notification, post }) => {
+            // Skip rendering if notification data is incomplete (post_id is required)
+            if (!notification.post_id) {
+              return null
+            }
+            return (
+              <div key={notification.id} className="author-post-item">
+                {/* Thread header - same style as search */}
+                <div className="author-post-thread-info">
+                  <span className="thread-link-btn" style={{ cursor: 'default' }}>
+                    In thread: {notification.thread_title}
                   </span>
                   <span className="notification-date">
                     {formatRelativeTime(notification.updated_at)}
                   </span>
                 </div>
-                {notification.post_content && (
-                  <div className="notification-preview">
-                    {notification.post_content}
-                  </div>
-                )}
+                {/* Activity badges - what triggered the notification */}
+                <div className="notification-badges">
+                  {notification.new_reply_count > 0 && (
+                    <span className="reply-count-badge">
+                      <MessageCircle size={14} />
+                      {notification.new_reply_count} new {notification.new_reply_count === 1 ? 'reply' : 'replies'}
+                    </span>
+                  )}
+                  {notification.new_upvotes > 0 && (
+                    <span className="notification-badge likes">
+                      <img src={happyPanda} alt="" className="notification-panda-icon" />
+                      {notification.new_upvotes} new
+                    </span>
+                  )}
+                  {notification.new_downvotes > 0 && (
+                    <span className="notification-badge dislikes">
+                      <img src={sadPanda} alt="" className="notification-panda-icon" />
+                      {notification.new_downvotes} new
+                    </span>
+                  )}
+                </div>
+                {/* Full post card - same as search results */}
+                <div
+                  className="author-post-card-wrapper"
+                  onClick={() => handleNotificationClick(notification)}
+                >
+                  <PostCard
+                    post={post}
+                    user={user}
+                    variant="reply"
+                  />
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

@@ -27,15 +27,10 @@ export function useDiscussionForms() {
   // Toggle inline reply to a post
   const toggleReplyToPost = useCallback((post: Post, e: React.MouseEvent) => {
     e.stopPropagation()
-    setReplyingToPost((current) => {
-      if (current?.id === post.id) {
-        setInlineReplyContent('')
-        return null
-      } else {
-        setInlineReplyContent('')
-        return post
-      }
-    })
+    // Always clear content when toggling (both branches did this)
+    setInlineReplyContent('')
+    // Toggle: close if same post, open if different
+    setReplyingToPost((current) => (current?.id === post.id ? null : post))
   }, [])
 
   // Clear new thread form

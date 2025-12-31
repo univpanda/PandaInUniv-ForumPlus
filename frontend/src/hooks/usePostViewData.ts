@@ -2,14 +2,15 @@ import { useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePosts, usePaginatedPosts, usePaginatedAuthorPosts, forumKeys } from './useForumQueries'
 import { PAGE_SIZE } from '../utils/constants'
-import type { View } from './useDiscussionNavigation'
+import { isPostStub } from '../types'
+import type { View, SelectedThread, SelectedPost } from './useDiscussionNavigation'
 import type { ReplySortBy } from './useDiscussionFilters'
-import type { Thread, Post, AuthorPost } from '../types'
+import type { Post, AuthorPost } from '../types'
 
 interface UsePostViewDataProps {
   view: View
-  selectedThread: Thread | null
-  selectedPost: Post | null
+  selectedThread: SelectedThread
+  selectedPost: SelectedPost
   replySortBy: ReplySortBy
   repliesPage: number
   subRepliesPage: number
@@ -28,8 +29,12 @@ export interface PostViewDataReturn {
 
   // Computed post data
   originalPost: Post | undefined
+  resolvedSelectedPost: Post | undefined
   replies: Post[]
   sortedSubReplies: Post[]
+
+  // Post lookup cache for O(1) access
+  postsById: Map<number, Post>
 
   // Posts search data
   postsSearchData: AuthorPost[]
@@ -94,7 +99,8 @@ export function usePostViewData({
   )
 
   // Sub-replies query for replies view - server-side sorted
-  const hasSubReplies = view === 'replies' && (selectedPost?.reply_count ?? 0) > 0
+  // Only check reply_count if we have a full Post (not a stub)
+  const hasSubReplies = view === 'replies' && selectedPost && !isPostStub(selectedPost) && selectedPost.reply_count > 0
   const paginatedSubRepliesQuery = usePaginatedPosts(
     threadId ?? 0,
     selectedPost?.id ?? 0,
@@ -113,6 +119,24 @@ export function usePostViewData({
     threadId ?? 0,
     null,
     view === 'replies' && threadId !== null && !cachedRootPosts
+  )
+
+  // Get OP ID for replies view (needed to fetch level-1 replies where selectedPost lives)
+  const repliesViewOpId = useMemo(() => {
+    if (view !== 'replies') return null
+    const rootPosts = cachedRootPosts ?? threadRootPostsQuery.data ?? []
+    const op = rootPosts.find((p) => p.parent_id === null)
+    return op?.id ?? null
+  }, [view, cachedRootPosts, threadRootPostsQuery.data])
+
+  // Check if selectedPost is a stub (only has id, missing content)
+  const isSelectedPostStub = view === 'replies' && isPostStub(selectedPost)
+
+  // Fetch level-1 replies to find selectedPost when it's a stub
+  const level1RepliesQuery = usePosts(
+    threadId ?? 0,
+    repliesViewOpId ?? 0,
+    view === 'replies' && threadId !== null && repliesViewOpId !== null && isSelectedPostStub
   )
 
   // Paginated posts search query (searches all posts when searchMode is 'posts')
@@ -147,6 +171,16 @@ export function usePostViewData({
     return { originalPost: original, replies: paginatedReplies }
   }, [postsQuery.data, paginatedRepliesQuery.data, view, cachedRootPosts, threadRootPostsQuery.data])
 
+  // Resolve selectedPost from fetched data when it's a stub
+  const resolvedSelectedPost = useMemo(() => {
+    if (view !== 'replies' || !selectedPost) return undefined
+    // If selectedPost is a full Post (not a stub), use it as-is
+    if (!isPostStub(selectedPost)) return selectedPost
+    // Otherwise, find it in the level-1 replies
+    const level1Replies = level1RepliesQuery.data ?? []
+    return level1Replies.find((p) => p.id === selectedPost.id)
+  }, [view, selectedPost, level1RepliesQuery.data])
+
   // Sub-replies for replies view
   const sortedSubReplies = useMemo(() => {
     if (view !== 'replies') return []
@@ -156,12 +190,24 @@ export function usePostViewData({
   // Posts search data
   const postsSearchData = paginatedPostsSearchQuery.data?.posts ?? []
 
+  // Post lookup cache for O(1) access by ID (used by vote actions)
+  const postsById = useMemo(() => {
+    const map = new Map<number, Post>()
+    // Add all posts from various sources
+    rawPosts.forEach((p) => map.set(p.id, p))
+    replies.forEach((p) => map.set(p.id, p))
+    sortedSubReplies.forEach((p) => map.set(p.id, p))
+    if (originalPost) map.set(originalPost.id, originalPost)
+    return map
+  }, [rawPosts, replies, sortedSubReplies, originalPost])
+
   // ============ LOADING & ERROR STATES ============
 
   const needsRootPostsLoading = !cachedRootPosts && threadRootPostsQuery.isLoading
+  const needsLevel1RepliesLoading = isSelectedPostStub && level1RepliesQuery.isLoading
   const isLoading =
     (view === 'thread' && (postsQuery.isLoading || (opId !== null && paginatedRepliesQuery.isLoading))) ||
-    (view === 'replies' && ((hasSubReplies && paginatedSubRepliesQuery.isLoading) || needsRootPostsLoading))
+    (view === 'replies' && ((hasSubReplies && paginatedSubRepliesQuery.isLoading) || needsRootPostsLoading || needsLevel1RepliesLoading))
 
   const isError =
     (view === 'thread' && (postsQuery.isError || paginatedRepliesQuery.isError)) ||
@@ -170,8 +216,10 @@ export function usePostViewData({
   return {
     rawPosts,
     originalPost,
+    resolvedSelectedPost,
     replies,
     sortedSubReplies,
+    postsById,
     postsSearchData,
     postsSearchLoading: paginatedPostsSearchQuery.isLoading,
     postsSearchError: paginatedPostsSearchQuery.isError,

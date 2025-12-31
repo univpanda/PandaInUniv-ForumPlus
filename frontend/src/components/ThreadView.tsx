@@ -34,7 +34,7 @@ export function ThreadView() {
   return (
     <div className="thread-view">
       {/* Original Post */}
-      {originalPost && (
+      {originalPost && originalPost.content !== undefined && (
         <PostCard
           key={originalPost.id}
           post={originalPost}

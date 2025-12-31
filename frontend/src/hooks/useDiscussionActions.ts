@@ -138,19 +138,15 @@ export function useDiscussionActions({
       e.stopPropagation()
       if (!user) return
 
-      const isSelectedPostMatch = navigation.selectedPost?.id === postId
-      // Search through all available post arrays to find the post
-      const post = isSelectedPostMatch
-        ? navigation.selectedPost
-        : postsData.posts.find((p) => p.id === postId) ??
-          postsData.replies.find((p) => p.id === postId) ??
-          postsData.sortedSubReplies.find((p) => p.id === postId) ??
-          (postsData.originalPost?.id === postId ? postsData.originalPost : null)
+      // O(1) lookup using cached Map
+      const post = postsData.postsById.get(postId)
 
       if (!post) {
         toast.showError('Post not found')
         return
       }
+
+      const isSelectedPostMatch = navigation.selectedPost?.id === postId
 
       const prevVote = post.user_vote
       const prevLikes = post.likes
@@ -188,7 +184,7 @@ export function useDiscussionActions({
         }
       )
     },
-    [user, navigation.selectedPost, navigation.updateSelectedPost, postsData.posts, postsData.replies, postsData.sortedSubReplies, postsData.originalPost, postsData.voteMutation, toast]
+    [user, navigation.selectedPost, navigation.updateSelectedPost, postsData.postsById, postsData.voteMutation, toast]
   )
 
   // ============ Navigation Actions ============

@@ -1,5 +1,35 @@
 // Forum-related types
 
+/**
+ * Stub types for navigation - these represent incomplete data
+ * that will be resolved by queries before rendering.
+ * Using separate types prevents accidental access to missing fields.
+ */
+export interface ThreadStub {
+  id: number
+  title?: string  // May be empty when navigating by ID
+}
+
+export interface PostStub {
+  id: number
+  // All other fields are intentionally omitted
+  // The stub will be resolved to a full Post by usePostViewData
+}
+
+/** Type guard to check if a thread is a stub or full Thread */
+export function isThreadStub(thread: Thread | ThreadStub | null): thread is ThreadStub {
+  if (!thread) return false
+  // A stub has id but missing required fields like author_id
+  return !('author_id' in thread)
+}
+
+/** Type guard to check if a post is a stub or full Post */
+export function isPostStub(post: Post | PostStub | null): post is PostStub {
+  if (!post) return false
+  // A stub has id but missing required fields like content
+  return !('content' in post)
+}
+
 export interface PollOption {
   id: number
   option_text: string

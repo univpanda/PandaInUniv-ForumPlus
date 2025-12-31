@@ -4,8 +4,8 @@
 export type { Notification, NotificationType } from './notification'
 
 // Forum types
-export type { Thread, Post, FlaggedPost, AuthorPost, BookmarkedPost, Poll, PollOption, PollSettings } from './forum'
-export { flaggedPostToPost, authorPostToPost } from './forum'
+export type { Thread, Post, FlaggedPost, AuthorPost, BookmarkedPost, Poll, PollOption, PollSettings, ThreadStub, PostStub } from './forum'
+export { flaggedPostToPost, authorPostToPost, isThreadStub, isPostStub } from './forum'
 
 // User types
 export type { UserProfile, UserWithStats } from './user'

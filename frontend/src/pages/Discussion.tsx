@@ -270,9 +270,9 @@ export function Discussion({
         {nav.view === 'replies' &&
           !status.loading &&
           !status.queryError &&
-          nav.selectedPost &&
           nav.selectedThread &&
-          data.originalPost && (
+          data.originalPost &&
+          data.resolvedSelectedPost && (
             <DiscussionProvider
               core={{
                 user: auth.user,
@@ -292,7 +292,7 @@ export function Discussion({
               viewData={{
                 thread: nav.selectedThread,
                 originalPost: data.originalPost,
-                selectedPost: nav.selectedPost,
+                selectedPost: data.resolvedSelectedPost,
                 sortedSubReplies: data.sortedSubReplies,
                 replySortBy: sort.replySortBy,
                 replyContent: replyForm.replyContent,

@@ -165,6 +165,7 @@ export function useDiscussionPage({ resetToList }: UseDiscussionPageProps) {
     postBookmarks: postsData.postBookmarks,
     bookmarkedPosts: postsData.bookmarkedPosts,
     originalPost: postsData.originalPost,
+    resolvedSelectedPost: postsData.resolvedSelectedPost,
     replies: postsData.replies,
     sortedSubReplies: postsData.sortedSubReplies,
     postsSearchData: postsData.postsSearchData,
