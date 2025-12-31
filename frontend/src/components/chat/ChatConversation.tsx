@@ -1,6 +1,6 @@
 import { MessageCircle, FileText, EyeOff, UserX, UserCheck } from 'lucide-react'
-import happyPanda from '../../assets/happy-panda.png'
-import sadPanda from '../../assets/sad-panda.png'
+import happyPanda from '../../assets/webp/happy-panda.webp'
+import sadPanda from '../../assets/webp/sad-panda.webp'
 import { ChatMessageList } from './ChatMessageList'
 import { ChatInput } from './ChatInput'
 import { usePublicUserStats, useIsUserIgnored, useToggleIgnore } from '../../hooks'

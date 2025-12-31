@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import pandaTongue from '../../assets/panda-tongue.png'
+import pandaTongue from '../../assets/webp/panda-tongue.webp'
 
 interface VoteDisplayProps {
   likes: number

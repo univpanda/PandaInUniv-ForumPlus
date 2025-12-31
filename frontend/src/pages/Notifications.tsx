@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { Bell, MessageCircle } from 'lucide-react'
-import happyPanda from '../assets/happy-panda.png'
-import sadPanda from '../assets/sad-panda.png'
+import happyPanda from '../assets/webp/happy-panda.webp'
+import sadPanda from '../assets/webp/sad-panda.webp'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
 import {
