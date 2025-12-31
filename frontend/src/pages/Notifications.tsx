@@ -36,11 +36,14 @@ function notificationToPost(notification: Notification): Post {
     dislikes: notification.post_dislikes || 0,
     user_vote: null,
     reply_count: notification.post_reply_count || 0,
+    first_reply_content: null,
+    first_reply_author: null,
+    first_reply_avatar: null,
+    first_reply_date: null,
     is_flagged: false,
     flag_reason: null,
     is_deleted: false,
     deleted_by: null,
-    is_author_deleted: false,
     additional_comments: null,
   }
 }

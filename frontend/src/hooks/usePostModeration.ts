@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEditPost, useDeletePost } from './useForumQueries'
 import { forumKeys } from './forumQueryKeys'
 import { canEditContent } from '../utils/format'
-import type { Post, Thread, GetPaginatedPostsResponse } from '../types'
+import type { Post, Thread, ThreadStub, PostStub, GetPaginatedPostsResponse } from '../types'
 import type { View } from './useDiscussionNavigation'
 
 interface ModalState {
@@ -24,8 +24,8 @@ interface ModalActions {
 interface UsePostModerationProps {
   userId?: string
   view: View
-  selectedPost: Post | null
-  selectedThread: Thread | null
+  selectedPost: Post | PostStub | null
+  selectedThread: Thread | ThreadStub | null
   modalState: ModalState
   modalActions: ModalActions
   goToList: () => void
@@ -161,7 +161,8 @@ export function usePostModeration({
     modalActions.confirmDelete()
 
     const isOP = postToDelete.parent_id === null
-    const threadHasNoReplies = selectedThread && selectedThread.reply_count === 0
+    // Check if thread has no replies - only full Thread has reply_count
+    const threadHasNoReplies = selectedThread && 'reply_count' in selectedThread && selectedThread.reply_count === 0
     const cacheParentId = view === 'replies' ? (selectedPost?.id ?? null) : null
 
     deletePostMutation.mutate(

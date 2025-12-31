@@ -1,5 +1,5 @@
 import { createContext, useMemo } from 'react'
-import type { Post, Thread } from '../types'
+import type { Post, Thread, ThreadStub } from '../types'
 
 // Reply sort type
 export type ReplySortBy = 'popular' | 'new'
@@ -36,7 +36,7 @@ export interface DiscussionActionsProps {
 
 /** View-specific data (thread/replies views) */
 export interface DiscussionViewDataProps {
-  thread: Thread | null
+  thread: Thread | ThreadStub | null
   originalPost?: Post
   selectedPost?: Post | null
   replies?: Post[]
@@ -79,7 +79,7 @@ export interface DiscussionContextType {
 
 export interface DiscussionViewContextType {
   // Data
-  thread: Thread | null
+  thread: Thread | ThreadStub | null
   originalPost: Post | undefined
   selectedPost: Post | null
   replies: Post[]

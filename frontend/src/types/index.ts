@@ -1,11 +1,11 @@
 // Centralized type exports
 
 // Notification types
-export type { Notification, NotificationType } from './notification'
+export type { Notification } from './notification'
 
 // Forum types
 export type { Thread, Post, FlaggedPost, AuthorPost, BookmarkedPost, Poll, PollOption, PollSettings, ThreadStub, PostStub } from './forum'
-export { flaggedPostToPost, authorPostToPost, isThreadStub, isPostStub } from './forum'
+export { flaggedPostToPost, authorPostToPost, isThreadStub, isPostStub, isFullPost } from './forum'
 
 // User types
 export type { UserProfile, UserWithStats } from './user'

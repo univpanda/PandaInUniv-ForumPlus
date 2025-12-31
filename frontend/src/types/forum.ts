@@ -30,6 +30,12 @@ export function isPostStub(post: Post | PostStub | null): post is PostStub {
   return !('content' in post)
 }
 
+/** Type guard to check if a post is a full Post (not a stub) */
+export function isFullPost(post: Post | PostStub | null): post is Post {
+  if (!post) return false
+  return 'content' in post
+}
+
 export interface PollOption {
   id: number
   option_text: string

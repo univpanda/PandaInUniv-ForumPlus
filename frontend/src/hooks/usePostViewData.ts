@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePosts, usePaginatedPosts, usePaginatedAuthorPosts, forumKeys } from './useForumQueries'
 import { PAGE_SIZE } from '../utils/constants'
-import { isPostStub } from '../types'
+import { isPostStub, isFullPost } from '../types'
 import type { View, SelectedThread, SelectedPost } from './useDiscussionNavigation'
 import type { ReplySortBy } from './useDiscussionFilters'
 import type { Post, AuthorPost } from '../types'
@@ -100,14 +100,14 @@ export function usePostViewData({
 
   // Sub-replies query for replies view - server-side sorted
   // Only check reply_count if we have a full Post (not a stub)
-  const hasSubReplies = view === 'replies' && selectedPost && !isPostStub(selectedPost) && selectedPost.reply_count > 0
+  const hasSubReplies = view === 'replies' && isFullPost(selectedPost) && selectedPost.reply_count > 0
   const paginatedSubRepliesQuery = usePaginatedPosts(
     threadId ?? 0,
     selectedPost?.id ?? 0,
     subRepliesPage,
     PAGE_SIZE.POSTS,
     replySortBy,
-    view === 'replies' && threadId !== null && hasSubReplies
+    view === 'replies' && threadId !== null && !!hasSubReplies
   )
 
   // Root posts query for replies view (to show OP)
