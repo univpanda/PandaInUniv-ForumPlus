@@ -30,7 +30,7 @@ function getStoredPageSize(): number {
   } catch {
     // localStorage not available
   }
-  return PAGE_SIZE.FEEDBACK
+  return PAGE_SIZE.POSTS
 }
 
 interface UseChatConversationsProps {
@@ -70,7 +70,7 @@ export function useChatConversations({
 
   // Pagination state - only admins can use stored page size
   const [conversationsPage, setConversationsPage] = useState(1)
-  const initialPageSize = isAdmin ? getStoredPageSize() : PAGE_SIZE.FEEDBACK
+  const initialPageSize = isAdmin ? getStoredPageSize() : PAGE_SIZE.POSTS
   const [pageSize, setPageSize] = useState(initialPageSize)
 
   // Query

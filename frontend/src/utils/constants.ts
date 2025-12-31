@@ -46,7 +46,6 @@ export const RETRY_CONFIG = {
 export const PAGE_SIZE = {
   THREADS: 20, // Forum threads per page
   POSTS: 20, // Posts/replies per page
-  FEEDBACK: 20, // Chat conversations per page
   USERS: 50, // Users in admin panel per page
 } as const
 

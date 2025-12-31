@@ -63,6 +63,6 @@ export { useChatPageState } from './useChatPageState'
 
 
 // Utilities
-export { useOptimisticMutation, createOptimisticMutationOptions } from './useOptimisticMutation'
+export { useOptimisticMutation } from './useOptimisticMutation'
 export { useClickOutside } from './useClickOutside'
 export { usePrefetchUserData } from './usePrefetchUserData'

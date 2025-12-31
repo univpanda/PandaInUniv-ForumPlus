@@ -121,10 +121,8 @@ export function useDiscussionActions({
     (post: Post, e: React.MouseEvent) => {
       e.stopPropagation()
       if (!isAdmin) return
-      // Use the post's parent_id for cache invalidation - this matches the query key structure
-      const cacheParentId = post.parent_id ?? null
       postsData.toggleFlaggedMutation.mutate(
-        { postId: post.id, threadId: post.thread_id, parentId: cacheParentId },
+        { postId: post.id, threadId: post.thread_id },
         {
           onError: (err) =>
             toast.showError(err instanceof Error ? err.message : 'Failed to toggle flagged status'),

@@ -74,7 +74,7 @@ export function useConversationMessages(
       const { data, error } = await supabase.rpc('get_conversation_messages', {
         p_user_id: userId,
         p_partner_id: partnerId,
-        p_limit: PAGE_SIZE.FEEDBACK,
+        p_limit: PAGE_SIZE.POSTS,
         p_before_cursor: pageParam || null,
       })
 
@@ -82,7 +82,7 @@ export function useConversationMessages(
 
       const rawMessages = (data || []) as RawConversationMessage[]
       const messages = rawMessages.map(transformConversationMessage)
-      const hasMore = messages.length === PAGE_SIZE.FEEDBACK
+      const hasMore = messages.length === PAGE_SIZE.POSTS
       const nextCursor = hasMore ? messages[messages.length - 1]?.created_at : null
 
       return { messages, nextCursor, hasMore }

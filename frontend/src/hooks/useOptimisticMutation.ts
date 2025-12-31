@@ -165,18 +165,3 @@ export function useOptimisticMutation<TData, TVariables, TResult = void>(
   })
 }
 
-/**
- * Creates mutation options for use with useMutation directly.
- * Useful when you need more control over the mutation or want to add custom behavior.
- */
-export function createOptimisticMutationOptions<TData, TVariables, TResult = void>(
-  queryClient: QueryClient,
-  config: OptimisticMutationConfig<TData, TVariables, TResult>
-) {
-  const callbacks = buildMutationCallbacks<TData, TVariables, TResult>(queryClient, config)
-
-  return {
-    mutationFn: config.mutationFn,
-    ...callbacks,
-  }
-}

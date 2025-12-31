@@ -1,14 +1,15 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { STALE_TIME, PAGE_SIZE } from '../utils/constants'
 import { extractPaginatedResponse } from '../utils/queryHelpers'
 import { forumKeys } from './forumQueryKeys'
-import { useOptimisticMutation } from './useOptimisticMutation'
 import { userKeys } from './useUserQueries'
 import {
   extractSingleResult,
   type FlaggedPost,
   type GetPaginatedFlaggedPostsResponse,
+  type GetPaginatedPostsResponse,
+  type Post,
   type ToggleFlaggedResponse,
 } from '../types'
 
@@ -36,21 +37,16 @@ export function usePaginatedFlaggedPosts(
 }
 
 // Toggle post flagged status (admin only)
-// Uses targeted invalidation instead of broad cache updates for better performance
+// Uses same pattern as useVotePost/useEditPost for consistent cache handling
 export function useToggleFlagged() {
   const queryClient = useQueryClient()
 
   interface ToggleFlaggedVariables {
     postId: number
     threadId: number
-    parentId: number | null
   }
 
-  return useOptimisticMutation<
-    FlaggedPost[],
-    ToggleFlaggedVariables,
-    ToggleFlaggedResponse
-  >({
+  return useMutation<ToggleFlaggedResponse, Error, ToggleFlaggedVariables, { previousData: Map<string, unknown> }>({
     mutationFn: async ({ postId }): Promise<ToggleFlaggedResponse> => {
       const { data, error } = await supabase.rpc('toggle_post_flagged', {
         p_post_id: postId,
@@ -62,24 +58,64 @@ export function useToggleFlagged() {
       }
       return result
     },
-    cacheUpdates: [
-      // Optimistically remove from flagged posts list (for unflagging)
-      {
-        queryKey: forumKeys.flaggedPosts(),
-        updater: (flaggedPosts, { postId }) => {
-          if (!flaggedPosts) return flaggedPosts
-          return flaggedPosts.filter((post) => post.id !== postId)
-        },
-      },
-    ],
-    invalidateOnSettled: true, // Refetch flaggedPosts after mutation settles
-    invalidateKeys: [
-      userKeys.all, // Update user flagged counts in admin panel
-    ],
-    onSuccess: (_data, { threadId, parentId }) => {
-      // Invalidate only the specific thread's posts (both paginated and non-paginated)
-      // Uses prefix matching: posts key is prefix of paginatedPosts key
-      queryClient.invalidateQueries({ queryKey: forumKeys.posts(threadId, parentId) })
+
+    onMutate: async ({ postId, threadId }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['forum', 'posts', threadId] })
+
+      const previousData = new Map<string, unknown>()
+      const cache = queryClient.getQueryCache()
+
+      // Find all post caches for this thread (matches both Post[] and paginated formats)
+      const queries = cache.findAll({ queryKey: ['forum', 'posts', threadId] })
+
+      for (const query of queries) {
+        const key = query.queryKey
+        const data = query.state.data
+        if (!data) continue
+
+        // Handle paginated format: { posts: Post[], totalCount: number }
+        if (typeof data === 'object' && 'posts' in data && Array.isArray((data as GetPaginatedPostsResponse).posts)) {
+          const paginatedData = data as GetPaginatedPostsResponse
+          if (paginatedData.posts.some((p) => p.id === postId)) {
+            previousData.set(JSON.stringify(key), paginatedData)
+            queryClient.setQueryData<GetPaginatedPostsResponse>(key, {
+              ...paginatedData,
+              posts: paginatedData.posts.map((p) =>
+                p.id === postId ? { ...p, is_flagged: !p.is_flagged } : p
+              ),
+            })
+          }
+        }
+        // Handle legacy format: Post[]
+        else if (Array.isArray(data)) {
+          const posts = data as Post[]
+          if (posts.some((p) => p.id === postId)) {
+            previousData.set(JSON.stringify(key), posts)
+            queryClient.setQueryData<Post[]>(
+              key,
+              posts.map((p) => (p.id === postId ? { ...p, is_flagged: !p.is_flagged } : p))
+            )
+          }
+        }
+      }
+
+      return { previousData }
+    },
+
+    onError: (_err, _variables, context) => {
+      // Rollback on error
+      if (context?.previousData) {
+        for (const [keyStr, data] of context.previousData) {
+          queryClient.setQueryData(JSON.parse(keyStr), data)
+        }
+      }
+    },
+
+    onSettled: () => {
+      // Refetch flagged posts list and user stats
+      queryClient.invalidateQueries({ queryKey: forumKeys.flaggedPosts() })
+      queryClient.invalidateQueries({ queryKey: userKeys.all })
     },
   })
 }
