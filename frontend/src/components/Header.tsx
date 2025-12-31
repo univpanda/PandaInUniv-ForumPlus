@@ -1,8 +1,8 @@
 import { memo } from 'react'
-import { FileText, Users, MessagesSquare, User } from 'lucide-react'
+import { FileText, Users, MessagesSquare, User, Bell } from 'lucide-react'
 import { AuthButton } from './AuthButton'
 
-export type Tab = 'discussion' | 'chat' | 'users' | 'profile'
+export type Tab = 'discussion' | 'chat' | 'users' | 'profile' | 'notifications'
 
 interface HeaderProps {
   activeTab: Tab
@@ -10,9 +10,11 @@ interface HeaderProps {
   user: { id: string } | null
   isAdmin: boolean
   chatUnread: number
+  notificationCount: number
   showTerms: boolean
   onDiscussionClick: () => void
   onChatClick: () => void
+  onNotificationsClick: () => void
   onUsersHover?: () => void
 }
 
@@ -22,9 +24,11 @@ export const Header = memo(function Header({
   user,
   isAdmin,
   chatUnread,
+  notificationCount,
   showTerms,
   onDiscussionClick,
   onChatClick,
+  onNotificationsClick,
   onUsersHover,
 }: HeaderProps) {
   return (
@@ -55,6 +59,16 @@ export const Header = memo(function Header({
             <MessagesSquare size={18} />
             Den
             {chatUnread > 0 && <span className="header-tab-badge">{chatUnread}</span>}
+          </button>
+        )}
+        {user && (
+          <button
+            className={`header-tab ${activeTab === 'notifications' ? 'active' : ''}`}
+            onClick={onNotificationsClick}
+          >
+            <Bell size={18} />
+            Alerts
+            {notificationCount > 0 && <span className="header-tab-badge">{notificationCount}</span>}
           </button>
         )}
         {isAdmin && (

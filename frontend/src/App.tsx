@@ -8,15 +8,18 @@ import { Discussion } from './pages/Discussion'
 import { UserManagement } from './pages/UserManagement'
 import { Chat } from './pages/Chat'
 import { Profile } from './pages/Profile'
+import { Notifications } from './pages/Notifications'
 import { Terms } from './pages/Terms'
 import { AlertBanner, ToastContainer } from './components/ui'
 import { useAuth } from './hooks/useAuth'
 import { ToastProvider } from './contexts/ToastContext'
 import { useUnreadMessageCount } from './hooks/useChatQueries'
+import { useNotificationCount } from './hooks/useNotificationQueries'
 import { usePrefetchUsers } from './hooks/useUserQueries'
 import { usePrefetchUserData } from './hooks/usePrefetchUserData'
 import type { StartChatEvent } from './components/UserNameHover'
 import type { SearchDiscussionEvent } from './components/AuthButton'
+import type { Notification } from './types'
 import './styles/index.css'
 
 // Configure React Query to use page visibility for focus detection
@@ -62,7 +65,7 @@ const TAB_STORAGE_KEY = 'activeTab'
 const getStoredTab = (): Tab => {
   try {
     const stored = localStorage.getItem(TAB_STORAGE_KEY)
-    if (stored && ['discussion', 'chat', 'users', 'profile'].includes(stored)) {
+    if (stored && ['discussion', 'chat', 'users', 'profile', 'notifications'].includes(stored)) {
       return stored as Tab
     }
   } catch {
@@ -89,6 +92,11 @@ function AppContent() {
   const [initialDiscussionSearch, setInitialDiscussionSearch] = useState<{
     searchQuery: string
   } | null>(null)
+  const [initialDiscussionNavigation, setInitialDiscussionNavigation] = useState<{
+    threadId: number
+    postId: number
+    postParentId: number | null
+  } | null>(null)
 
   // Persist tab to localStorage
   useEffect(() => {
@@ -97,6 +105,7 @@ function AppContent() {
 
   // React Query hooks for unread counts
   const { data: chatUnread } = useUnreadMessageCount(user?.id || null)
+  const { data: notificationCount } = useNotificationCount(user?.id || null)
   const prefetchUsers = usePrefetchUsers()
   const prefetchUserData = usePrefetchUserData()
 
@@ -156,6 +165,11 @@ function AppContent() {
     setInitialDiscussionSearch(null)
   }, [])
 
+  // Clear initial navigation after Discussion component consumes it
+  const clearInitialDiscussionNavigation = useCallback(() => {
+    setInitialDiscussionNavigation(null)
+  }, [])
+
   // Track if initial load is complete (active tab has loaded)
   const [initialLoadComplete, setInitialLoadComplete] = useState(false)
 
@@ -203,6 +217,23 @@ function AppContent() {
     // Note: Badge clears automatically when Chat component marks messages as read
   }
 
+  const handleNotificationsClick = () => {
+    setActiveTab('notifications')
+  }
+
+  // Handle navigation from notification to post
+  const handleNavigateToPost = useCallback((notification: Notification) => {
+    // Navigate to the post - post_parent_id determines view:
+    // null = Thread View (OP or direct reply), non-null = Replies View
+    setInitialDiscussionNavigation({
+      threadId: notification.thread_id,
+      postId: notification.post_id,
+      postParentId: notification.post_parent_id,
+    })
+    setActiveTab('discussion')
+    setShowTerms(false)
+  }, [])
+
   return (
     <div className="app">
       <Header
@@ -211,9 +242,11 @@ function AppContent() {
         user={user}
         isAdmin={isAdmin}
         chatUnread={chatUnread || 0}
+        notificationCount={notificationCount || 0}
         showTerms={showTerms}
         onDiscussionClick={handleDiscussionClick}
         onChatClick={handleChatClick}
+        onNotificationsClick={handleNotificationsClick}
         onUsersHover={handleUsersHover}
       />
 
@@ -235,6 +268,8 @@ function AppContent() {
               resetToList={discussionResetKey > 0 ? discussionResetKey : undefined}
               initialSearch={initialDiscussionSearch}
               onInitialSearchConsumed={clearInitialDiscussionSearch}
+              initialNavigation={initialDiscussionNavigation}
+              onInitialNavigationConsumed={clearInitialDiscussionNavigation}
             />
           </ErrorBoundary>
         </div>
@@ -266,6 +301,14 @@ function AppContent() {
         <div className={`tab-content ${effectiveTab !== 'profile' || showTerms ? 'hidden' : ''}`}>
           <ErrorBoundary fallbackMessage="Failed to load profile. Please try again.">
             <Profile />
+          </ErrorBoundary>
+        </div>
+      )}
+
+      {user && shouldMountTab('notifications') && (
+        <div className={`tab-content ${effectiveTab !== 'notifications' || showTerms ? 'hidden' : ''}`}>
+          <ErrorBoundary fallbackMessage="Failed to load notifications. Please try again.">
+            <Notifications onNavigateToPost={handleNavigateToPost} />
           </ErrorBoundary>
         </div>
       )}

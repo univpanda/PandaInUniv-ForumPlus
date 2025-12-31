@@ -26,9 +26,21 @@ interface DiscussionProps {
     searchQuery: string
   } | null
   onInitialSearchConsumed?: () => void
+  initialNavigation?: {
+    threadId: number
+    postId: number
+    postParentId: number | null
+  } | null
+  onInitialNavigationConsumed?: () => void
 }
 
-export function Discussion({ resetToList, initialSearch, onInitialSearchConsumed }: DiscussionProps) {
+export function Discussion({
+  resetToList,
+  initialSearch,
+  onInitialSearchConsumed,
+  initialNavigation,
+  onInitialNavigationConsumed,
+}: DiscussionProps) {
   const {
     auth,
     nav,
@@ -55,6 +67,23 @@ export function Discussion({ resetToList, initialSearch, onInitialSearchConsumed
       onInitialSearchConsumed?.()
     }
   }, [initialSearch, onInitialSearchConsumed, nav.goToList, search.setSearchQuery])
+
+  // Handle direct navigation to a specific post (from notifications)
+  useEffect(() => {
+    if (initialNavigation) {
+      const { threadId, postId, postParentId } = initialNavigation
+
+      if (postParentId === null) {
+        // Post is the OP or a direct reply to OP - open thread view
+        nav.openThreadById(threadId)
+        nav.triggerHighlightPost(postId)
+      } else {
+        // Post is a reply (has a parent) - open replies view for that post
+        nav.openRepliesById(threadId, postId)
+      }
+      onInitialNavigationConsumed?.()
+    }
+  }, [initialNavigation, onInitialNavigationConsumed, nav.openThreadById, nav.openRepliesById, nav.triggerHighlightPost])
 
   return (
     <div className="discussion-container no-sidebar">

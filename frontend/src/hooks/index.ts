@@ -61,6 +61,14 @@ export {
 } from './useChatQueries'
 export { useChatPageState } from './useChatPageState'
 
+// Notification queries
+export {
+  useNotificationCount,
+  useNotifications,
+  useDismissNotification,
+  useDismissAllNotifications,
+  notificationKeys,
+} from './useNotificationQueries'
 
 // Utilities
 export { useOptimisticMutation } from './useOptimisticMutation'

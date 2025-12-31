@@ -110,9 +110,11 @@ export function useDiscussionPage({ resetToList }: UseDiscussionPageProps) {
     openThread: navigation.openThread,
     openThreadById: navigation.openThreadById,
     openReplies: actions.openReplies,
+    openRepliesById: navigation.openRepliesById,
     goToThreadFromTitle: navigation.goToThreadFromReplies,
     goToThread: goToThreadWithScroll,
     goToList: navigation.goToList,
+    triggerHighlightPost: scrollEffects.triggerHighlightPost,
   }
 
   const threadForm = {

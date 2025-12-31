@@ -97,6 +97,14 @@ export function useDiscussionNavigation({
     setView('thread')
   }, [])
 
+  // Navigate to replies view by IDs (for notifications) - creates minimal objects
+  const openRepliesById = useCallback((threadId: number, postId: number) => {
+    // Create minimal objects - actual data will be fetched by queries
+    setSelectedThread({ id: threadId, title: '' } as Thread)
+    setSelectedPost({ id: postId } as Post)
+    setView('replies')
+  }, [])
+
   // Update selected post optimistically (for voting)
   const updateSelectedPost = useCallback((updater: (post: Post) => Post) => {
     setSelectedPost((prev) => (prev ? updater(prev) : null))
@@ -112,6 +120,7 @@ export function useDiscussionNavigation({
     openThread,
     openThreadById,
     openReplies,
+    openRepliesById,
     goToList,
     goToThreadFromReplies,
     navigateToNewThread,

@@ -1379,7 +1379,8 @@ BEGIN
     RETURN;
   END IF;
 
-  SELECT forum_posts.is_flagged INTO v_current_flagged FROM forum_posts WHERE forum_posts.id = p_post_id;
+  SELECT forum_posts.is_flagged INTO v_current_flagged
+  FROM forum_posts WHERE forum_posts.id = p_post_id;
 
   IF v_current_flagged IS NULL THEN
     RETURN QUERY SELECT FALSE, FALSE, 'Post not found'::TEXT;
@@ -2086,6 +2087,268 @@ BEGIN
     'total_count', v_total,
     'is_private', FALSE
   );
+END;
+$$;
+
+
+-- =============================================================================
+-- NOTIFICATIONS
+-- =============================================================================
+
+-- Notifications table
+-- Aggregates votes AND replies to a specific post (one notification per post)
+CREATE TABLE IF NOT EXISTS notifications (
+  id SERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+  post_id INTEGER NOT NULL REFERENCES forum_posts(id) ON DELETE CASCADE,
+  thread_id INTEGER NOT NULL REFERENCES forum_threads(id) ON DELETE CASCADE,
+  reply_count INTEGER DEFAULT 0,
+  upvotes INTEGER DEFAULT 0,
+  downvotes INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, post_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_post ON notifications(post_id);
+
+-- RLS for notifications
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own notifications" ON notifications
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own notifications" ON notifications
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- Trigger: notify on reply (creates notification for parent post author)
+CREATE OR REPLACE FUNCTION notify_on_reply()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_parent_author_id UUID;
+  v_current_reply_count INTEGER;
+BEGIN
+  -- If replying to a specific post
+  IF NEW.parent_id IS NOT NULL THEN
+    SELECT author_id INTO v_parent_author_id
+    FROM forum_posts WHERE id = NEW.parent_id;
+
+    -- Notify parent post author (if not self)
+    IF v_parent_author_id IS NOT NULL AND v_parent_author_id != NEW.author_id THEN
+      -- Count current replies to this post (excluding the new one which isn't committed yet)
+      SELECT COUNT(*) + 1 INTO v_current_reply_count
+      FROM forum_posts WHERE parent_id = NEW.parent_id AND id != NEW.id;
+
+      INSERT INTO notifications (user_id, post_id, thread_id, reply_count)
+      VALUES (v_parent_author_id, NEW.parent_id, NEW.thread_id, v_current_reply_count)
+      ON CONFLICT (user_id, post_id)
+      DO UPDATE SET
+        reply_count = EXCLUDED.reply_count,
+        updated_at = NOW();
+    END IF;
+  END IF;
+
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  -- Don't fail the post creation if notification fails
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trigger_notify_on_reply ON forum_posts;
+CREATE TRIGGER trigger_notify_on_reply
+  AFTER INSERT ON forum_posts
+  FOR EACH ROW
+  EXECUTE FUNCTION notify_on_reply();
+
+-- Trigger: notify on vote (aggregated with replies)
+CREATE OR REPLACE FUNCTION notify_on_vote()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_post_author_id UUID;
+  v_thread_id INTEGER;
+  v_current_upvotes INTEGER;
+  v_current_downvotes INTEGER;
+BEGIN
+  SELECT author_id, thread_id INTO v_post_author_id, v_thread_id
+  FROM forum_posts WHERE id = NEW.post_id;
+
+  -- Don't notify for own votes
+  IF v_post_author_id = NEW.user_id THEN
+    RETURN NEW;
+  END IF;
+
+  -- Calculate current vote counts
+  SELECT
+    COALESCE(SUM(CASE WHEN vote_type = 1 THEN 1 ELSE 0 END), 0),
+    COALESCE(SUM(CASE WHEN vote_type = -1 THEN 1 ELSE 0 END), 0)
+  INTO v_current_upvotes, v_current_downvotes
+  FROM post_votes WHERE post_id = NEW.post_id;
+
+  -- Upsert notification (aggregated with replies)
+  INSERT INTO notifications (user_id, post_id, thread_id, upvotes, downvotes)
+  VALUES (v_post_author_id, NEW.post_id, v_thread_id, v_current_upvotes, v_current_downvotes)
+  ON CONFLICT (user_id, post_id)
+  DO UPDATE SET
+    upvotes = EXCLUDED.upvotes,
+    downvotes = EXCLUDED.downvotes,
+    updated_at = NOW();
+
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  -- Don't fail the vote if notification fails
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trigger_notify_on_vote_insert ON post_votes;
+CREATE TRIGGER trigger_notify_on_vote_insert
+  AFTER INSERT ON post_votes
+  FOR EACH ROW
+  EXECUTE FUNCTION notify_on_vote();
+
+DROP TRIGGER IF EXISTS trigger_notify_on_vote_update ON post_votes;
+CREATE TRIGGER trigger_notify_on_vote_update
+  AFTER UPDATE ON post_votes
+  FOR EACH ROW
+  EXECUTE FUNCTION notify_on_vote();
+
+-- Trigger: handle vote deletion (update counts, remove notification only if no votes AND no replies)
+CREATE OR REPLACE FUNCTION notify_on_vote_delete()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_post_author_id UUID;
+  v_current_upvotes INTEGER;
+  v_current_downvotes INTEGER;
+  v_reply_count INTEGER;
+BEGIN
+  SELECT author_id INTO v_post_author_id
+  FROM forum_posts WHERE id = OLD.post_id;
+
+  -- Recalculate vote counts
+  SELECT
+    COALESCE(SUM(CASE WHEN vote_type = 1 THEN 1 ELSE 0 END), 0),
+    COALESCE(SUM(CASE WHEN vote_type = -1 THEN 1 ELSE 0 END), 0)
+  INTO v_current_upvotes, v_current_downvotes
+  FROM post_votes WHERE post_id = OLD.post_id;
+
+  -- Get current reply count from notification
+  SELECT COALESCE(reply_count, 0) INTO v_reply_count
+  FROM notifications
+  WHERE user_id = v_post_author_id AND post_id = OLD.post_id;
+
+  -- If no more votes AND no replies, remove notification
+  IF v_current_upvotes = 0 AND v_current_downvotes = 0 AND COALESCE(v_reply_count, 0) = 0 THEN
+    DELETE FROM notifications
+    WHERE user_id = v_post_author_id AND post_id = OLD.post_id;
+  ELSE
+    -- Update counts
+    UPDATE notifications
+    SET upvotes = v_current_upvotes, downvotes = v_current_downvotes, updated_at = NOW()
+    WHERE user_id = v_post_author_id AND post_id = OLD.post_id;
+  END IF;
+
+  RETURN OLD;
+EXCEPTION WHEN OTHERS THEN
+  -- Don't fail the vote removal if notification update fails
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trigger_notify_on_vote_delete ON post_votes;
+CREATE TRIGGER trigger_notify_on_vote_delete
+  AFTER DELETE ON post_votes
+  FOR EACH ROW
+  EXECUTE FUNCTION notify_on_vote_delete();
+
+-- Get notification count
+CREATE OR REPLACE FUNCTION get_notification_count()
+RETURNS BIGINT
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT COUNT(*) FROM notifications WHERE user_id = auth.uid();
+$$;
+
+-- Get notifications with post/thread data
+CREATE OR REPLACE FUNCTION get_notifications(
+  p_limit INTEGER DEFAULT 50,
+  p_offset INTEGER DEFAULT 0
+)
+RETURNS TABLE (
+  id INTEGER,
+  post_id INTEGER,
+  thread_id INTEGER,
+  thread_title TEXT,
+  post_content TEXT,
+  post_parent_id INTEGER,
+  reply_count INTEGER,
+  upvotes INTEGER,
+  downvotes INTEGER,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ,
+  total_count BIGINT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_total BIGINT;
+BEGIN
+  SELECT COUNT(*) INTO v_total
+  FROM notifications n
+  WHERE n.user_id = auth.uid();
+
+  RETURN QUERY
+  SELECT
+    n.id,
+    n.post_id,
+    n.thread_id,
+    t.title,
+    LEFT(p.content, 200),
+    p.parent_id,
+    n.reply_count,
+    n.upvotes,
+    n.downvotes,
+    n.created_at,
+    n.updated_at,
+    v_total
+  FROM notifications n
+  JOIN forum_posts p ON p.id = n.post_id
+  JOIN forum_threads t ON t.id = n.thread_id
+  WHERE n.user_id = auth.uid()
+  ORDER BY n.updated_at DESC
+  LIMIT p_limit OFFSET p_offset;
+END;
+$$;
+
+-- Dismiss a single notification
+CREATE OR REPLACE FUNCTION dismiss_notification(p_notification_id INTEGER)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  DELETE FROM notifications
+  WHERE id = p_notification_id AND user_id = auth.uid();
+  RETURN FOUND;
+END;
+$$;
+
+-- Dismiss all notifications
+CREATE OR REPLACE FUNCTION dismiss_all_notifications()
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_count INTEGER;
+BEGIN
+  DELETE FROM notifications WHERE user_id = auth.uid();
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
 END;
 $$;
 
