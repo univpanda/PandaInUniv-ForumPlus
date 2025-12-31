@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { PostCard } from './PostCard'
 import { Pagination } from './Pagination'
 import { ReplyInput, ReplySortOptions, PollDisplay } from './discussion'
@@ -6,6 +7,7 @@ import {
   useDiscussionView,
   useDiscussionViewActions,
 } from '../contexts/DiscussionContext'
+import type { Post } from '../types'
 
 export function ThreadView() {
   const { user } = useDiscussion()
@@ -28,6 +30,17 @@ export function ThreadView() {
     onToggleReplyToPost,
     onOpenReplies,
   } = useDiscussionViewActions()
+
+  // Memoized handlers to prevent breaking PostCard's memo()
+  const handlePostClick = useCallback(
+    (post: Post) => onOpenReplies(post),
+    [onOpenReplies]
+  )
+
+  const handleReplyClick = useCallback(
+    (post: Post, e: React.MouseEvent) => onToggleReplyToPost(post, e),
+    [onToggleReplyToPost]
+  )
 
   if (!thread) return null
 
@@ -89,8 +102,8 @@ export function ThreadView() {
               post={post}
               variant="reply"
               threadId={thread.id}
-              onClick={() => onOpenReplies(post)}
-              onReplyClick={(e) => onToggleReplyToPost(post, e)}
+              onClick={handlePostClick}
+              onReplyClick={handleReplyClick}
               showSubReplyPreview={true}
             />
             {/* Inline reply form */}

@@ -61,6 +61,9 @@ export const ReplyInput = memo(function ReplyInput({
   const [isExpanded, setIsExpanded] = useState(autoFocus)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  // Use ref to avoid re-adding event listeners on every value change
+  const valueRef = useRef(value)
+  valueRef.current = value
 
   const editor = useEditor({
     extensions: [
@@ -95,15 +98,15 @@ export const ReplyInput = memo(function ReplyInput({
         const markdown = turndownService.turndown(html)
         onChange(markdown)
       }
+      // Force re-render to update button states on content changes
+      setForceUpdate(n => n + 1)
     },
     onSelectionUpdate: () => {
-      // Force re-render to update button states
+      // Force re-render to update button states (bold/italic/link active state)
       setForceUpdate(n => n + 1)
     },
-    onTransaction: () => {
-      // Force re-render on any transaction
-      setForceUpdate(n => n + 1)
-    },
+    // Note: Removed onTransaction - it fires too frequently and is redundant
+    // with onUpdate + onSelectionUpdate which cover all UI-relevant changes
   })
 
   // Sync external value changes (e.g., clearing after submit)
@@ -143,12 +146,13 @@ export const ReplyInput = memo(function ReplyInput({
   useClickOutside(emojiPickerRef, () => setShowEmojiPicker(false), showEmojiPicker)
 
   // Collapse when clicking outside (only if empty)
+  // Uses valueRef to avoid re-adding listeners on every keystroke
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
         containerRef.current &&
         !containerRef.current.contains(e.target as Node) &&
-        !value.trim()
+        !valueRef.current.trim()
       ) {
         setIsExpanded(false)
       }
@@ -157,7 +161,7 @@ export const ReplyInput = memo(function ReplyInput({
       document.addEventListener('mousedown', handleClickOutside)
     }
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isExpanded, value])
+  }, [isExpanded])
 
   // Expand when editor is focused
   const handleContainerClick = useCallback(() => {

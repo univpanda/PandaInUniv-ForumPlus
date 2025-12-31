@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { LogIn, EyeOff } from 'lucide-react'
 import { useDiscussionPage } from '../hooks/useDiscussionPage'
 import { DiscussionProvider } from '../contexts/DiscussionContext'
@@ -84,6 +84,125 @@ export function Discussion({
       onInitialNavigationConsumed?.()
     }
   }, [initialNavigation, onInitialNavigationConsumed, nav.openThreadById, nav.openRepliesById, nav.triggerHighlightPost])
+
+  // Memoize core props (shared between ThreadView and RepliesView)
+  const coreProps = useMemo(
+    () => ({
+      user: auth.user,
+      isAdmin: auth.isAdmin,
+      bookmarks: data.bookmarks,
+      postBookmarks: data.postBookmarks,
+    }),
+    [auth.user, auth.isAdmin, data.bookmarks, data.postBookmarks]
+  )
+
+  // Memoize action props (shared between ThreadView and RepliesView)
+  const actionProps = useMemo(
+    () => ({
+      onVote: postActions.votePost,
+      onToggleBookmark: postActions.toggleBookmark,
+      onTogglePostBookmark: postActions.togglePostBookmark,
+      onEdit: postActions.handleEditPost,
+      onDelete: postActions.handleDeletePost,
+      onUserDeletedClick: postActions.handleUserDeletedClick,
+      onToggleFlagged: postActions.toggleFlagged,
+    }),
+    [
+      postActions.votePost,
+      postActions.toggleBookmark,
+      postActions.togglePostBookmark,
+      postActions.handleEditPost,
+      postActions.handleDeletePost,
+      postActions.handleUserDeletedClick,
+      postActions.toggleFlagged,
+    ]
+  )
+
+  // Memoize viewData for ThreadView to prevent unnecessary context updates
+  const threadViewData = useMemo(
+    () => ({
+      thread: nav.selectedThread,
+      originalPost: data.originalPost,
+      replies: data.replies,
+      replySortBy: sort.replySortBy,
+      replyContent: replyForm.replyContent,
+      inlineReplyContent: replyForm.inlineReplyContent,
+      replyingToPost: replyForm.replyingToPost,
+      submitting: status.submitting,
+      repliesPagination: data.pagination.replies,
+    }),
+    [
+      nav.selectedThread,
+      data.originalPost,
+      data.replies,
+      sort.replySortBy,
+      replyForm.replyContent,
+      replyForm.inlineReplyContent,
+      replyForm.replyingToPost,
+      status.submitting,
+      data.pagination.replies,
+    ]
+  )
+
+  // Memoize viewActions for ThreadView
+  const threadViewActions = useMemo(
+    () => ({
+      onReplyContentChange: replyForm.setReplyContent,
+      onInlineReplyContentChange: replyForm.setInlineReplyContent,
+      onAddReply: replyForm.addReply,
+      onReplySortChange: sort.setReplySortBy,
+      onToggleReplyToPost: replyForm.toggleReplyToPost,
+      onOpenReplies: nav.openReplies,
+    }),
+    [
+      replyForm.setReplyContent,
+      replyForm.setInlineReplyContent,
+      replyForm.addReply,
+      sort.setReplySortBy,
+      replyForm.toggleReplyToPost,
+      nav.openReplies,
+    ]
+  )
+
+  // Memoize viewData for RepliesView
+  const repliesViewData = useMemo(
+    () => ({
+      thread: nav.selectedThread,
+      originalPost: data.originalPost,
+      selectedPost: data.resolvedSelectedPost,
+      sortedSubReplies: data.sortedSubReplies,
+      replySortBy: sort.replySortBy,
+      replyContent: replyForm.replyContent,
+      submitting: status.submitting,
+      subRepliesPagination: data.pagination.subReplies,
+    }),
+    [
+      nav.selectedThread,
+      data.originalPost,
+      data.resolvedSelectedPost,
+      data.sortedSubReplies,
+      sort.replySortBy,
+      replyForm.replyContent,
+      status.submitting,
+      data.pagination.subReplies,
+    ]
+  )
+
+  // Memoize viewActions for RepliesView
+  const repliesViewActions = useMemo(
+    () => ({
+      onReplyContentChange: replyForm.setReplyContent,
+      onAddReply: replyForm.addReply,
+      onReplySortChange: sort.setReplySortBy,
+      onGoToThread: nav.goToThread,
+    }),
+    [
+      replyForm.setReplyContent,
+      replyForm.addReply,
+      sort.setReplySortBy,
+      nav.goToThread,
+    ]
+  )
 
   return (
     <div className="discussion-container no-sidebar">
@@ -227,40 +346,10 @@ export function Discussion({
         {/* Thread View */}
         {nav.view === 'thread' && !status.loading && !status.queryError && nav.selectedThread && (
           <DiscussionProvider
-            core={{
-              user: auth.user,
-              isAdmin: auth.isAdmin,
-              bookmarks: data.bookmarks,
-              postBookmarks: data.postBookmarks,
-            }}
-            actions={{
-              onVote: postActions.votePost,
-              onToggleBookmark: postActions.toggleBookmark,
-              onTogglePostBookmark: postActions.togglePostBookmark,
-              onEdit: postActions.handleEditPost,
-              onDelete: postActions.handleDeletePost,
-              onUserDeletedClick: postActions.handleUserDeletedClick,
-              onToggleFlagged: postActions.toggleFlagged,
-            }}
-            viewData={{
-              thread: nav.selectedThread,
-              originalPost: data.originalPost,
-              replies: data.replies,
-              replySortBy: sort.replySortBy,
-              replyContent: replyForm.replyContent,
-              inlineReplyContent: replyForm.inlineReplyContent,
-              replyingToPost: replyForm.replyingToPost,
-              submitting: status.submitting,
-              repliesPagination: data.pagination.replies,
-            }}
-            viewActions={{
-              onReplyContentChange: replyForm.setReplyContent,
-              onInlineReplyContentChange: replyForm.setInlineReplyContent,
-              onAddReply: replyForm.addReply,
-              onReplySortChange: sort.setReplySortBy,
-              onToggleReplyToPost: replyForm.toggleReplyToPost,
-              onOpenReplies: nav.openReplies,
-            }}
+            core={coreProps}
+            actions={actionProps}
+            viewData={threadViewData}
+            viewActions={threadViewActions}
           >
             <ThreadView />
           </DiscussionProvider>
@@ -274,37 +363,10 @@ export function Discussion({
           data.originalPost &&
           data.resolvedSelectedPost && (
             <DiscussionProvider
-              core={{
-                user: auth.user,
-                isAdmin: auth.isAdmin,
-                bookmarks: data.bookmarks,
-                postBookmarks: data.postBookmarks,
-              }}
-              actions={{
-                onVote: postActions.votePost,
-                onToggleBookmark: postActions.toggleBookmark,
-                onTogglePostBookmark: postActions.togglePostBookmark,
-                onEdit: postActions.handleEditPost,
-                onDelete: postActions.handleDeletePost,
-                onUserDeletedClick: postActions.handleUserDeletedClick,
-                onToggleFlagged: postActions.toggleFlagged,
-              }}
-              viewData={{
-                thread: nav.selectedThread,
-                originalPost: data.originalPost,
-                selectedPost: data.resolvedSelectedPost,
-                sortedSubReplies: data.sortedSubReplies,
-                replySortBy: sort.replySortBy,
-                replyContent: replyForm.replyContent,
-                submitting: status.submitting,
-                subRepliesPagination: data.pagination.subReplies,
-              }}
-              viewActions={{
-                onReplyContentChange: replyForm.setReplyContent,
-                onAddReply: replyForm.addReply,
-                onReplySortChange: sort.setReplySortBy,
-                onGoToThread: nav.goToThread,
-              }}
+              core={coreProps}
+              actions={actionProps}
+              viewData={repliesViewData}
+              viewActions={repliesViewActions}
             >
               <RepliesView />
             </DiscussionProvider>

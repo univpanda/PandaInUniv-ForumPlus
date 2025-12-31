@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useState, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
 import katex from 'katex'
@@ -48,8 +48,8 @@ interface PostCardProps {
   post: Post
   variant?: 'original' | 'reply' | 'parent'
   replyCount?: number // Override for original post to show thread reply count
-  onClick?: () => void
-  onReplyClick?: (e: React.MouseEvent) => void
+  onClick?: (post: Post) => void
+  onReplyClick?: (post: Post, e: React.MouseEvent) => void
   showSubReplyPreview?: boolean
   // Bookmark/Share props (only used for original posts)
   threadId?: number
@@ -99,6 +99,10 @@ export const PostCard = memo(function PostCard({
   const isUserDeleted = post.deleted_by === post.author_id
   const isOwner = Boolean(user?.id && post.author_id && user.id === post.author_id)
 
+  // Wrap onClick to pass post - stable reference since onClick is memoized by parent
+  const handleClick = onClick ? () => onClick(post) : undefined
+  const handleReplyClick = onReplyClick ? (e: React.MouseEvent) => onReplyClick(post, e) : undefined
+
   // Get CSS class for post variant
   const variantClass =
     variant === 'original' ? 'original-post' : variant === 'parent' ? 'parent-post' : 'reply-card'
@@ -110,8 +114,8 @@ export const PostCard = memo(function PostCard({
     return (
       <div
         className={`post-card ${variantClass} compact deleted-post`}
-        onClick={onClick}
-        style={onClick ? { cursor: 'pointer' } : undefined}
+        onClick={handleClick}
+        style={handleClick ? { cursor: 'pointer' } : undefined}
       >
         {/* Header with date */}
         <div className="post-header">
@@ -150,11 +154,17 @@ export const PostCard = memo(function PostCard({
     ? safeContent.slice(0, CONTENT_LIMIT) + '...'
     : safeContent
 
+  // Memoize LaTeX processing - only recompute when content changes
+  const processedContent = useMemo(
+    () => processLatexTags(displayContent),
+    [displayContent]
+  )
+
   return (
     <div
       className={`post-card ${variantClass} compact ${hasReplies && variant === 'reply' ? 'has-replies' : ''} ${deletedClass} ${highlightClass}`}
-      onClick={onClick}
-      style={onClick ? { cursor: 'pointer' } : undefined}
+      onClick={handleClick}
+      style={handleClick ? { cursor: 'pointer' } : undefined}
       data-post-id={post.id}
     >
       {/* Post Header */}
@@ -178,7 +188,7 @@ export const PostCard = memo(function PostCard({
         {post.edited_at && (post.reply_count > 0 || post.likes > 0 || post.dislikes > 0) && (
           <><span className="edited-indicator">(edited)</span><br /></>
         )}
-        <ReactMarkdown rehypePlugins={[rehypeRaw]}>{processLatexTags(displayContent)}</ReactMarkdown>
+        <ReactMarkdown rehypePlugins={[rehypeRaw]}>{processedContent}</ReactMarkdown>
         {isLongContent && (
           <button
             className="show-more-btn"
@@ -217,7 +227,7 @@ export const PostCard = memo(function PostCard({
           post={post}
           variant={variant}
           displayReplyCount={displayReplyCount}
-          onReplyClick={onReplyClick}
+          onReplyClick={handleReplyClick}
           threadId={threadId}
           threadTitle={threadTitle}
           isBookmarked={isBookmarked}
@@ -227,7 +237,7 @@ export const PostCard = memo(function PostCard({
 
       {/* Sub-reply Preview */}
       {showSubReplyPreview && (
-        <SubReplyPreview post={post} displayReplyCount={displayReplyCount} onClick={onClick} />
+        <SubReplyPreview post={post} displayReplyCount={displayReplyCount} onClick={handleClick} />
       )}
     </div>
   )
