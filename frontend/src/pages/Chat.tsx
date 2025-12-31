@@ -73,9 +73,9 @@ export function Chat({ initialPartner, onInitialPartnerConsumed, resetToList }: 
 
   const handleIgnoreToggled = useCallback((username: string, isNowIgnored: boolean) => {
     if (isNowIgnored) {
-      toast.showSuccess(`${username} has been ignored`)
+      toast.showSuccess(`${username} has been shushed`)
     } else {
-      toast.showSuccess(`${username} has been unignored`)
+      toast.showSuccess(`${username} has been unshushed`)
     }
   }, [toast])
 
