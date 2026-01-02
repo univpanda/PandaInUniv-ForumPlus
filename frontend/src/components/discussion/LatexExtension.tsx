@@ -96,7 +96,7 @@ export const LatexNode = Node.create({
   },
 
   addKeyboardShortcuts() {
-    const self = this
+    const nodeName = this.name
     return {
       ArrowLeft: ({ editor }) => {
         const { state } = editor
@@ -106,7 +106,7 @@ export const LatexNode = Node.create({
         // Find if we're inside a latexNode at any depth
         let latexDepth = -1
         for (let d = $from.depth; d >= 0; d--) {
-          if ($from.node(d)?.type.name === self.name) {
+          if ($from.node(d)?.type.name === nodeName) {
             latexDepth = d
             break
           }
@@ -138,7 +138,7 @@ export const LatexNode = Node.create({
         // Find if we're inside a latexNode at any depth
         let latexDepth = -1
         for (let d = $from.depth; d >= 0; d--) {
-          if ($from.node(d)?.type.name === self.name) {
+          if ($from.node(d)?.type.name === nodeName) {
             latexDepth = d
             break
           }

@@ -32,6 +32,10 @@ export function extractPaginatedResponse<T>(
 ): PaginatedResponse<T> {
   const data = rawData ?? []
   const totalCount = data[0]?.total_count ?? 0
-  const items = data.map(({ total_count: _, ...item }) => item as T)
+  const items = data.map((row) => {
+    const { total_count: _totalCount, ...item } = row
+    void _totalCount
+    return item as T
+  })
   return { items, totalCount }
 }

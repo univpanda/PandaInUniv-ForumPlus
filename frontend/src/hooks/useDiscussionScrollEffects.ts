@@ -23,6 +23,7 @@ export function useDiscussionScrollEffects({
       if (parentPost) {
         parentPost.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShouldScrollToParent(false)
     }
   }, [shouldScrollToParent, view, loading])
@@ -48,6 +49,7 @@ export function useDiscussionScrollEffects({
       }
     }, 50 + ANIMATION_DURATION.HIGHLIGHT)
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShouldScrollToNewReply(false)
 
     return () => {
@@ -62,6 +64,7 @@ export function useDiscussionScrollEffects({
 
     const postElement = document.querySelector(`[data-post-id="${highlightPostId}"]`)
     if (!postElement) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHighlightPostId(null)
       return
     }

@@ -48,6 +48,7 @@ export function Chat({ initialPartner, onInitialPartnerConsumed, resetToList }: 
 
   // Sync pageSizeInput with the actual page size from hook
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPageSizeInput(String(pagination.conversations.pageSize))
   }, [pagination.conversations.pageSize])
 

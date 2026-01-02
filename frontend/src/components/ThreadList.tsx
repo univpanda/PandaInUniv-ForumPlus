@@ -3,7 +3,7 @@ import { MessageSquare } from 'lucide-react'
 import { formatRelativeTime } from '../utils/format'
 import type { Thread } from '../types'
 import { usePrefetchPosts } from '../hooks/useForumQueries'
-import { EmptyState, VoteDisplay, ReplyCount } from './ui'
+import { EmptyState, VoteDisplay, ReplyCount, BookmarkButton } from './ui'
 
 interface ThreadListProps {
   threads: Thread[]
@@ -15,10 +15,10 @@ interface ThreadListProps {
 
 export const ThreadList = memo(function ThreadList({
   threads,
-  bookmarks: _bookmarks,
-  user: _user,
+  bookmarks,
+  user,
   onOpenThread,
-  onToggleBookmark: _onToggleBookmark,
+  onToggleBookmark,
 }: ThreadListProps) {
   const prefetchPosts = usePrefetchPosts()
   if (threads.length === 0) {
@@ -49,6 +49,12 @@ export const ThreadList = memo(function ThreadList({
                 dislikes={thread.total_dislikes || 0}
               />
               <ReplyCount count={thread.reply_count} />
+              {user && (
+                <BookmarkButton
+                  isBookmarked={bookmarks.has(thread.id)}
+                  onClick={(e) => onToggleBookmark(thread.id, e)}
+                />
+              )}
             </div>
           </div>
         </div>

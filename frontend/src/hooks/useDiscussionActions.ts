@@ -184,7 +184,7 @@ export function useDiscussionActions({
         }
       )
     },
-    [user, navigation.selectedPost, navigation.updateSelectedPost, postsData.postsById, postsData.voteMutation, toast]
+    [user, navigation, postsData.postsById, postsData.voteMutation, toast]
   )
 
   // ============ Navigation Actions ============
@@ -193,7 +193,7 @@ export function useDiscussionActions({
       navigation.openReplies(post)
       scrollEffects.triggerScrollToParent()
     },
-    [navigation.openReplies, scrollEffects.triggerScrollToParent]
+    [navigation, scrollEffects]
   )
 
   const handleUserDeletedClick = useCallback(
@@ -217,14 +217,7 @@ export function useDiscussionActions({
         scrollEffects.triggerScrollToParent()
       }
     },
-    [
-      navigation.setSelectedThread,
-      navigation.openThread,
-      navigation.setSelectedPost,
-      navigation.openReplies,
-      filters.setRecentSort,
-      scrollEffects.triggerScrollToParent,
-    ]
+    [navigation, filters, scrollEffects]
   )
 
   // ============ Computed State ============

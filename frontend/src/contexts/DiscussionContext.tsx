@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useMemo } from 'react'
 import type { Post, Thread, ThreadStub } from '../types'
 

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useCallback, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { TOAST_DURATION } from '../utils/constants'

@@ -1,4 +1,5 @@
-import { memo, useState, useMemo } from 'react'
+/* eslint-disable react-hooks/set-state-in-effect */
+import { memo, useState, useMemo, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
@@ -93,6 +94,37 @@ export const PostCard = memo(function PostCard({
   const variantClass =
     variant === 'original' ? 'original-post' : variant === 'parent' ? 'parent-post' : 'reply-card'
 
+  // Show more/less for long content
+  const CONTENT_LIMIT = 2000
+  const safeContent = post.content ?? ''
+  const isLongContent = safeContent.length > CONTENT_LIMIT
+  const [isExpanded, setIsExpanded] = useState(false)
+  const displayContent = isLongContent && !isExpanded
+    ? safeContent.slice(0, CONTENT_LIMIT) + '...'
+    : safeContent
+
+  // Memoize LaTeX processing - only recompute when content changes
+  const processedContent = useMemo(
+    () => convertLatexTagsToMath(displayContent),
+    [displayContent]
+  )
+
+  // Highlight optimistic posts (negative IDs) or recently edited posts (within 3 seconds)
+  const [isRecentlyEdited, setIsRecentlyEdited] = useState(false)
+  useEffect(() => {
+    if (!post.edited_at) {
+      setIsRecentlyEdited(false)
+      return
+    }
+    const editedAtMs = new Date(post.edited_at).getTime()
+    const isRecent = Date.now() - editedAtMs < 3000
+    setIsRecentlyEdited(isRecent)
+    if (!isRecent) return
+    const timer = setTimeout(() => setIsRecentlyEdited(false), 3000)
+    return () => clearTimeout(timer)
+  }, [post.edited_at])
+  const highlightClass = post.id < 0 || isRecentlyEdited ? 'highlight' : ''
+
   // Deleted posts: hide from non-admins if no replies, show placeholder for users
   if (isDeleted && !isAdmin) {
     if (!hasReplies) return null
@@ -125,26 +157,8 @@ export const PostCard = memo(function PostCard({
 
   // Deleted post styling for admin view
   const deletedClass = isDeleted && isAdmin ? 'deleted-post admin-view' : ''
-  // Highlight optimistic posts (negative IDs) or recently edited posts (within 3 seconds)
-  const isRecentlyEdited = post.edited_at && (Date.now() - new Date(post.edited_at).getTime()) < 3000
-  const highlightClass = post.id < 0 || isRecentlyEdited ? 'highlight' : ''
 
   const isOriginal = variant === 'original'
-
-  // Show more/less for long content
-  const CONTENT_LIMIT = 2000
-  const safeContent = post.content ?? ''
-  const isLongContent = safeContent.length > CONTENT_LIMIT
-  const [isExpanded, setIsExpanded] = useState(false)
-  const displayContent = isLongContent && !isExpanded
-    ? safeContent.slice(0, CONTENT_LIMIT) + '...'
-    : safeContent
-
-  // Memoize LaTeX processing - only recompute when content changes
-  const processedContent = useMemo(
-    () => convertLatexTagsToMath(displayContent),
-    [displayContent]
-  )
 
   return (
     <div

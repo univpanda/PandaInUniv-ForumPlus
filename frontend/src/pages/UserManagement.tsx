@@ -144,6 +144,7 @@ export function UserManagement({ isActive = true }: UserManagementProps) {
   // Auto-navigate to last page if current page exceeds total (e.g., after deletion)
   useEffect(() => {
     if (totalPages > 0 && currentPage > totalPages) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCurrentPage(totalPages)
     }
   }, [totalPages, currentPage])

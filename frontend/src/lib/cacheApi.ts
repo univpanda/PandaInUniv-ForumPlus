@@ -15,6 +15,15 @@ export interface CachedUserProfile {
   _cached?: boolean
 }
 
+export interface PublicUserProfile {
+  id: string
+  username: string
+  avatar_url: string | null
+  avatar_path: string | null
+  is_private: boolean
+  _cached?: boolean
+}
+
 export interface PaginatedUsersResponse {
   users: UserWithStats[]
   totalCount: number
@@ -59,6 +68,39 @@ export async function getCachedUserProfile(
     return await response.json()
   } catch (error) {
     console.warn('Cache API fetch failed, will fallback to Supabase:', error)
+    return null
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+// Get public user profile from cache (no auth required)
+export async function getPublicUserProfile(
+  userId: string
+): Promise<PublicUserProfile | null> {
+  if (!CACHE_API_URL) {
+    return null
+  }
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 2000)
+
+  try {
+    const response = await fetch(`${CACHE_API_URL}/public/user/${userId}`, {
+      method: 'GET',
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null
+      }
+      throw new Error(`Cache API error: ${response.status}`)
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.warn('Public cache API fetch failed, will fallback to Supabase:', error)
     return null
   } finally {
     clearTimeout(timeout)

@@ -97,7 +97,7 @@ export function useDiscussionPage({ resetToList }: UseDiscussionPageProps) {
         scrollEffects.triggerHighlightPost(scrollToPostId)
       }
     },
-    [navigation.goToThreadFromReplies, scrollEffects.triggerHighlightPost]
+    [navigation, scrollEffects]
   )
 
   // Group related state and handlers for cleaner API

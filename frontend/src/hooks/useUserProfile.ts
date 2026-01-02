@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { STALE_TIME } from '../utils/constants'
 import type { UserProfile } from '../types'
-import { getCachedUserProfile, invalidateUserCache, isCacheEnabled } from '../lib/cacheApi'
+import { getCachedUserProfile, getPublicUserProfile, invalidateUserCache, isCacheEnabled } from '../lib/cacheApi'
 import { useAuth } from './useAuth'
 
 // Re-export for backwards compatibility
@@ -29,14 +29,27 @@ export function useUserProfile(userId: string | null) {
 
       // Try cache first if enabled
       if (isCacheEnabled()) {
-        const cached = await getCachedUserProfile(userId, session?.access_token)
-        if (cached) {
-          return {
-            id: cached.id,
-            username: cached.username,
-            avatar_url: cached.avatar_url,
-            avatar_path: cached.avatar_path ?? null,
-            is_private: cached.is_private,
+        if (session?.access_token) {
+          const cached = await getCachedUserProfile(userId, session.access_token)
+          if (cached) {
+            return {
+              id: cached.id,
+              username: cached.username,
+              avatar_url: cached.avatar_url,
+              avatar_path: cached.avatar_path ?? null,
+              is_private: cached.is_private,
+            }
+          }
+        } else {
+          const cached = await getPublicUserProfile(userId)
+          if (cached) {
+            return {
+              id: cached.id,
+              username: cached.username,
+              avatar_url: cached.avatar_url,
+              avatar_path: cached.avatar_path ?? null,
+              is_private: cached.is_private,
+            }
           }
         }
       }

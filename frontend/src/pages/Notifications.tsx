@@ -59,7 +59,10 @@ export function Notifications({ onNavigateToPost }: NotificationsProps) {
   const dismissNotification = useDismissNotification(user?.id || null)
   const dismissAllNotifications = useDismissAllNotifications(user?.id || null)
 
-  const notifications = data?.notifications || []
+  const notifications = useMemo(
+    () => data?.notifications ?? [],
+    [data?.notifications]
+  )
   const totalCount = data?.totalCount || 0
   const totalPages = Math.ceil(totalCount / PAGE_SIZE.POSTS)
 

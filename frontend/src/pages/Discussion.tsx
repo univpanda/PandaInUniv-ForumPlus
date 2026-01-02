@@ -57,16 +57,24 @@ export function Discussion({
     handleRetry,
   } = useDiscussionPage({ resetToList })
 
+  const {
+    goToList,
+    openThreadById,
+    openRepliesById,
+    triggerHighlightPost,
+  } = nav
+  const { setSearchQuery } = search
+
   // Apply initial search when provided from external navigation
   // This handles @username, @bookmarked, @op, @replies, and regular text searches from profile dropdown
   useEffect(() => {
     if (initialSearch) {
       // Navigate back to list view first (in case a thread is open)
-      nav.goToList()
-      search.setSearchQuery(initialSearch.searchQuery)
+      goToList()
+      setSearchQuery(initialSearch.searchQuery)
       onInitialSearchConsumed?.()
     }
-  }, [initialSearch, onInitialSearchConsumed, nav.goToList, search.setSearchQuery])
+  }, [initialSearch, onInitialSearchConsumed, goToList, setSearchQuery])
 
   // Handle direct navigation to a specific post (from notifications)
   useEffect(() => {
@@ -75,15 +83,21 @@ export function Discussion({
 
       if (postParentId === null) {
         // Post is the OP or a direct reply to OP - open thread view
-        nav.openThreadById(threadId)
-        nav.triggerHighlightPost(postId)
+        openThreadById(threadId)
+        triggerHighlightPost(postId)
       } else {
         // Post is a reply (has a parent) - open replies view for that post
-        nav.openRepliesById(threadId, postId)
+        openRepliesById(threadId, postId)
       }
       onInitialNavigationConsumed?.()
     }
-  }, [initialNavigation, onInitialNavigationConsumed, nav.openThreadById, nav.openRepliesById, nav.triggerHighlightPost])
+  }, [
+    initialNavigation,
+    onInitialNavigationConsumed,
+    openThreadById,
+    openRepliesById,
+    triggerHighlightPost,
+  ])
 
   // Memoize core props (shared between ThreadView and RepliesView)
   const coreProps = useMemo(

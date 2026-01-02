@@ -81,7 +81,10 @@ export function useChatConversations({
   // Get ignored users
   const { data: ignoredUsers } = useIgnoredUsers(userId)
 
-  const allConversations = conversationsQuery.data ?? []
+  const allConversations = useMemo(
+    () => conversationsQuery.data ?? [],
+    [conversationsQuery.data]
+  )
 
   // Split conversations into ignored and non-ignored
   const { nonIgnoredConversations, ignoredConversations } = useMemo(() => {
@@ -138,12 +141,14 @@ export function useChatConversations({
 
   // Reset pagination when search query or tab changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setConversationsPage(1)
   }, [searchQuery, activeTab])
 
   // Reset pagination when entering conversations view
   useEffect(() => {
     if (view === 'conversations') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setConversationsPage(1)
     }
   }, [view])

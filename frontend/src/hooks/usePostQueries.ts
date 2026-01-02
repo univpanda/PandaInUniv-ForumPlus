@@ -88,6 +88,8 @@ export function useThreadView(
       // Convert to Post type (remove is_op and total_count fields)
       const toPost = (row: Post & { is_op: boolean; total_count: number }): Post => {
         const { is_op: _isOp, total_count: _totalCount, ...post } = row
+        void _isOp
+        void _totalCount
         return post as Post
       }
 
@@ -228,7 +230,7 @@ export function useAddReply() {
 
     onMutate: async (variables) => {
       // Cancel outgoing queries
-      await queryClient.cancelQueries({ queryKey: forumKeys.postsAll() })
+      await queryClient.cancelQueries({ queryKey: ['forum', 'posts', variables.threadId] })
 
       // Store previous data for ALL caches (unified rollback)
       const previousData = new Map<string, unknown>()

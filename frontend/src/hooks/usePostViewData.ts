@@ -45,6 +45,7 @@ export interface PostViewDataReturn {
 
   // Loading/error states
   isLoading: boolean
+  isFetching: boolean
   isError: boolean
 
   // Pagination totals
@@ -56,6 +57,8 @@ export interface PostViewDataReturn {
   refetchReplies: () => void
   refetchSubReplies: () => void
   refetchPostsSearch: () => void
+  refetchRootPosts: () => void
+  refetchLevel1Replies: () => void
 }
 
 export function usePostViewData({
@@ -224,6 +227,7 @@ export function usePostViewData({
 
   // Thread view: simple loading - just wait for single query
   const isThreadViewLoading = view === 'thread' && threadViewQuery.isLoading
+  const isThreadViewFetching = view === 'thread' && threadViewQuery.isFetching
 
   // Replies view: loading if sub-replies loading OR we need OP and it's loading
   const isRepliesViewLoading =
@@ -232,9 +236,22 @@ export function usePostViewData({
 
   const isLoading = isThreadViewLoading || isRepliesViewLoading
 
-  const isError =
-    (view === 'thread' && threadViewQuery.isError) ||
-    (view === 'replies' && paginatedSubRepliesQuery.isError)
+  const isRepliesViewFetching =
+    view === 'replies' &&
+    ((hasSubReplies && paginatedSubRepliesQuery.isFetching) ||
+      (needsOpFetch && threadRootPostsQuery.isFetching) ||
+      (isSelectedPostStub && level1RepliesQuery.isFetching))
+
+  const isFetching = isThreadViewFetching || isRepliesViewFetching
+
+  const isThreadViewError = view === 'thread' && threadViewQuery.isError
+  const isRepliesViewError =
+    view === 'replies' &&
+    ((hasSubReplies && paginatedSubRepliesQuery.isError) ||
+      (needsOpFetch && threadRootPostsQuery.isError) ||
+      (isSelectedPostStub && level1RepliesQuery.isError))
+
+  const isError = isThreadViewError || isRepliesViewError
 
   return {
     rawPosts,
@@ -249,6 +266,7 @@ export function usePostViewData({
     postsSearchTotalCount: paginatedPostsSearchQuery.data?.totalCount ?? 0,
     postsSearchIsPrivate: paginatedPostsSearchQuery.data?.isPrivate ?? false,
     isLoading,
+    isFetching,
     isError,
     repliesTotalCount: threadViewQuery.data?.totalCount ?? 0,
     subRepliesTotalCount: paginatedSubRepliesQuery.data?.totalCount ?? 0,
@@ -256,5 +274,7 @@ export function usePostViewData({
     refetchReplies: threadViewQuery.refetch,
     refetchSubReplies: paginatedSubRepliesQuery.refetch,
     refetchPostsSearch: paginatedPostsSearchQuery.refetch,
+    refetchRootPosts: threadRootPostsQuery.refetch,
+    refetchLevel1Replies: level1RepliesQuery.refetch,
   }
 }

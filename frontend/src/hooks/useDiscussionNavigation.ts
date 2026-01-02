@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useCallback, useEffect } from 'react'
 import type { Thread, Post, ThreadStub, PostStub } from '../types'
 
@@ -13,8 +14,8 @@ const STORAGE_KEY = 'discussionNav'
 
 interface StoredNavState {
   view: View
-  thread: SelectedThread
-  post: SelectedPost
+  threadId: number | null
+  postId: number | null
 }
 
 // Parse stored state from localStorage
@@ -23,21 +24,39 @@ const getStoredNavState = (): StoredNavState => {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
       const parsed = JSON.parse(stored)
+      const threadId = typeof parsed.threadId === 'number'
+        ? parsed.threadId
+        : typeof parsed.thread?.id === 'number'
+          ? parsed.thread.id
+          : null
+      const postId = typeof parsed.postId === 'number'
+        ? parsed.postId
+        : typeof parsed.post?.id === 'number'
+          ? parsed.post.id
+          : null
+      const view = parsed.view || 'list'
+      if (view !== 'list' && threadId === null) {
+        return { view: 'list', threadId: null, postId: null }
+      }
       return {
-        view: parsed.view || 'list',
-        thread: parsed.thread || null,
-        post: parsed.post || null,
+        view,
+        threadId,
+        postId,
       }
     }
   } catch {
     // Ignore parse errors
   }
-  return { view: 'list', thread: null, post: null }
+  return { view: 'list', threadId: null, postId: null }
 }
 
 // Save nav state to localStorage
 const saveNavState = (view: View, thread: SelectedThread, post: SelectedPost) => {
-  const state: StoredNavState = { view, thread, post }
+  const state: StoredNavState = {
+    view,
+    threadId: thread?.id ?? null,
+    postId: post?.id ?? null,
+  }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
 
@@ -51,8 +70,12 @@ export function useDiscussionNavigation({
   // Initialize from stored state
   const [initialized] = useState(() => getStoredNavState())
   const [view, setView] = useState<View>(initialized.view)
-  const [selectedThread, setSelectedThread] = useState<SelectedThread>(initialized.thread)
-  const [selectedPost, setSelectedPost] = useState<SelectedPost>(initialized.post)
+  const [selectedThread, setSelectedThread] = useState<SelectedThread>(
+    initialized.threadId !== null ? { id: initialized.threadId } : null
+  )
+  const [selectedPost, setSelectedPost] = useState<SelectedPost>(
+    initialized.postId !== null ? { id: initialized.postId } : null
+  )
 
   // Persist state changes to localStorage
   useEffect(() => {

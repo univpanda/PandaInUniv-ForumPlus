@@ -243,7 +243,7 @@ export function useVotePost() {
 
     onMutate: async ({ postId, threadId, isOriginalPost, prevVote, prevLikes, prevDislikes, voteType }) => {
       // Cancel any outgoing refetches to prevent race conditions
-      await queryClient.cancelQueries({ queryKey: forumKeys.postsAll() })
+      await queryClient.cancelQueries({ queryKey: ['forum', 'posts', threadId] })
 
       const previousData = new Map<string, unknown>()
       const update = calculateVoteUpdate(prevVote, prevLikes, prevDislikes, voteType)
@@ -303,7 +303,7 @@ export function useEditPost() {
     },
 
     onMutate: async ({ postId, content, additionalComments, threadId }) => {
-      await queryClient.cancelQueries({ queryKey: forumKeys.postsAll() })
+      await queryClient.cancelQueries({ queryKey: ['forum', 'posts', threadId] })
 
       const previousData = new Map<string, unknown>()
 
@@ -354,7 +354,7 @@ export function useDeletePost() {
     },
 
     onMutate: async ({ postId, threadId, userId, isDeleted }) => {
-      await queryClient.cancelQueries({ queryKey: forumKeys.postsAll() })
+      await queryClient.cancelQueries({ queryKey: ['forum', 'posts', threadId] })
 
       const previousData = new Map<string, unknown>()
       const willBeDeleted = !isDeleted

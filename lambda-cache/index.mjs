@@ -276,6 +276,31 @@ async function getUserProfile(userId) {
   return { ...profile, _cached: false };
 }
 
+// GET /public/user/:userId - Get public user profile (no auth)
+async function getPublicUserProfile(userId) {
+  const pk = `user:${userId}`;
+  const sk = 'public-profile';
+
+  const cached = await getFromCache(pk, sk);
+  if (cached) {
+    return { ...cached, _cached: true };
+  }
+
+  const data = await fetchFromSupabase(
+    'user_profiles',
+    `id=eq.${userId}&select=id,username,avatar_url,avatar_path,is_private`
+  );
+
+  if (!data || data.length === 0) {
+    return null;
+  }
+
+  const profile = data[0];
+
+  await putToCache(pk, sk, profile, TTL.USER_PROFILE);
+
+  return { ...profile, _cached: false };
+}
 // GET /users - Get all users with stats (admin only)
 async function getAllUsers() {
   const pk = 'admin';
@@ -428,6 +453,19 @@ export const handler = async (event) => {
       }
 
       const profile = await getUserProfile(userId);
+
+      if (!profile) {
+        return response(404, { error: 'User not found' });
+      }
+
+      return response(200, profile);
+    }
+
+    // GET /public/user/:userId (no auth)
+    if (method === 'GET' && pathParts[0] === 'public' && pathParts[1] === 'user' && pathParts[2]) {
+      const userId = pathParts[2];
+
+      const profile = await getPublicUserProfile(userId);
 
       if (!profile) {
         return response(404, { error: 'User not found' });

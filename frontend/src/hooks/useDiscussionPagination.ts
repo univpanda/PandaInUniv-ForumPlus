@@ -128,28 +128,33 @@ export function useDiscussionPagination({
 
   // Reset pagination when sort, view, or search filter changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setThreadsPage(1)
   }, [sortBy, authorUsername, searchText, isDeleted, isFlagged])
 
   // Reset posts search pagination when search mode or filters change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAuthorPostsPage(1)
   }, [searchMode, authorUsername, searchText, isDeleted, isFlagged])
 
   // Reset bookmarks pagination when entering bookmarks view
   useEffect(() => {
     if (isBookmarksView) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setBookmarksPage(1)
     }
   }, [isBookmarksView])
 
   // Reset replies pagination when thread or sort changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRepliesPage(1)
   }, [selectedThreadId, replySortBy])
 
   // Reset sub-replies pagination when selected post or sort changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSubRepliesPage(1)
   }, [selectedPostId, replySortBy])
 

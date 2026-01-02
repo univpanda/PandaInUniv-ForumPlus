@@ -142,7 +142,7 @@ export function useDiscussionPosts({
     (view === 'list' && !isPostsSearchView && !isBookmarksView && threadListData.isFetching) ||
     (view === 'list' && isBookmarksView && bookmarkedPostsQuery.isFetching) ||
     (view === 'list' && isPostsSearchView && postViewData.postsSearchLoading) ||
-    postViewData.isLoading
+    postViewData.isFetching
 
   // Only consider query errors when the query is actually enabled/fetched
   // React Query keeps error state even when query is disabled, so we check fetchStatus
@@ -168,6 +168,8 @@ export function useDiscussionPosts({
       postViewData.refetchReplies()
     } else if (view === 'replies') {
       postViewData.refetchSubReplies()
+      postViewData.refetchRootPosts()
+      postViewData.refetchLevel1Replies()
     }
   }, [view, isBookmarksView, isPostsSearchView, bookmarkedPostsQuery, threadListData, postViewData])
 

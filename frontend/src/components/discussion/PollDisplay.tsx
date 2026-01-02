@@ -32,10 +32,11 @@ export const PollDisplay = memo(function PollDisplay({ threadId, userId }: PollD
   const hasVoted = poll && poll.user_votes && poll.user_votes.length > 0
 
   // Check if poll has expired
+  const pollEndsAt = poll?.ends_at ?? null
   const isPollExpired = useMemo(() => {
-    if (!poll?.ends_at) return false
-    return new Date(poll.ends_at) < new Date()
-  }, [poll?.ends_at])
+    if (!pollEndsAt) return false
+    return new Date(pollEndsAt) < new Date()
+  }, [pollEndsAt])
 
   // Determine if results should be shown (always show if voted or expired)
   const showResults = poll && (hasVoted || isPollExpired)

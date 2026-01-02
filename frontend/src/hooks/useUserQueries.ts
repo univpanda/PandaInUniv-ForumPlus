@@ -54,7 +54,11 @@ async function fetchPaginatedUsers(
   const totalCount = rows.length > 0 ? Number(rows[0].total_count) : 0
 
   // Remove total_count from each row
-  const users = rows.map(({ total_count, ...user }) => user as UserWithStats)
+  const users = rows.map((row) => {
+    const { total_count: _totalCount, ...user } = row
+    void _totalCount
+    return user as UserWithStats
+  })
 
   return { users, totalCount }
 }

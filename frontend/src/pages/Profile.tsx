@@ -45,7 +45,7 @@ export const Profile = memo(function Profile() {
       detail: { searchQuery },
     })
     window.dispatchEvent(event)
-  }, [profile?.username])
+  }, [profile])
 
   // Navigate to Discussion with bookmarks view
   const handleBookmarksClick = useCallback(() => {

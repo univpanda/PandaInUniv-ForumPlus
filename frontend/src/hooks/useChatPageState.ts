@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from './useAuth'
 import { useUserProfile } from './useUserProfile'
@@ -63,7 +64,7 @@ export function useChatPageState({ resetToList }: UseChatPageStateOptions = {}) 
       conversationsData.setSearchQuery('')
       messagesData.clearMessage()
     }
-  }, [resetToList, conversationsData.setSearchQuery, messagesData.clearMessage])
+  }, [resetToList, conversationsData, messagesData])
 
   // ============ Computed Values ============
   const loading =
@@ -81,7 +82,7 @@ export function useChatPageState({ resetToList }: UseChatPageStateOptions = {}) 
       setView('chat')
       conversationsData.setSearchQuery('')
     },
-    [conversationsData.setSearchQuery]
+    [conversationsData]
   )
 
   // Used by Discussion username hover to start a new chat
@@ -96,7 +97,7 @@ export function useChatPageState({ resetToList }: UseChatPageStateOptions = {}) 
       setView('chat')
       conversationsData.setSearchQuery('')
     },
-    [conversationsData.setSearchQuery]
+    [conversationsData]
   )
 
   const backToList = useCallback(() => {
