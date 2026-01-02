@@ -43,6 +43,7 @@ FROM (
   SELECT parent_id, COUNT(*) AS count
   FROM forum_posts
   WHERE parent_id IS NOT NULL
+    AND COALESCE(is_deleted, FALSE) = FALSE
   GROUP BY parent_id
 ) r
 WHERE p.id = r.parent_id;
@@ -52,14 +53,14 @@ CREATE OR REPLACE FUNCTION update_post_reply_count()
 RETURNS TRIGGER AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
-    IF NEW.parent_id IS NOT NULL THEN
+    IF NEW.parent_id IS NOT NULL AND COALESCE(NEW.is_deleted, FALSE) = FALSE THEN
       UPDATE forum_posts
       SET reply_count = reply_count + 1
       WHERE id = NEW.parent_id;
     END IF;
     RETURN NEW;
   ELSIF TG_OP = 'DELETE' THEN
-    IF OLD.parent_id IS NOT NULL THEN
+    IF OLD.parent_id IS NOT NULL AND COALESCE(OLD.is_deleted, FALSE) = FALSE THEN
       UPDATE forum_posts
       SET reply_count = GREATEST(reply_count - 1, 0)
       WHERE id = OLD.parent_id;
@@ -81,6 +82,38 @@ CREATE TRIGGER trigger_update_post_reply_count_delete
   AFTER DELETE ON forum_posts
   FOR EACH ROW
   EXECUTE FUNCTION update_post_reply_count();
+
+-- Trigger to maintain reply_count on soft delete/restore
+CREATE OR REPLACE FUNCTION update_post_reply_count_on_visibility()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.parent_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF COALESCE(OLD.is_deleted, FALSE) = COALESCE(NEW.is_deleted, FALSE) THEN
+    RETURN NEW;
+  END IF;
+
+  IF COALESCE(NEW.is_deleted, FALSE) = TRUE THEN
+    UPDATE forum_posts
+    SET reply_count = GREATEST(reply_count - 1, 0)
+    WHERE id = NEW.parent_id;
+  ELSE
+    UPDATE forum_posts
+    SET reply_count = reply_count + 1
+    WHERE id = NEW.parent_id;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_update_post_reply_count_visibility ON forum_posts;
+CREATE TRIGGER trigger_update_post_reply_count_visibility
+  AFTER UPDATE OF is_deleted ON forum_posts
+  FOR EACH ROW
+  EXECUTE FUNCTION update_post_reply_count_on_visibility();
 
 -- Trigger to maintain likes/dislikes counters on forum_posts
 CREATE OR REPLACE FUNCTION update_post_vote_counts()

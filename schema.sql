@@ -292,14 +292,14 @@ CREATE OR REPLACE FUNCTION update_post_reply_count()
 RETURNS TRIGGER AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
-    IF NEW.parent_id IS NOT NULL THEN
+    IF NEW.parent_id IS NOT NULL AND COALESCE(NEW.is_deleted, FALSE) = FALSE THEN
       UPDATE forum_posts
       SET reply_count = reply_count + 1
       WHERE id = NEW.parent_id;
     END IF;
     RETURN NEW;
   ELSIF TG_OP = 'DELETE' THEN
-    IF OLD.parent_id IS NOT NULL THEN
+    IF OLD.parent_id IS NOT NULL AND COALESCE(OLD.is_deleted, FALSE) = FALSE THEN
       UPDATE forum_posts
       SET reply_count = GREATEST(reply_count - 1, 0)
       WHERE id = OLD.parent_id;
@@ -319,6 +319,37 @@ CREATE TRIGGER trigger_update_post_reply_count_delete
   AFTER DELETE ON forum_posts
   FOR EACH ROW
   EXECUTE FUNCTION update_post_reply_count();
+
+-- Trigger to maintain reply_count on soft delete/restore
+CREATE OR REPLACE FUNCTION update_post_reply_count_on_visibility()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.parent_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF COALESCE(OLD.is_deleted, FALSE) = COALESCE(NEW.is_deleted, FALSE) THEN
+    RETURN NEW;
+  END IF;
+
+  IF COALESCE(NEW.is_deleted, FALSE) = TRUE THEN
+    UPDATE forum_posts
+    SET reply_count = GREATEST(reply_count - 1, 0)
+    WHERE id = NEW.parent_id;
+  ELSE
+    UPDATE forum_posts
+    SET reply_count = reply_count + 1
+    WHERE id = NEW.parent_id;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_post_reply_count_visibility
+  AFTER UPDATE OF is_deleted ON forum_posts
+  FOR EACH ROW
+  EXECUTE FUNCTION update_post_reply_count_on_visibility();
 
 
 -- =============================================================================
@@ -1168,7 +1199,7 @@ BEGIN
       u.avatar_path,
       CASE WHEN p_sort_by = 'recent' THEN COALESCE(t.last_activity, t.created_at) ELSE t.created_at END AS created_at,
       op.content,
-      count_visible_thread_replies(t.id, v_is_admin) AS reply_count,
+      COALESCE(op.reply_count, 0) AS reply_count,
     COALESCE(op.likes, 0) AS total_likes,
     COALESCE(op.dislikes, 0) AS total_dislikes,
       COALESCE(op.is_deleted, FALSE) AS is_op_deleted,
@@ -1250,7 +1281,7 @@ BEGIN
     COALESCE(p.likes, 0) AS likes,
     COALESCE(p.dislikes, 0) AS dislikes,
     (SELECT pv.vote_type FROM post_votes pv WHERE pv.post_id = p.id AND pv.user_id = auth.uid()),
-    count_visible_replies(p.id, v_is_admin),
+    COALESCE(p.reply_count, 0),
     p.is_flagged,
     p.flag_reason,
     COALESCE(p.is_deleted, FALSE),
@@ -2251,7 +2282,7 @@ BEGIN
       COALESCE(p.likes, 0) AS likes,
       COALESCE(p.dislikes, 0) AS dislikes,
       (SELECT pv.vote_type FROM post_votes pv WHERE pv.post_id = p.id AND pv.user_id = auth.uid()) AS user_vote,
-      count_visible_replies(p.id, FALSE) AS reply_count,
+      COALESCE(p.reply_count, 0) AS reply_count,
       p.is_flagged,
       p.flag_reason,
       COALESCE(p.is_deleted, FALSE) AS is_deleted,
@@ -2355,7 +2386,7 @@ BEGIN
       p.created_at,
       COALESCE(p.likes, 0) AS likes,
       COALESCE(p.dislikes, 0) AS dislikes,
-      count_visible_replies(p.id, v_is_admin) AS reply_count,
+      COALESCE(p.reply_count, 0) AS reply_count,
       COALESCE(p.is_deleted, FALSE) AS is_deleted,
       p.deleted_by,
       p.is_flagged,
@@ -2439,9 +2470,10 @@ BEGIN
 
     -- Notify parent post author (if not self)
     IF v_parent_author_id IS NOT NULL AND v_parent_author_id != NEW.author_id THEN
-      -- Count current replies to this post (excluding the new one which isn't committed yet)
-      SELECT COUNT(*) + 1 INTO v_current_reply_count
-      FROM forum_posts WHERE parent_id = NEW.parent_id AND id != NEW.id;
+      SELECT COUNT(*) INTO v_current_reply_count
+      FROM forum_posts
+      WHERE parent_id = NEW.parent_id
+        AND COALESCE(is_deleted, FALSE) = FALSE;
 
       INSERT INTO notifications (user_id, post_id, thread_id, reply_count)
       VALUES (v_parent_author_id, NEW.parent_id, NEW.thread_id, v_current_reply_count)
