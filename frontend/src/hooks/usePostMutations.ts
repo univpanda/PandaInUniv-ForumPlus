@@ -333,7 +333,6 @@ export function useEditPost() {
 interface DeletePostVariables {
   postId: number
   threadId: number
-  parentId: number | null
   userId?: string
   isDeleted: boolean // Current state to toggle
 }

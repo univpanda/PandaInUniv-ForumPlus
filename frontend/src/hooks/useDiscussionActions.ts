@@ -85,8 +85,6 @@ export function useDiscussionActions({
   // ============ Post Moderation (Edit/Delete) ============
   const moderation = usePostModeration({
     userId: user?.id,
-    view: navigation.view,
-    selectedPost: navigation.selectedPost,
     selectedThread: navigation.selectedThread,
     modalState,
     modalActions,

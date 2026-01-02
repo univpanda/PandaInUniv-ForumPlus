@@ -289,47 +289,36 @@ export function useAddReply() {
         }
       })
 
-      // Replace optimistic ID in threadView (only for level-1 replies)
+      // Single pass over threadView queries: replace optimistic ID + update reply_count
       const threadViewQueries = findThreadViewQueries(queryClient, variables.threadId)
       for (const query of threadViewQueries) {
         const data = queryClient.getQueryData<ThreadViewResponse>(query.queryKey)
         if (!data) continue
 
-        // Check if this was a level-1 reply (parentId === OP's ID)
         const opId = data.originalPost?.id
         const isLevel1Reply = opId !== undefined && variables.parentId === opId
 
-        if (isLevel1Reply) {
-          queryClient.setQueryData<ThreadViewResponse>(query.queryKey, (old) => {
-            if (!old) return old
-            return {
-              ...old,
-              replies: old.replies.map((p) =>
-                p.id === variables.optimisticId ? { ...p, id: realPostId } : p
-              ),
-            }
-          })
-        }
+        queryClient.setQueryData<ThreadViewResponse>(query.queryKey, (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            replies: old.replies.map((p) => {
+              // Replace optimistic ID (level-1 replies only)
+              if (isLevel1Reply && p.id === variables.optimisticId) {
+                return { ...p, id: realPostId }
+              }
+              // Update parent's reply_count (sub-replies only)
+              if (p.id === variables.parentId) {
+                return { ...p, reply_count: p.reply_count + 1 }
+              }
+              return p
+            }),
+          }
+        })
       }
 
-      // Update reply_count in parent post (for sub-replies)
+      // Update reply_count in paginated and legacy caches (for sub-replies)
       if (variables.parentId !== null) {
-        // Update reply_count in threadView caches (parent is a level-1 reply)
-        for (const query of threadViewQueries) {
-          queryClient.setQueryData<ThreadViewResponse>(query.queryKey, (old) => {
-            if (!old) return old
-            return {
-              ...old,
-              replies: old.replies.map((p) =>
-                p.id === variables.parentId
-                  ? { ...p, reply_count: p.reply_count + 1 }
-                  : p
-              ),
-            }
-          })
-        }
-
-        // Update reply_count in paginated and legacy caches
         const updateParentReplyCount = (oldData: GetPaginatedPostsResponse | GetThreadPostsResponse | undefined) => {
           if (!oldData) return oldData
 
@@ -356,7 +345,6 @@ export function useAddReply() {
 
           return oldData
         }
-        // Update root posts caches (doesn't include threadView due to different key structure)
         queryClient.setQueriesData(
           { queryKey: forumKeys.posts(variables.threadId, null) },
           updateParentReplyCount

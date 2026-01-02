@@ -3,8 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEditPost, useDeletePost } from './useForumQueries'
 import { forumKeys } from './forumQueryKeys'
 import { canEditContent } from '../utils/format'
-import type { Post, Thread, ThreadStub, PostStub, GetPaginatedPostsResponse } from '../types'
-import type { View } from './useDiscussionNavigation'
+import type { Post, Thread, ThreadStub, GetPaginatedPostsResponse } from '../types'
 
 interface ModalState {
   editingPost: Post | null
@@ -23,8 +22,6 @@ interface ModalActions {
 
 interface UsePostModerationProps {
   userId?: string
-  view: View
-  selectedPost: Post | PostStub | null
   selectedThread: Thread | ThreadStub | null
   modalState: ModalState
   modalActions: ModalActions
@@ -61,8 +58,6 @@ function findRealPostId(
 
 export function usePostModeration({
   userId,
-  view,
-  selectedPost,
   selectedThread,
   modalState,
   modalActions,
@@ -163,13 +158,11 @@ export function usePostModeration({
     const isOP = postToDelete.parent_id === null
     // Check if thread has no replies - only full Thread has reply_count
     const threadHasNoReplies = selectedThread && 'reply_count' in selectedThread && selectedThread.reply_count === 0
-    const cacheParentId = view === 'replies' ? (selectedPost?.id ?? null) : null
 
     deletePostMutation.mutate(
       {
         postId: postToDelete.id,
         threadId: postToDelete.thread_id,
-        parentId: cacheParentId,
         userId,
         isDeleted: postToDelete.is_deleted ?? false,
       },
@@ -187,8 +180,6 @@ export function usePostModeration({
     modalState.deletingPost,
     modalActions,
     userId,
-    view,
-    selectedPost,
     selectedThread,
     goToList,
     deletePostMutation,
