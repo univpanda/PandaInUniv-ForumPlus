@@ -53,22 +53,22 @@ export const Header = memo(function Header({
         </button>
         {user && (
           <button
-            className={`header-tab ${activeTab === 'chat' ? 'active' : ''}`}
-            onClick={onChatClick}
-          >
-            <MessagesSquare size={18} />
-            Den
-            {chatUnread > 0 && <span className="header-tab-badge">{chatUnread}</span>}
-          </button>
-        )}
-        {user && (
-          <button
             className={`header-tab ${activeTab === 'notifications' ? 'active' : ''}`}
             onClick={onNotificationsClick}
           >
             <Bell size={18} />
             Alerts
             {notificationCount > 0 && <span className="header-tab-badge">{notificationCount}</span>}
+          </button>
+        )}
+        {user && (
+          <button
+            className={`header-tab ${activeTab === 'chat' ? 'active' : ''}`}
+            onClick={onChatClick}
+          >
+            <MessagesSquare size={18} />
+            Den
+            {chatUnread > 0 && <span className="header-tab-badge">{chatUnread}</span>}
           </button>
         )}
         {isAdmin && (
