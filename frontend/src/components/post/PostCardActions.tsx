@@ -161,14 +161,12 @@ export const PostCardActions = memo(function PostCardActions({
         </button>
       </div>
 
-      {/* Reply count - always show for original posts, clickable for replies */}
-      {(onReplyClick || variant === 'original') && (
-        <ReplyCount
-          count={displayReplyCount}
-          onClick={onReplyClick && user && !isDeleted ? onReplyClick : undefined}
-          disabled={!user || isDeleted || !onReplyClick}
-        />
-      )}
+      {/* Reply count - always show for design consistency */}
+      <ReplyCount
+        count={displayReplyCount}
+        onClick={onReplyClick && user && !isDeleted ? onReplyClick : undefined}
+        disabled={!user || isDeleted || !onReplyClick}
+      />
 
       {/* Bookmark button - thread bookmark for original, post bookmark for replies */}
       {variant === 'original' && threadId && onBookmarkToggle && (

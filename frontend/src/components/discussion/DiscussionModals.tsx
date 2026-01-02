@@ -1,4 +1,4 @@
-import { memo, useState, useEffect } from 'react'
+import { memo, useState, useEffect, useCallback } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { Modal } from '../Modal'
 import { ButtonSpinner } from '../ui'
@@ -30,6 +30,20 @@ export const EditModal = memo(function EditModal({
   const [canEdit, setCanEdit] = useState(() => canEditContent(post.created_at))
   const [showExpiredWarning, setShowExpiredWarning] = useState(false)
   const isOriginalPost = post.parent_id === null
+
+  // Handle Shift+Enter / Cmd+Enter / Ctrl+Enter to submit
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && (e.shiftKey || e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        const hasContent = canEdit ? editContent.trim() : additionalComment.trim()
+        if (!submitting && hasContent) {
+          onSubmit()
+        }
+      }
+    },
+    [canEdit, editContent, additionalComment, submitting, onSubmit]
+  )
 
   // Re-check edit window every 10 seconds
   useEffect(() => {
@@ -87,6 +101,7 @@ export const EditModal = memo(function EditModal({
           <textarea
             value={editContent}
             onChange={(e) => onEditContentChange(e.target.value)}
+            onKeyDown={handleKeyDown}
             className="edit-textarea"
             rows={5}
             autoFocus
@@ -101,6 +116,7 @@ export const EditModal = memo(function EditModal({
           <textarea
             value={additionalComment}
             onChange={(e) => onAdditionalCommentChange(e.target.value)}
+            onKeyDown={handleKeyDown}
             className="edit-textarea"
             placeholder="Add your additional comments..."
             rows={3}

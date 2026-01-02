@@ -26,6 +26,7 @@ export interface UserConversation {
   conversation_partner_id: string
   partner_username: string
   partner_avatar: string | null
+  partner_avatar_path: string | null
   last_message: string
   last_message_at: string
   last_message_is_from_me: boolean

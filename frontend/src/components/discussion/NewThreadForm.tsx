@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { ButtonSpinner } from '../ui'
 import { PollCreator } from './PollCreator'
 import type { PollSettings } from '../../types'
@@ -36,6 +37,22 @@ export function NewThreadForm({
   const validOptionCount = pollOptions.filter((opt) => opt.trim()).length
   const isPollValid = !isPollEnabled || validOptionCount >= 2
 
+  // Check if form can be submitted
+  const canSubmit = !submitting && title.trim() && (isPollEnabled || content.trim()) && isPollValid
+
+  // Handle Shift+Enter / Cmd+Enter / Ctrl+Enter to submit
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && (e.shiftKey || e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        if (canSubmit) {
+          onSubmit()
+        }
+      }
+    },
+    [canSubmit, onSubmit]
+  )
+
   return (
     <div className="new-thread-form">
       <input
@@ -50,6 +67,7 @@ export function NewThreadForm({
         placeholder="Chew on it..."
         value={content}
         onChange={(e) => onContentChange(e.target.value)}
+        onKeyDown={handleKeyDown}
         className="thread-content-input"
         rows={4}
         maxLength={40000}
@@ -67,7 +85,7 @@ export function NewThreadForm({
       <div className="form-actions">
         <button
           onClick={onSubmit}
-          disabled={submitting || !title.trim() || (!isPollEnabled && !content.trim()) || !isPollValid}
+          disabled={!canSubmit}
           className="submit-btn"
         >
           {submitting ? <ButtonSpinner /> : isPollEnabled ? 'Create Poll' : 'Chomp!'}

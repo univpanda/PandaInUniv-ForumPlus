@@ -37,7 +37,7 @@ export const PostCardHeader = memo(function PostCardHeader({
     <div className="post-header">
       <div className="post-author">
         <img
-          src={getAvatarUrl(post.author_avatar, post.author_name)}
+          src={getAvatarUrl(post.author_avatar, post.author_name, post.author_avatar_path)}
           alt=""
           className="avatar-small"
         />

@@ -65,7 +65,11 @@ export const AuthButton = memo(function AuthButton() {
   }
 
   const displayName = profile?.username || null
-  const avatarUrl = getAvatarUrl(profile?.avatar_url || null, displayName || user.email || 'User')
+  const avatarUrl = getAvatarUrl(
+    profile?.avatar_url || null,
+    displayName || user.email || 'User',
+    profile?.avatar_path
+  )
 
   return (
     <div className="auth-dropdown" ref={dropdownRef}>

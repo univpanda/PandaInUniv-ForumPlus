@@ -1,5 +1,7 @@
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { EDIT_WINDOW_MINUTES, MS_PER_MINUTE } from './constants'
+import pandaAvatar from '../assets/webp/panda-tongue.webp'
+import { getAvatarByPath } from './avatars'
 
 // Relative time like "2 hours ago" - used for posts/comments
 // Shows seconds for recent times (e.g., "10 seconds ago") instead of "less than a minute ago"
@@ -107,7 +109,6 @@ export const getDateKey = (dateStr: string): string => {
 const ALLOWED_AVATAR_DOMAINS = [
   'lh3.googleusercontent.com', // Google profile pictures
   'avatars.githubusercontent.com', // GitHub avatars
-  'ui-avatars.com', // Fallback avatar service
 ]
 
 const isAllowedAvatarUrl = (url: string): boolean => {
@@ -121,23 +122,28 @@ const isAllowedAvatarUrl = (url: string): boolean => {
   }
 }
 
-// Generate a deterministic color based on the username
-const getAvatarColor = (name: string): string => {
-  let hash = 0
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash)
+// Get avatar URL from various sources:
+// 1. avatar_path (e.g., 'kawaii/chef') - new system, resolves from registry
+// 2. avatar_url (e.g., Google profile URL) - external URL, validated
+// 3. Falls back to default panda avatar
+export const getAvatarUrl = (
+  avatarUrl: string | null,
+  _name: string,
+  avatarPath?: string | null
+) => {
+  // First try avatar_path (new system)
+  if (avatarPath) {
+    const resolved = getAvatarByPath(avatarPath)
+    if (resolved) return resolved
   }
-  // Convert to a hex color (without #)
-  const color = Math.abs(hash).toString(16).slice(0, 6).padStart(6, '0')
-  return color
-}
 
-const fallbackAvatar = (name: string) =>
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${getAvatarColor(name)}&color=fff`
+  // Then try avatar_url (external URL like Google)
+  if (avatarUrl && isAllowedAvatarUrl(avatarUrl)) {
+    return avatarUrl
+  }
 
-export const getAvatarUrl = (avatar: string | null, name: string) => {
-  if (!avatar) return fallbackAvatar(name)
-  return isAllowedAvatarUrl(avatar) ? avatar : fallbackAvatar(name)
+  // Fallback to default panda
+  return pandaAvatar
 }
 
 // Check if a post can be edited (within EDIT_WINDOW_MINUTES of creation)

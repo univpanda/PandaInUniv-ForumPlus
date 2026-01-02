@@ -1,4 +1,8 @@
+import { useRef, useEffect } from 'react'
 import { Loader2, Send } from 'lucide-react'
+
+const MIN_HEIGHT = 40 // ~2 rows
+const MAX_HEIGHT = 120 // ~6 rows
 
 interface ChatInputProps {
   value: string
@@ -15,10 +19,26 @@ export function ChatInput({
   sending,
   placeholder = 'Type your message...',
 }: ChatInputProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-resize textarea based on content
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+
+    // Reset to min height to get accurate scrollHeight
+    textarea.style.height = `${MIN_HEIGHT}px`
+    // Set to scrollHeight, capped at max
+    const newHeight = Math.min(textarea.scrollHeight, MAX_HEIGHT)
+    textarea.style.height = `${newHeight}px`
+  }, [value])
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Shift+Enter, Cmd+Enter (Mac), or Ctrl+Enter (Windows) to submit
+    // Plain Enter = new line
+    if (e.key === 'Enter' && (e.shiftKey || e.metaKey || e.ctrlKey)) {
       e.preventDefault()
-      if (value.trim()) {
+      if (!sending && value.trim()) {
         onSend()
       }
     }
@@ -27,12 +47,13 @@ export function ChatInput({
   return (
     <div className="chat-input-container">
       <textarea
+        ref={textareaRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        rows={2}
         disabled={sending}
+        style={{ minHeight: MIN_HEIGHT, maxHeight: MAX_HEIGHT }}
       />
       <button
         className="chat-send-btn"

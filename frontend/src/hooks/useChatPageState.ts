@@ -31,6 +31,7 @@ export function useChatPageState({ resetToList }: UseChatPageStateOptions = {}) 
     id: string
     username: string
     avatar: string | null
+    avatarPath?: string | null
   } | null>(null)
 
   // Reset to conversations list when resetToList changes
@@ -75,6 +76,7 @@ export function useChatPageState({ resetToList }: UseChatPageStateOptions = {}) 
         id: partner.conversation_partner_id,
         username: partner.partner_username,
         avatar: partner.partner_avatar,
+        avatarPath: partner.partner_avatar_path,
       })
       setView('chat')
       conversationsData.setSearchQuery('')
@@ -84,11 +86,12 @@ export function useChatPageState({ resetToList }: UseChatPageStateOptions = {}) 
 
   // Used by Discussion username hover to start a new chat
   const startNewChat = useCallback(
-    (partnerId: string, partnerUsername: string, partnerAvatar: string | null) => {
+    (partnerId: string, partnerUsername: string, partnerAvatar: string | null, partnerAvatarPath?: string | null) => {
       setSelectedPartner({
         id: partnerId,
         username: partnerUsername,
         avatar: partnerAvatar,
+        avatarPath: partnerAvatarPath,
       })
       setView('chat')
       conversationsData.setSearchQuery('')

@@ -25,9 +25,10 @@ export function TextareaInput({
   buttonSize = 18,
 }: TextareaInputProps) {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    // Shift+Enter, Cmd+Enter (Mac), or Ctrl+Enter (Windows) to submit
+    if (e.key === 'Enter' && (e.shiftKey || e.metaKey || e.ctrlKey)) {
       e.preventDefault()
-      if (!disabled && value.trim()) {
+      if (!disabled && !submitting && value.trim()) {
         onSubmit()
       }
     }
@@ -46,7 +47,7 @@ export function TextareaInput({
       <button
         onClick={onSubmit}
         disabled={disabled || submitting || !value.trim()}
-        title="Submit (Cmd+Enter)"
+        title="Submit (Shift+Enter)"
       >
         {submitting ? <ButtonSpinner size={buttonSize} /> : <Send size={buttonSize} />}
       </button>

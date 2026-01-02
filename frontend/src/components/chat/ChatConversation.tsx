@@ -12,6 +12,7 @@ interface ChatConversationProps {
     id: string
     username: string
     avatar: string | null
+    avatarPath?: string | null
   }
   messages: ChatMessage[]
   loading: boolean
@@ -61,7 +62,7 @@ export function ChatConversation({
         <div className="chat-partner-info">
           <button className="chat-partner-back" onClick={onBack} title="Back to whispers">
             <div className="chat-partner-avatar">
-              <img src={getAvatarUrl(partner.avatar, partner.username)} alt="" />
+              <img src={getAvatarUrl(partner.avatar, partner.username, partner.avatarPath)} alt="" />
             </div>
             <span className="chat-partner-name">{partner.username}</span>
           </button>
@@ -123,6 +124,7 @@ export function ChatConversation({
         loading={loading}
         currentUserId={currentUserId}
         partnerAvatar={partner.avatar}
+        partnerAvatarPath={partner.avatarPath}
         partnerUsername={partner.username}
         hasMore={hasMoreMessages}
         onLoadMore={onLoadMoreMessages}

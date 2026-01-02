@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { AuthContext } from './AuthContextType'
 import { cleanOAuthHash } from '../utils/url'
 import { invalidateUserCache } from '../lib/cacheApi'
+import { generateNewUserIdentity } from '../utils/avatars'
 
 // ============================================================================
 // Local Storage Auth Cache - for instant refresh without network delay
@@ -85,9 +86,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Profile doesn't exist (new user) - create it
         const email = newSession.user.email
         if (email) {
+          // Generate username and avatar on frontend
+          const identity = generateNewUserIdentity()
+
           const { error: createError } = await supabase.rpc('create_user_profile', {
             p_user_id: userId,
             p_email: email,
+            p_username: identity.username,
+            p_avatar_path: identity.avatarPath,
           })
 
           if (createError) {

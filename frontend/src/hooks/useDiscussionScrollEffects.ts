@@ -27,11 +27,12 @@ export function useDiscussionScrollEffects({
     }
   }, [shouldScrollToParent, view, loading])
 
-  // Scroll to new reply after posting (optimistic update means reply is already in DOM)
+  // Scroll to new reply after posting
+  // Waits for loading to complete (important for subreplies which navigate to a new view)
   useEffect(() => {
-    if (!shouldScrollToNewReply) return
+    if (!shouldScrollToNewReply || loading) return
 
-    // Small delay to let optimistic update render
+    // Small delay to let DOM render
     const scrollTimer = setTimeout(() => {
       const firstReply = document.querySelector('.reply-card')
       if (firstReply) {
@@ -53,7 +54,7 @@ export function useDiscussionScrollEffects({
       clearTimeout(scrollTimer)
       clearTimeout(highlightTimer)
     }
-  }, [shouldScrollToNewReply])
+  }, [shouldScrollToNewReply, loading])
 
   // Highlight post when navigating from flagged view
   useEffect(() => {

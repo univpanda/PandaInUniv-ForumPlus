@@ -80,7 +80,7 @@ export function usePrefetchUserData() {
         queryFn: async () => {
           const { data, error } = await supabase
             .from('user_profiles')
-            .select('id, username, avatar_url, is_private')
+            .select('id, username, avatar_url, avatar_path, is_private')
             .eq('id', userId)
             .single()
           if (error) throw error

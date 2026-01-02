@@ -53,6 +53,7 @@ export function PostsSearchView({
             author_id: '',
             author_name: '',
             author_avatar: null,
+            author_avatar_path: null,
             created_at: '',
             first_post_content: '',
             reply_count: 0,

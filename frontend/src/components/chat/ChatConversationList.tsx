@@ -109,7 +109,7 @@ export function ChatConversationList({
               onClick={() => onOpenConversation(conv)}
             >
               <div className="chat-conv-avatar">
-                <img src={getAvatarUrl(conv.partner_avatar, conv.partner_username)} alt="" />
+                <img src={getAvatarUrl(conv.partner_avatar, conv.partner_username, conv.partner_avatar_path)} alt="" />
               </div>
               <div className="chat-conv-content">
                 <div className="chat-conv-header">

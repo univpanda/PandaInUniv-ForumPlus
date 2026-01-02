@@ -10,6 +10,7 @@ export interface CachedUserProfile {
   is_blocked: boolean
   username: string
   avatar_url: string | null
+  avatar_path: string | null
   is_private: boolean
   _cached?: boolean
 }

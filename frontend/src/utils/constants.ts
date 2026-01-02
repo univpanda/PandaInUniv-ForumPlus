@@ -49,6 +49,15 @@ export const PAGE_SIZE = {
   USERS: 50, // Users in admin panel per page
 } as const
 
+// Content length limits
+export const CONTENT_LIMITS = {
+  THREAD_TITLE_MIN: 3,
+  THREAD_TITLE_MAX: 200,
+  POST_CONTENT_MIN: 1,
+  POST_CONTENT_MAX: 50000, // 50K characters
+  POLL_OPTION_MAX: 200,
+} as const
+
 // Extension to MIME type mapping for file uploads
 export const EXT_TO_MIME: Record<string, string> = {
   '.jpg': 'image/jpeg',

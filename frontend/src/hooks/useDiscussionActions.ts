@@ -47,6 +47,7 @@ export function useDiscussionActions({
     newThreadContent: forms.newThreadContent,
     clearNewThreadForm: forms.clearNewThreadForm,
     navigateToNewThread: navigation.navigateToNewThread,
+    onSuccess: toast.showSuccess,
     onError: toast.showError,
     // Poll props
     isPollEnabled: forms.isPollEnabled,
@@ -76,6 +77,7 @@ export function useDiscussionActions({
     setSelectedPost: navigation.setSelectedPost,
     openReplies: navigation.openReplies,
     triggerScrollToNewReply: scrollEffects.triggerScrollToNewReply,
+    onSuccess: toast.showSuccess,
     onError: toast.showError,
     getCurrentPageSort,
   })

@@ -8,6 +8,7 @@ export interface Notification {
   post_author_id: string
   post_author_name: string
   post_author_avatar: string | null
+  post_author_avatar_path: string | null
   post_created_at: string
   post_likes: number
   post_dislikes: number

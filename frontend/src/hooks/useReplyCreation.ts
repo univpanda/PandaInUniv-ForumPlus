@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useAddReply } from './useForumQueries'
+import { CONTENT_LIMITS } from '../utils/constants'
 import type { Post, UserProfile } from '../types'
 import type { User } from '@supabase/supabase-js'
 
@@ -13,6 +14,7 @@ interface UseReplyCreationProps {
   setSelectedPost: (post: Post) => void
   openReplies: (post: Post) => void
   triggerScrollToNewReply: () => void
+  onSuccess: (message: string) => void
   onError: (message: string) => void
   // Current page/sort for optimistic cache update
   getCurrentPageSort: () => { page: number; sort: 'popular' | 'new' }
@@ -28,6 +30,7 @@ export function useReplyCreation({
   setSelectedPost,
   openReplies,
   triggerScrollToNewReply,
+  onSuccess,
   onError,
   getCurrentPageSort,
 }: UseReplyCreationProps) {
@@ -37,6 +40,17 @@ export function useReplyCreation({
     async (threadId: number, parentId: number | null = null, isInline: boolean = false) => {
       const content = getReplyContent(isInline)
       if (!user || !content.trim()) return
+
+      // Validate content length
+      const trimmedContent = content.trim()
+      if (trimmedContent.length < CONTENT_LIMITS.POST_CONTENT_MIN) {
+        onError('Reply is too short.')
+        return
+      }
+      if (trimmedContent.length > CONTENT_LIMITS.POST_CONTENT_MAX) {
+        onError(`Reply is too long (max ${CONTENT_LIMITS.POST_CONTENT_MAX.toLocaleString()} characters).`)
+        return
+      }
 
       // Store the parent post before clearing the form (for navigation after inline reply)
       const parentPost = isInline ? replyingToPost : null
@@ -48,7 +62,7 @@ export function useReplyCreation({
       addReplyMutation.mutate(
         {
           threadId,
-          content: content.trim(),
+          content: trimmedContent,
           parentId,
           userId: user.id,
           userName: userProfile?.username || user.user_metadata?.name || user.email || 'User',
@@ -69,6 +83,7 @@ export function useReplyCreation({
             } else {
               clearReplyForm()
             }
+            onSuccess('Reply posted')
             // Don't change sort - keep user's current selection
             triggerScrollToNewReply()
           },
@@ -87,6 +102,7 @@ export function useReplyCreation({
       openReplies,
       triggerScrollToNewReply,
       addReplyMutation,
+      onSuccess,
       onError,
       getCurrentPageSort,
     ]

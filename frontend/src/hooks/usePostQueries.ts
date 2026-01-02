@@ -100,14 +100,16 @@ function createOptimisticReply(variables: AddReplyVariables): Post {
     author_id: variables.userId,
     author_name: variables.userName,
     author_avatar: variables.userAvatar,
+    author_avatar_path: null, // Will be fetched on refetch
     created_at: new Date().toISOString(),
-    likes: 0,
+    likes: 1, // Auto-upvoted
     dislikes: 0,
     reply_count: 0,
-    user_vote: null,
+    user_vote: 1, // Author auto-upvotes their own post
     first_reply_content: null,
     first_reply_author: null,
     first_reply_avatar: null,
+    first_reply_avatar_path: null,
     first_reply_date: null,
     is_deleted: false,
     deleted_by: null,
@@ -168,18 +170,39 @@ export function useAddReply() {
         }
       })
 
-      // Update reply_count in root posts cache (for sub-replies)
+      // Update reply_count in all root posts caches (for sub-replies)
       if (variables.parentId !== null) {
-        queryClient.setQueryData<Post[]>(
-          forumKeys.posts(variables.threadId, null),
-          (oldPosts) => {
-            if (!oldPosts) return oldPosts
-            return oldPosts.map((p) =>
+        // Handle both paginated ({ posts, totalCount }) and legacy (Post[]) formats
+        const updateParentReplyCount = (oldData: GetPaginatedPostsResponse | GetThreadPostsResponse | undefined) => {
+          if (!oldData) return oldData
+
+          // Paginated format: { posts: Post[], totalCount: number }
+          if (typeof oldData === 'object' && 'posts' in oldData) {
+            return {
+              ...oldData,
+              posts: oldData.posts.map((p) =>
+                p.id === variables.parentId
+                  ? { ...p, reply_count: p.reply_count + 1 }
+                  : p
+              ),
+            }
+          }
+
+          // Legacy format: Post[]
+          if (Array.isArray(oldData)) {
+            return oldData.map((p) =>
               p.id === variables.parentId
                 ? { ...p, reply_count: p.reply_count + 1 }
                 : p
             )
           }
+
+          return oldData
+        }
+        // Use partial key match to update all root posts caches (paginated and legacy)
+        queryClient.setQueriesData(
+          { queryKey: forumKeys.posts(variables.threadId, null) },
+          updateParentReplyCount
         )
       }
 

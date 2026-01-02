@@ -45,7 +45,11 @@ export const Profile = memo(function Profile() {
   }
 
   const displayName = profile?.username || null
-  const avatarUrl = getAvatarUrl(profile?.avatar_url || null, displayName || user.email || 'User')
+  const avatarUrl = getAvatarUrl(
+    profile?.avatar_url || null,
+    displayName || user.email || 'User',
+    profile?.avatar_path
+  )
 
   return (
     <div className="profile-page">

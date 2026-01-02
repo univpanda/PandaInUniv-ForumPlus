@@ -1,4 +1,4 @@
-import { memo, useEffect, useCallback, useState, useRef } from 'react'
+import { memo, useEffect, useLayoutEffect, useCallback, useState, useRef } from 'react'
 import { useClickOutside } from '../../hooks/useClickOutside'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -61,9 +61,16 @@ export const ReplyInput = memo(function ReplyInput({
   const [isExpanded, setIsExpanded] = useState(autoFocus)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  // Use ref to avoid re-adding event listeners on every value change
+  // Use refs to access current values in handleKeyDown without re-creating editor
   const valueRef = useRef(value)
-  valueRef.current = value
+  const submittingRef = useRef(submitting)
+  const onSubmitRef = useRef(onSubmit)
+  // Sync refs with props in useLayoutEffect to satisfy React Compiler
+  useLayoutEffect(() => {
+    valueRef.current = value
+    submittingRef.current = submitting
+    onSubmitRef.current = onSubmit
+  })
 
   const editor = useEditor({
     extensions: [
@@ -88,6 +95,17 @@ export const ReplyInput = memo(function ReplyInput({
     editorProps: {
       attributes: {
         class: `reply-editor ${size === 'small' ? 'small' : ''}`,
+      },
+      handleKeyDown: (_view, event) => {
+        // Shift+Enter or Cmd+Enter (Mac) / Ctrl+Enter (Windows) to submit
+        if (event.key === 'Enter' && (event.shiftKey || event.metaKey || event.ctrlKey)) {
+          event.preventDefault()
+          if (!submittingRef.current && valueRef.current.trim()) {
+            onSubmitRef.current()
+          }
+          return true
+        }
+        return false
       },
     },
     onUpdate: ({ editor }) => {

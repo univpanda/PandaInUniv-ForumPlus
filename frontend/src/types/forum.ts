@@ -64,6 +64,7 @@ export interface Thread {
   author_id: string
   author_name: string
   author_avatar: string | null
+  author_avatar_path: string | null
   created_at: string
   first_post_content: string
   reply_count: number
@@ -81,6 +82,7 @@ export interface Post {
   author_id: string
   author_name: string
   author_avatar: string | null
+  author_avatar_path: string | null
   created_at: string
   reply_count: number
   likes: number
@@ -89,6 +91,7 @@ export interface Post {
   first_reply_content: string | null
   first_reply_author: string | null
   first_reply_avatar: string | null
+  first_reply_avatar_path: string | null
   first_reply_date: string | null
   is_flagged?: boolean
   flag_reason?: string | null
@@ -107,6 +110,7 @@ export interface FlaggedPost {
   author_id: string
   author_name: string
   author_avatar: string | null
+  author_avatar_path: string | null
   created_at: string
   flag_reason: string
   is_thread_op: boolean
@@ -121,6 +125,7 @@ export interface AuthorPost {
   author_id: string
   author_name: string
   author_avatar: string | null
+  author_avatar_path: string | null
   created_at: string
   likes: number
   dislikes: number
@@ -152,6 +157,7 @@ export function flaggedPostToPost(flaggedPost: FlaggedPost): Post {
     author_id: flaggedPost.author_id,
     author_name: flaggedPost.author_name,
     author_avatar: flaggedPost.author_avatar,
+    author_avatar_path: flaggedPost.author_avatar_path,
     created_at: flaggedPost.created_at,
     // Voting data not available for flagged posts
     reply_count: 0,
@@ -162,6 +168,7 @@ export function flaggedPostToPost(flaggedPost: FlaggedPost): Post {
     first_reply_content: null,
     first_reply_author: null,
     first_reply_avatar: null,
+    first_reply_avatar_path: null,
     first_reply_date: null,
     // Flag status
     is_flagged: true,
@@ -187,6 +194,7 @@ export function authorPostToPost(authorPost: AuthorPost): Post {
     author_id: authorPost.author_id,
     author_name: authorPost.author_name,
     author_avatar: authorPost.author_avatar,
+    author_avatar_path: authorPost.author_avatar_path,
     created_at: authorPost.created_at,
     reply_count: authorPost.reply_count,
     likes: authorPost.likes,
@@ -196,6 +204,7 @@ export function authorPostToPost(authorPost: AuthorPost): Post {
     first_reply_content: null,
     first_reply_author: null,
     first_reply_avatar: null,
+    first_reply_avatar_path: null,
     first_reply_date: null,
     // Flag status
     is_flagged: authorPost.is_flagged,

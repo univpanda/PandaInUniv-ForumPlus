@@ -5,6 +5,7 @@ export interface UserProfile {
   id: string
   username: string
   avatar_url: string | null
+  avatar_path: string | null
   is_private?: boolean
 }
 
@@ -15,6 +16,7 @@ export interface UserWithStats {
   email: string
   full_name: string | null
   avatar_url: string | null
+  avatar_path: string | null
   role: string
   is_blocked: boolean
   is_deleted: boolean

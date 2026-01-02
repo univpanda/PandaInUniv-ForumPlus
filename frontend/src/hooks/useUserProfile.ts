@@ -35,6 +35,7 @@ export function useUserProfile(userId: string | null) {
             id: cached.id,
             username: cached.username,
             avatar_url: cached.avatar_url,
+            avatar_path: cached.avatar_path ?? null,
             is_private: cached.is_private,
           }
         }
@@ -43,7 +44,7 @@ export function useUserProfile(userId: string | null) {
       // Fallback to Supabase
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('id, username, avatar_url, is_private')
+        .select('id, username, avatar_url, avatar_path, is_private')
         .eq('id', userId)
         .single()
 

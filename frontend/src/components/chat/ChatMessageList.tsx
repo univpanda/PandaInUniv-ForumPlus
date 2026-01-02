@@ -9,6 +9,7 @@ interface ChatMessageListProps {
   loading: boolean
   currentUserId: string
   partnerAvatar: string | null
+  partnerAvatarPath?: string | null
   partnerUsername: string
   /** Whether there are more messages to load */
   hasMore?: boolean
@@ -23,27 +24,20 @@ export const ChatMessageList = memo(function ChatMessageList({
   loading,
   currentUserId,
   partnerAvatar,
+  partnerAvatarPath,
   partnerUsername,
   hasMore = false,
   onLoadMore,
   isLoadingMore = false,
 }: ChatMessageListProps) {
-  const avatarUrl = getAvatarUrl(partnerAvatar, partnerUsername)
+  const avatarUrl = getAvatarUrl(partnerAvatar, partnerUsername, partnerAvatarPath)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const prevScrollHeightRef = useRef<number>(0)
 
   // Scroll to bottom when messages change (for new messages)
   useEffect(() => {
-    if (!loading && messages.length > 0 && !isLoadingMore) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            if (messagesContainerRef.current) {
-              messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
-            }
-          }, 100)
-        })
-      })
+    if (!loading && messages.length > 0 && !isLoadingMore && messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
     }
   }, [messages, loading, isLoadingMore])
 

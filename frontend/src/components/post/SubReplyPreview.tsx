@@ -26,7 +26,7 @@ export const SubReplyPreview = memo(function SubReplyPreview({
       <div className="sub-reply-content">{post.first_reply_content}</div>
       <div className="sub-reply-meta">
         <img
-          src={getAvatarUrl(post.first_reply_avatar, post.first_reply_author || 'User')}
+          src={getAvatarUrl(post.first_reply_avatar, post.first_reply_author || 'User', post.first_reply_avatar_path)}
           alt=""
           className="avatar-tiny"
         />
