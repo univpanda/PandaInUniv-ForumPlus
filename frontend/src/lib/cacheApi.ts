@@ -30,6 +30,9 @@ export async function getCachedUserProfile(
     console.warn('Cache API URL not configured, skipping cache')
     return null
   }
+  if (!authToken) {
+    return null
+  }
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 2000)
@@ -38,9 +41,7 @@ export async function getCachedUserProfile(
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     }
-    if (authToken) {
-      headers['Authorization'] = `Bearer ${authToken}`
-    }
+    headers['Authorization'] = `Bearer ${authToken}`
 
     const response = await fetch(`${CACHE_API_URL}/user/${userId}`, {
       method: 'GET',

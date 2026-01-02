@@ -1,7 +1,7 @@
 import { memo, useState, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
-import rehypeRaw from 'rehype-raw'
-import katex from 'katex'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import type { Post } from '../types'
 import { formatDate, parseAdditionalComments } from '../utils/format'
@@ -9,38 +9,24 @@ import { useDiscussionOptional } from '../contexts/DiscussionContext'
 import { PostCardActions, PostCardHeader, SubReplyPreview } from './post'
 import { ReplyCount } from './ui'
 
-// Preprocess content to render <latex> tags as KaTeX HTML
-// Each call resets equation numbering for the post
-function processLatexTags(content: string): string {
-  let equationCounter = 0
-
+// Convert <latex> tags into remark-math syntax to avoid raw HTML rendering.
+function convertLatexTagsToMath(content: string): string {
   return content.replace(/<latex>([\s\S]*?)<\/latex>/g, (_match, latex) => {
-    try {
-      // Check for $$ delimiters or block-level environments
-      const hasDoubleDollar = /^\$\$[\s\S]*\$\$$/.test(latex.trim())
-      const hasBlockEnv = /\\begin\{(equation\*?|align\*?|gather\*?|multline\*?|split|matrix|pmatrix|bmatrix|vmatrix|Vmatrix|smallmatrix|array|cases|subequations)\}/.test(latex)
-      const isDisplayMode = hasDoubleDollar || hasBlockEnv
+    const trimmed = latex.trim()
+    if (!trimmed) return ''
 
-      // Strip $$ if present
-      let processedLatex = latex
-      if (hasDoubleDollar) {
-        processedLatex = latex.trim().slice(2, -2)
-      }
+    const hasDoubleDollar = /^\$\$[\s\S]*\$\$$/.test(trimmed)
+    const hasBlockEnv = /\\begin\{(equation\*?|align\*?|gather\*?|multline\*?|split|matrix|pmatrix|bmatrix|vmatrix|Vmatrix|smallmatrix|array|cases|subequations)\}/.test(trimmed)
 
-      // Inject custom \tag for equation numbering per post (only for numbered equations)
-      if (/\\begin\{equation\}/.test(processedLatex) && !/\\tag\{/.test(processedLatex)) {
-        equationCounter++
-        // Insert \tag{n} before \end{equation}
-        processedLatex = processedLatex.replace(/\\end\{equation\}/, `\\tag{${equationCounter}}\\end{equation}`)
-      }
-
-      return katex.renderToString(processedLatex, {
-        throwOnError: false,
-        displayMode: isDisplayMode,
-      })
-    } catch {
-      return `<span class="latex-error">${latex}</span>`
+    if (hasDoubleDollar) {
+      return trimmed
     }
+
+    if (hasBlockEnv) {
+      return `$$\n${trimmed}\n$$`
+    }
+
+    return `$${trimmed}$`
   })
 }
 
@@ -156,7 +142,7 @@ export const PostCard = memo(function PostCard({
 
   // Memoize LaTeX processing - only recompute when content changes
   const processedContent = useMemo(
-    () => processLatexTags(displayContent),
+    () => convertLatexTagsToMath(displayContent),
     [displayContent]
   )
 
@@ -188,7 +174,9 @@ export const PostCard = memo(function PostCard({
         {post.edited_at && (post.reply_count > 0 || post.likes > 0 || post.dislikes > 0) && (
           <><span className="edited-indicator">(edited)</span><br /></>
         )}
-        <ReactMarkdown rehypePlugins={[rehypeRaw]}>{processedContent}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+          {processedContent}
+        </ReactMarkdown>
         {isLongContent && (
           <button
             className="show-more-btn"

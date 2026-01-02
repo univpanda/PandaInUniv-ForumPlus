@@ -1,5 +1,6 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, PutCommand, DeleteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import crypto from 'crypto';
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
@@ -7,6 +8,9 @@ const docClient = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = process.env.CACHE_TABLE || process.env.DYNAMODB_TABLE || 'panda-user-cache';
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_KEY;
+
+const JWKS_TTL_MS = 10 * 60 * 1000;
+let jwksCache = { keys: [], fetchedAt: 0 };
 
 // Cache TTLs in seconds
 const TTL = {
@@ -30,7 +34,66 @@ const response = (statusCode, body) => ({
   body: JSON.stringify(body),
 });
 
-// Verify Supabase JWT (basic validation)
+function base64UrlDecode(value) {
+  const padded = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
+  return Buffer.from(padded, 'base64');
+}
+
+function getSupabaseIssuer() {
+  if (!SUPABASE_URL) return null;
+  return `${SUPABASE_URL.replace(/\/$/, '')}/auth/v1`;
+}
+
+async function getJwks() {
+  if (!SUPABASE_URL) {
+    throw new Error('SUPABASE_URL is not configured');
+  }
+
+  const now = Date.now();
+  if (jwksCache.keys.length > 0 && now - jwksCache.fetchedAt < JWKS_TTL_MS) {
+    return jwksCache;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const res = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/auth/v1/keys`, {
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const err = new Error(`Failed to fetch JWKS: ${res.status}`);
+      err.code = 'JWKS_FETCH_FAILED';
+      throw err;
+    }
+    const data = await res.json();
+    if (!data?.keys) {
+      const err = new Error('Invalid JWKS response');
+      err.code = 'JWKS_FETCH_FAILED';
+      throw err;
+    }
+    jwksCache = { keys: data.keys, fetchedAt: now };
+    return jwksCache;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function jwkToKeyObject(jwk) {
+  try {
+    return crypto.createPublicKey({ key: jwk, format: 'jwk' });
+  } catch {
+    const cert = jwk?.x5c?.[0];
+    if (!cert) {
+      throw new Error('No usable key material for JWT verification');
+    }
+    const wrapped = cert.match(/.{1,64}/g)?.join('\n') || cert;
+    const pem = `-----BEGIN CERTIFICATE-----\n${wrapped}\n-----END CERTIFICATE-----\n`;
+    return crypto.createPublicKey(pem);
+  }
+}
+
+// Verify Supabase JWT (signature + basic claims)
 async function verifyToken(authHeader) {
   if (!authHeader?.startsWith('Bearer ')) {
     return null;
@@ -39,19 +102,49 @@ async function verifyToken(authHeader) {
   const token = authHeader.slice(7);
 
   try {
-    // Decode JWT payload (base64)
     const parts = token.split('.');
     if (parts.length !== 3) return null;
 
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+    const header = JSON.parse(base64UrlDecode(parts[0]).toString());
+    const payload = JSON.parse(base64UrlDecode(parts[1]).toString());
+    const signature = base64UrlDecode(parts[2]);
+    const signingInput = `${parts[0]}.${parts[1]}`;
 
     // Check expiry
     if (payload.exp && payload.exp < Date.now() / 1000) {
       return null;
     }
 
+    const expectedIssuer = getSupabaseIssuer();
+    if (expectedIssuer && payload.iss !== expectedIssuer) {
+      return null;
+    }
+
+    const expectedAud = 'authenticated';
+    const aud = payload.aud;
+    const audMatches = Array.isArray(aud) ? aud.includes(expectedAud) : aud === expectedAud;
+    if (!audMatches) {
+      return null;
+    }
+
+    const jwks = await getJwks();
+    let jwk = jwks.keys.find((key) => key.kid === header.kid);
+    if (!jwk) {
+      jwksCache = { keys: [], fetchedAt: 0 };
+      const refreshed = await getJwks();
+      jwk = refreshed.keys.find((key) => key.kid === header.kid);
+    }
+    if (!jwk) return null;
+
+    const keyObject = jwkToKeyObject(jwk);
+    const isValid = crypto.verify('RSA-SHA256', Buffer.from(signingInput), keyObject, signature);
+    if (!isValid) return null;
+
     return payload;
-  } catch {
+  } catch (error) {
+    if (error?.code === 'JWKS_FETCH_FAILED') {
+      throw error;
+    }
     return null;
   }
 }
@@ -297,6 +390,10 @@ export const handler = async (event) => {
   const path = event.rawPath || '/';
 
   try {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+      return response(500, { error: 'Server configuration error' });
+    }
+
     // Parse path
     const pathParts = path.split('/').filter(Boolean);
 
@@ -307,13 +404,29 @@ export const handler = async (event) => {
 
     // Verify auth for protected endpoints
     const authHeader = event.headers?.authorization || event.headers?.Authorization;
-    const token = await verifyToken(authHeader);
+    let token = null;
+    try {
+      token = await verifyToken(authHeader);
+    } catch (error) {
+      console.error('Auth verification failed:', error);
+      return response(503, { error: 'Auth service unavailable' });
+    }
 
     // GET /user/:userId
     if (method === 'GET' && pathParts[0] === 'user' && pathParts[1]) {
+      if (!token) {
+        return response(401, { error: 'Unauthorized' });
+      }
       const userId = pathParts[1];
 
-      // Optional: verify token.sub matches userId for non-admin
+      // Allow self lookup; require admin for other users
+      if (token.sub !== userId) {
+        const requesterProfile = await getUserProfile(token.sub);
+        if (requesterProfile?.role !== 'admin') {
+          return response(403, { error: 'Forbidden' });
+        }
+      }
+
       const profile = await getUserProfile(userId);
 
       if (!profile) {
@@ -331,8 +444,10 @@ export const handler = async (event) => {
 
       // Check for pagination query params
       const queryParams = event.queryStringParameters || {};
-      const limit = queryParams.limit ? parseInt(queryParams.limit, 10) : null;
-      const offset = queryParams.offset ? parseInt(queryParams.offset, 10) : null;
+      const parsedLimit = queryParams.limit ? parseInt(queryParams.limit, 10) : NaN;
+      const parsedOffset = queryParams.offset ? parseInt(queryParams.offset, 10) : NaN;
+      const limit = Number.isFinite(parsedLimit) ? parsedLimit : null;
+      const offset = Number.isFinite(parsedOffset) ? parsedOffset : null;
       const search = queryParams.search || null;
 
       // If pagination params provided, use optimized parallel fetch
@@ -375,7 +490,15 @@ export const handler = async (event) => {
         return response(401, { error: 'Unauthorized' });
       }
 
-      const result = await invalidateUserCache(pathParts[2]);
+      const targetUserId = pathParts[2];
+      if (token.sub !== targetUserId) {
+        const requesterProfile = await getUserProfile(token.sub);
+        if (requesterProfile?.role !== 'admin') {
+          return response(403, { error: 'Admin access required' });
+        }
+      }
+
+      const result = await invalidateUserCache(targetUserId);
       return response(200, result);
     }
 
@@ -383,6 +506,11 @@ export const handler = async (event) => {
     if (method === 'DELETE' && pathParts[0] === 'cache' && pathParts[1] === 'users') {
       if (!token) {
         return response(401, { error: 'Unauthorized' });
+      }
+
+      const requesterProfile = await getUserProfile(token.sub);
+      if (requesterProfile?.role !== 'admin') {
+        return response(403, { error: 'Admin access required' });
       }
 
       const result = await invalidateUsersCache();
