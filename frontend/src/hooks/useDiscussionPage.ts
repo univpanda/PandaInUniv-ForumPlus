@@ -32,8 +32,18 @@ export function useDiscussionPage({ resetToList }: UseDiscussionPageProps) {
     }
 
     if (!user) {
-      // Non-logged-in users can't use @ syntax
-      return { authorUsername: null, searchText: filters.deferredSearchQuery.trim(), isDeleted: false, isFlagged: false, postType: 'all' as const }
+      // Non-logged-in users can't use @username filters; drop leading @token.
+      const raw = filters.deferredSearchQuery.trim()
+      const sanitized = raw.startsWith('@')
+        ? raw.replace(/^@\S+\s*/, '').trim()
+        : raw
+      return {
+        authorUsername: null,
+        searchText: sanitized || null,
+        isDeleted: false,
+        isFlagged: false,
+        postType: 'all' as const,
+      }
     }
 
     // Use the already-parsed search from useDiscussionFilters
