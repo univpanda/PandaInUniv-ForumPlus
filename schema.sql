@@ -24,6 +24,9 @@
 -- 0. HELPER FUNCTIONS
 -- =============================================================================
 
+-- Text search acceleration
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 -- Helper function to check if current user is blocked (used in RLS policies)
 CREATE OR REPLACE FUNCTION public.is_not_blocked()
 RETURNS BOOLEAN
@@ -202,6 +205,7 @@ CREATE INDEX IF NOT EXISTS idx_forum_threads_author ON forum_threads(author_id);
 CREATE INDEX IF NOT EXISTS idx_forum_threads_created ON forum_threads(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_forum_threads_last_activity ON forum_threads(last_activity DESC);
 CREATE INDEX IF NOT EXISTS idx_forum_threads_flagged ON forum_threads(is_flagged) WHERE is_flagged = TRUE;
+CREATE INDEX IF NOT EXISTS idx_forum_threads_title_trgm ON forum_threads USING GIN (LOWER(title) gin_trgm_ops);
 
 ALTER TABLE forum_threads ENABLE ROW LEVEL SECURITY;
 
@@ -231,7 +235,10 @@ CREATE TABLE IF NOT EXISTS forum_posts (
   is_deleted BOOLEAN DEFAULT FALSE,
   deleted_by UUID REFERENCES user_profiles(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  edited_at TIMESTAMPTZ
+  edited_at TIMESTAMPTZ,
+  likes INTEGER DEFAULT 0,
+  dislikes INTEGER DEFAULT 0,
+  reply_count INTEGER DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_forum_posts_thread ON forum_posts(thread_id);
@@ -243,6 +250,9 @@ CREATE INDEX IF NOT EXISTS idx_forum_posts_flagged ON forum_posts(is_flagged) WH
 CREATE INDEX IF NOT EXISTS idx_forum_posts_author_created ON forum_posts(author_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_forum_posts_thread_parent ON forum_posts(thread_id, parent_id);
 CREATE INDEX IF NOT EXISTS idx_forum_posts_thread_created ON forum_posts(thread_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_forum_posts_thread_parent_created ON forum_posts(thread_id, parent_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_forum_posts_thread_op ON forum_posts(thread_id) WHERE parent_id IS NULL;
+CREATE INDEX IF NOT EXISTS idx_forum_posts_content_trgm ON forum_posts USING GIN (LOWER(content) gin_trgm_ops);
 
 ALTER TABLE forum_posts ENABLE ROW LEVEL SECURITY;
 
@@ -277,6 +287,39 @@ CREATE TRIGGER trigger_update_thread_last_activity
   FOR EACH ROW
   EXECUTE FUNCTION update_thread_last_activity();
 
+-- Trigger to maintain reply_count on parent posts
+CREATE OR REPLACE FUNCTION update_post_reply_count()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.parent_id IS NOT NULL THEN
+      UPDATE forum_posts
+      SET reply_count = reply_count + 1
+      WHERE id = NEW.parent_id;
+    END IF;
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    IF OLD.parent_id IS NOT NULL THEN
+      UPDATE forum_posts
+      SET reply_count = GREATEST(reply_count - 1, 0)
+      WHERE id = OLD.parent_id;
+    END IF;
+    RETURN OLD;
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_post_reply_count_insert
+  AFTER INSERT ON forum_posts
+  FOR EACH ROW
+  EXECUTE FUNCTION update_post_reply_count();
+
+CREATE TRIGGER trigger_update_post_reply_count_delete
+  AFTER DELETE ON forum_posts
+  FOR EACH ROW
+  EXECUTE FUNCTION update_post_reply_count();
+
 
 -- =============================================================================
 -- 4. POST VOTES
@@ -293,6 +336,7 @@ CREATE TABLE IF NOT EXISTS post_votes (
 
 CREATE INDEX IF NOT EXISTS idx_post_votes_post ON post_votes(post_id);
 CREATE INDEX IF NOT EXISTS idx_post_votes_user ON post_votes(user_id);
+CREATE INDEX IF NOT EXISTS idx_post_votes_post_type ON post_votes(post_id, vote_type);
 
 ALTER TABLE post_votes ENABLE ROW LEVEL SECURITY;
 
@@ -317,6 +361,62 @@ CREATE POLICY "Non-blocked users can remove own vote" ON post_votes
     AND public.is_not_blocked()
   );
 
+-- Trigger to maintain likes/dislikes counters on forum_posts
+CREATE OR REPLACE FUNCTION update_post_vote_counts()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.vote_type = 1 THEN
+      UPDATE forum_posts SET likes = likes + 1 WHERE id = NEW.post_id;
+    ELSE
+      UPDATE forum_posts SET dislikes = dislikes + 1 WHERE id = NEW.post_id;
+    END IF;
+    RETURN NEW;
+  ELSIF TG_OP = 'UPDATE' THEN
+    IF OLD.vote_type = NEW.vote_type THEN
+      RETURN NEW;
+    END IF;
+
+    IF OLD.vote_type = 1 THEN
+      UPDATE forum_posts SET likes = GREATEST(likes - 1, 0) WHERE id = NEW.post_id;
+    ELSE
+      UPDATE forum_posts SET dislikes = GREATEST(dislikes - 1, 0) WHERE id = NEW.post_id;
+    END IF;
+
+    IF NEW.vote_type = 1 THEN
+      UPDATE forum_posts SET likes = likes + 1 WHERE id = NEW.post_id;
+    ELSE
+      UPDATE forum_posts SET dislikes = dislikes + 1 WHERE id = NEW.post_id;
+    END IF;
+
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    IF OLD.vote_type = 1 THEN
+      UPDATE forum_posts SET likes = GREATEST(likes - 1, 0) WHERE id = OLD.post_id;
+    ELSE
+      UPDATE forum_posts SET dislikes = GREATEST(dislikes - 1, 0) WHERE id = OLD.post_id;
+    END IF;
+    RETURN OLD;
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_post_vote_counts_insert
+  AFTER INSERT ON post_votes
+  FOR EACH ROW
+  EXECUTE FUNCTION update_post_vote_counts();
+
+CREATE TRIGGER trigger_update_post_vote_counts_update
+  AFTER UPDATE ON post_votes
+  FOR EACH ROW
+  EXECUTE FUNCTION update_post_vote_counts();
+
+CREATE TRIGGER trigger_update_post_vote_counts_delete
+  AFTER DELETE ON post_votes
+  FOR EACH ROW
+  EXECUTE FUNCTION update_post_vote_counts();
+
 
 -- =============================================================================
 -- 5. BOOKMARKS
@@ -331,6 +431,7 @@ CREATE TABLE IF NOT EXISTS bookmarks (
 );
 
 CREATE INDEX IF NOT EXISTS idx_bookmarks_user ON bookmarks(user_id);
+CREATE INDEX IF NOT EXISTS idx_bookmarks_user_created ON bookmarks(user_id, created_at DESC);
 
 ALTER TABLE bookmarks ENABLE ROW LEVEL SECURITY;
 
@@ -418,6 +519,8 @@ CREATE TABLE IF NOT EXISTS feedback_messages (
 
 CREATE INDEX IF NOT EXISTS idx_feedback_messages_user ON feedback_messages(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_feedback_messages_recipient ON feedback_messages(recipient_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_feedback_messages_unread ON feedback_messages(recipient_id, user_id, created_at DESC) WHERE is_read = FALSE;
+CREATE INDEX IF NOT EXISTS idx_feedback_messages_recipient_unread ON feedback_messages(recipient_id) WHERE is_read = FALSE;
 
 ALTER TABLE feedback_messages ENABLE ROW LEVEL SECURITY;
 
@@ -1066,8 +1169,8 @@ BEGIN
       CASE WHEN p_sort_by = 'recent' THEN COALESCE(t.last_activity, t.created_at) ELSE t.created_at END AS created_at,
       op.content,
       count_visible_thread_replies(t.id, v_is_admin) AS reply_count,
-      (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = 1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = op.id) AS total_likes,
-      (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = -1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = op.id) AS total_dislikes,
+    COALESCE(op.likes, 0) AS total_likes,
+    COALESCE(op.dislikes, 0) AS total_dislikes,
       COALESCE(op.is_deleted, FALSE) AS is_op_deleted,
       v_total AS total_count
     FROM forum_threads t
@@ -1144,8 +1247,8 @@ BEGIN
     p.additional_comments,
     p.created_at,
     p.edited_at,
-    (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = 1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p.id) AS likes,
-    (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = -1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p.id) AS dislikes,
+    COALESCE(p.likes, 0) AS likes,
+    COALESCE(p.dislikes, 0) AS dislikes,
     (SELECT pv.vote_type FROM post_votes pv WHERE pv.post_id = p.id AND pv.user_id = auth.uid()),
     count_visible_replies(p.id, v_is_admin),
     p.is_flagged,
@@ -1252,10 +1355,10 @@ BEGIN
       p.additional_comments,
       p.created_at,
       p.edited_at,
-      (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = 1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p.id) AS likes,
-      (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = -1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p.id) AS dislikes,
+      COALESCE(p.likes, 0) AS likes,
+      COALESCE(p.dislikes, 0) AS dislikes,
       (SELECT pv.vote_type FROM post_votes pv WHERE pv.post_id = p.id AND pv.user_id = auth.uid()) AS user_vote,
-      (SELECT COUNT(*) FROM forum_posts r WHERE r.parent_id = p.id) AS reply_count,
+      COALESCE(p.reply_count, 0) AS reply_count,
       p.is_flagged,
       p.flag_reason,
       COALESCE(p.is_deleted, FALSE) AS is_deleted,
@@ -1353,10 +1456,10 @@ BEGIN
     p.additional_comments,
     p.created_at,
     p.edited_at,
-    (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = 1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p.id) AS likes,
-    (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = -1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p.id) AS dislikes,
+    COALESCE(p.likes, 0) AS likes,
+    COALESCE(p.dislikes, 0) AS dislikes,
     (SELECT pv.vote_type FROM post_votes pv WHERE pv.post_id = p.id AND pv.user_id = auth.uid()) AS user_vote,
-    (SELECT COUNT(*) FROM forum_posts r WHERE r.parent_id = p.id) AS reply_count,
+    COALESCE(p.reply_count, 0) AS reply_count,
     p.is_flagged,
     p.flag_reason,
     COALESCE(p.is_deleted, FALSE) AS is_deleted,
@@ -1383,10 +1486,10 @@ BEGIN
       p.additional_comments,
       p.created_at,
       p.edited_at,
-      (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = 1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p.id) AS likes,
-      (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = -1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p.id) AS dislikes,
+    COALESCE(p.likes, 0) AS likes,
+    COALESCE(p.dislikes, 0) AS dislikes,
       (SELECT pv.vote_type FROM post_votes pv WHERE pv.post_id = p.id AND pv.user_id = auth.uid()) AS user_vote,
-      (SELECT COUNT(*) FROM forum_posts r WHERE r.parent_id = p.id) AS reply_count,
+      COALESCE(p.reply_count, 0) AS reply_count,
       p.is_flagged,
       p.flag_reason,
       COALESCE(p.is_deleted, FALSE) AS is_deleted,
@@ -1531,9 +1634,11 @@ BEGIN
 
   RETURN QUERY
   SELECT
-    (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = 1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p_post_id),
-    (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = -1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p_post_id),
-    (SELECT pv.vote_type FROM post_votes pv WHERE pv.post_id = p_post_id AND pv.user_id = auth.uid());
+    COALESCE(p.likes, 0),
+    COALESCE(p.dislikes, 0),
+    (SELECT pv.vote_type FROM post_votes pv WHERE pv.post_id = p_post_id AND pv.user_id = auth.uid())
+  FROM forum_posts p
+  WHERE p.id = p_post_id;
 END;
 $$;
 
@@ -2143,8 +2248,8 @@ BEGIN
       u.avatar_path AS author_avatar_path,
       p.created_at,
       p.edited_at,
-      (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = 1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p.id) AS likes,
-      (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = -1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p.id) AS dislikes,
+      COALESCE(p.likes, 0) AS likes,
+      COALESCE(p.dislikes, 0) AS dislikes,
       (SELECT pv.vote_type FROM post_votes pv WHERE pv.post_id = p.id AND pv.user_id = auth.uid()) AS user_vote,
       count_visible_replies(p.id, FALSE) AS reply_count,
       p.is_flagged,
@@ -2248,8 +2353,8 @@ BEGIN
       u.avatar_url AS author_avatar,
       u.avatar_path AS author_avatar_path,
       p.created_at,
-      (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = 1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p.id) AS likes,
-      (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = -1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p.id) AS dislikes,
+      COALESCE(p.likes, 0) AS likes,
+      COALESCE(p.dislikes, 0) AS dislikes,
       count_visible_replies(p.id, v_is_admin) AS reply_count,
       COALESCE(p.is_deleted, FALSE) AS is_deleted,
       p.deleted_by,
@@ -2527,8 +2632,8 @@ BEGIN
     u.avatar_url,
     u.avatar_path,
     p.created_at,
-    (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = 1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p.id),
-    (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = -1 THEN 1 ELSE 0 END), 0) FROM post_votes pv WHERE pv.post_id = p.id),
+    COALESCE(p.likes, 0),
+    COALESCE(p.dislikes, 0),
     (SELECT COUNT(*) FROM forum_posts r WHERE r.parent_id = p.id AND COALESCE(r.is_deleted, FALSE) = FALSE),
     -- Delta counts (new activity since last dismissal)
     (n.reply_count - n.baseline_reply_count)::INTEGER,
