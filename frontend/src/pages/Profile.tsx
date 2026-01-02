@@ -6,9 +6,10 @@ import { useAuth } from '../hooks/useAuth'
 import { useUserProfile, useTogglePrivate } from '../hooks/useUserProfile'
 import { useUserProfileStats } from '../hooks/useProfileQueries'
 import { usePostBookmarks } from '../hooks/useBookmarkQueries'
+import { useToast } from '../contexts/ToastContext'
 import { UsernameEditor } from '../components/auth/UsernameEditor'
 import { getAvatarUrl } from '../utils/format'
-import { LoadingSpinner } from '../components/ui'
+import { LoadingSpinner, ButtonSpinner } from '../components/ui'
 import type { SearchDiscussionEvent } from '../components/AuthButton'
 
 export const Profile = memo(function Profile() {
@@ -17,6 +18,20 @@ export const Profile = memo(function Profile() {
   const { data: stats, isLoading: statsLoading } = useUserProfileStats(user?.id ?? null)
   const { data: bookmarks } = usePostBookmarks(user?.id)
   const togglePrivate = useTogglePrivate()
+  const toast = useToast()
+
+  // Handle privacy toggle with feedback
+  const handleTogglePrivate = useCallback(() => {
+    if (!user) return
+    togglePrivate.mutate(user.id, {
+      onSuccess: (isNowPrivate) => {
+        toast.showSuccess(isNowPrivate ? 'Profile set to private' : 'Profile set to public')
+      },
+      onError: () => {
+        toast.showError('Failed to update privacy setting')
+      },
+    })
+  }, [user, togglePrivate, toast])
 
   // Navigate to Discussion with search query
   // 'threads' -> @username @op (only thread OPs)
@@ -113,10 +128,16 @@ export const Profile = memo(function Profile() {
           <h3 className="profile-section-title">Privacy</h3>
           <button
             className={`profile-privacy-toggle ${profile?.is_private ? 'private' : 'public'}`}
-            onClick={() => user && togglePrivate.mutate(user.id)}
+            onClick={handleTogglePrivate}
             disabled={togglePrivate.isPending}
           >
-            {profile?.is_private ? <EyeOff size={20} /> : <Eye size={20} />}
+            {togglePrivate.isPending ? (
+              <ButtonSpinner size={20} />
+            ) : profile?.is_private ? (
+              <EyeOff size={20} />
+            ) : (
+              <Eye size={20} />
+            )}
             <div className="profile-privacy-info">
               <span className="profile-privacy-status">
                 {profile?.is_private ? 'Private Profile' : 'Public Profile'}

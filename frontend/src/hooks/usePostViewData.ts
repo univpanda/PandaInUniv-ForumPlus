@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { usePosts, usePaginatedPosts, usePaginatedAuthorPosts, forumKeys } from './useForumQueries'
+import { usePosts, usePaginatedPosts, usePaginatedAuthorPosts, useThreadView, forumKeys } from './useForumQueries'
 import { PAGE_SIZE } from '../utils/constants'
 import { isPostStub, isFullPost } from '../types'
 import type { View, SelectedThread, SelectedPost } from './useDiscussionNavigation'
@@ -78,25 +78,17 @@ export function usePostViewData({
   // Derive thread ID safely (null when no thread selected)
   const threadId = selectedThread?.id ?? null
 
-  // For thread view, we need the OP first to get paginated replies
-  const postsQuery = usePosts(threadId ?? 0, null, view === 'thread' && threadId !== null)
-
-  // Get the OP's ID from the legacy query to use for paginated replies
-  const opId = useMemo(() => {
-    if (view !== 'thread') return null
-    const op = postsQuery.data?.find((p) => p.parent_id === null)
-    return op?.id ?? null
-  }, [view, postsQuery.data])
-
-  // Paginated replies for thread view (replies to OP) - server-side sorted
-  const paginatedRepliesQuery = usePaginatedPosts(
+  // ============ THREAD VIEW: Single query for OP + paginated replies ============
+  // Uses get_thread_view RPC which returns both in one call (no waterfall)
+  const threadViewQuery = useThreadView(
     threadId ?? 0,
-    opId ?? 0,
     repliesPage,
     PAGE_SIZE.POSTS,
     replySortBy,
-    view === 'thread' && threadId !== null && opId !== null
+    view === 'thread' && threadId !== null
   )
+
+  // ============ REPLIES VIEW: Sub-replies + OP lookup ============
 
   // Sub-replies query for replies view - server-side sorted
   // Only check reply_count if we have a full Post (not a stub)
@@ -111,23 +103,33 @@ export function usePostViewData({
   )
 
   // Root posts query for replies view (to show OP)
+  // First check cache from thread view, then fall back to query
+  const threadViewCacheKey = threadId !== null ? forumKeys.threadView(threadId, 1, 'popular') : null
+  const cachedThreadView = threadViewCacheKey
+    ? queryClient.getQueryData<{ originalPost: Post | undefined }>(threadViewCacheKey)
+    : undefined
+  const cachedOp = cachedThreadView?.originalPost
+
+  // Legacy root posts cache (for backwards compatibility)
   const rootPostsQueryKey = threadId !== null ? forumKeys.posts(threadId, null) : null
   const cachedRootPosts = rootPostsQueryKey
     ? queryClient.getQueryData<Post[]>(rootPostsQueryKey)
     : undefined
-  const threadRootPostsQuery = usePosts(
-    threadId ?? 0,
-    null,
-    view === 'replies' && threadId !== null && !cachedRootPosts
-  )
+
+  // Only fetch if we don't have OP from any cache
+  const needsOpFetch = view === 'replies' && threadId !== null && !cachedOp && !cachedRootPosts
+  const threadRootPostsQuery = usePosts(threadId ?? 0, null, needsOpFetch)
 
   // Get OP ID for replies view (needed to fetch level-1 replies where selectedPost lives)
   const repliesViewOpId = useMemo(() => {
     if (view !== 'replies') return null
+    // Try cached OP first
+    if (cachedOp) return cachedOp.id
+    // Then legacy cache
     const rootPosts = cachedRootPosts ?? threadRootPostsQuery.data ?? []
     const op = rootPosts.find((p) => p.parent_id === null)
     return op?.id ?? null
-  }, [view, cachedRootPosts, threadRootPostsQuery.data])
+  }, [view, cachedOp, cachedRootPosts, threadRootPostsQuery.data])
 
   // Check if selectedPost is a stub (only has id, missing content)
   const isSelectedPostStub = view === 'replies' && isPostStub(selectedPost)
@@ -138,6 +140,8 @@ export function usePostViewData({
     repliesViewOpId ?? 0,
     view === 'replies' && threadId !== null && repliesViewOpId !== null && isSelectedPostStub
   )
+
+  // ============ POSTS SEARCH ============
 
   // Paginated posts search query (searches all posts when searchMode is 'posts')
   const paginatedPostsSearchQuery = usePaginatedAuthorPosts(
@@ -153,23 +157,35 @@ export function usePostViewData({
 
   // ============ COMPUTED DATA ============
 
-  // Raw posts from query (used for finding posts by ID)
-  const rawPosts = postsQuery.data ?? []
+  // Raw posts - for thread view, combine OP and replies from single query
+  const rawPosts = useMemo(() => {
+    if (view === 'thread') {
+      const posts: Post[] = []
+      if (threadViewQuery.data?.originalPost) posts.push(threadViewQuery.data.originalPost)
+      posts.push(...(threadViewQuery.data?.replies ?? []))
+      return posts
+    }
+    return []
+  }, [view, threadViewQuery.data])
 
-  // Computed original post and replies (server-side sorted)
+  // Computed original post and replies
   const { originalPost, replies } = useMemo(() => {
     if (view === 'list') return { originalPost: undefined, replies: [] }
-    if (view === 'replies') {
-      const rootPosts = cachedRootPosts ?? threadRootPostsQuery.data ?? []
-      const original = rootPosts.find((p) => p.parent_id === null)
-      return { originalPost: original, replies: [] }
+    if (view === 'thread') {
+      // Thread view: data comes from single threadView query
+      return {
+        originalPost: threadViewQuery.data?.originalPost,
+        replies: threadViewQuery.data?.replies ?? [],
+      }
     }
-    // For thread view: OP from postsQuery, replies from paginated query
-    const posts = postsQuery.data ?? []
-    const original = posts.find((p) => p.parent_id === null)
-    const paginatedReplies = paginatedRepliesQuery.data?.posts ?? []
-    return { originalPost: original, replies: paginatedReplies }
-  }, [postsQuery.data, paginatedRepliesQuery.data, view, cachedRootPosts, threadRootPostsQuery.data])
+    // Replies view: get OP from cache or fetch
+    if (cachedOp) {
+      return { originalPost: cachedOp, replies: [] }
+    }
+    const rootPosts = cachedRootPosts ?? threadRootPostsQuery.data ?? []
+    const original = rootPosts.find((p) => p.parent_id === null)
+    return { originalPost: original, replies: [] }
+  }, [view, threadViewQuery.data, cachedOp, cachedRootPosts, threadRootPostsQuery.data])
 
   // Resolve selectedPost from fetched data when it's a stub
   const resolvedSelectedPost = useMemo(() => {
@@ -203,14 +219,21 @@ export function usePostViewData({
 
   // ============ LOADING & ERROR STATES ============
 
-  const needsRootPostsLoading = !cachedRootPosts && threadRootPostsQuery.isLoading
+  const needsRootPostsLoading = needsOpFetch && threadRootPostsQuery.isLoading
   const needsLevel1RepliesLoading = isSelectedPostStub && level1RepliesQuery.isLoading
-  const isLoading =
-    (view === 'thread' && (postsQuery.isLoading || (opId !== null && paginatedRepliesQuery.isLoading))) ||
-    (view === 'replies' && ((hasSubReplies && paginatedSubRepliesQuery.isLoading) || needsRootPostsLoading || needsLevel1RepliesLoading))
+
+  // Thread view: simple loading - just wait for single query
+  const isThreadViewLoading = view === 'thread' && threadViewQuery.isLoading
+
+  // Replies view: loading if sub-replies loading OR we need OP and it's loading
+  const isRepliesViewLoading =
+    view === 'replies' &&
+    ((hasSubReplies && paginatedSubRepliesQuery.isLoading) || needsRootPostsLoading || needsLevel1RepliesLoading)
+
+  const isLoading = isThreadViewLoading || isRepliesViewLoading
 
   const isError =
-    (view === 'thread' && (postsQuery.isError || paginatedRepliesQuery.isError)) ||
+    (view === 'thread' && threadViewQuery.isError) ||
     (view === 'replies' && paginatedSubRepliesQuery.isError)
 
   return {
@@ -227,10 +250,10 @@ export function usePostViewData({
     postsSearchIsPrivate: paginatedPostsSearchQuery.data?.isPrivate ?? false,
     isLoading,
     isError,
-    repliesTotalCount: paginatedRepliesQuery.data?.totalCount ?? 0,
+    repliesTotalCount: threadViewQuery.data?.totalCount ?? 0,
     subRepliesTotalCount: paginatedSubRepliesQuery.data?.totalCount ?? 0,
-    refetchPosts: postsQuery.refetch,
-    refetchReplies: paginatedRepliesQuery.refetch,
+    refetchPosts: threadViewQuery.refetch,
+    refetchReplies: threadViewQuery.refetch,
     refetchSubReplies: paginatedSubRepliesQuery.refetch,
     refetchPostsSearch: paginatedPostsSearchQuery.refetch,
   }

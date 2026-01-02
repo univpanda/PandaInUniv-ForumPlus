@@ -15,9 +15,11 @@ export {
 export {
   usePosts,
   usePaginatedPosts,
+  useThreadView,
   usePrefetchPosts,
   useAddReply,
   type AddReplyVariables,
+  type ThreadViewResponse,
 } from './usePostQueries'
 
 // Post mutations

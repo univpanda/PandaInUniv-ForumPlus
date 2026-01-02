@@ -1,11 +1,10 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { checkContent } from '../utils/contentModeration'
 import { STALE_TIME, PAGE_SIZE } from '../utils/constants'
 import { extractPaginatedResponse } from '../utils/queryHelpers'
 import { forumKeys } from './forumQueryKeys'
 import { profileKeys } from './useUserProfile'
-import { useOptimisticMutation } from './useOptimisticMutation'
 import type { Post, Thread, GetThreadPostsResponse, GetPaginatedPostsResponse } from '../types'
 
 // Posts query (used to fetch all posts for a thread, then filtered/sorted client-side)
@@ -47,6 +46,56 @@ export function usePaginatedPosts(
       if (error) throw error
       const { items: posts, totalCount } = extractPaginatedResponse<Post>(data)
       return { posts, totalCount }
+    },
+    enabled,
+    staleTime: STALE_TIME.SHORT,
+    placeholderData: (prev) => prev,
+  })
+}
+
+// Thread view response type (OP + paginated replies in single query)
+export interface ThreadViewResponse {
+  originalPost: Post | undefined
+  replies: Post[]
+  totalCount: number
+}
+
+// Thread view query - fetches OP + paginated replies in a single query (eliminates waterfall)
+export function useThreadView(
+  threadId: number,
+  page: number,
+  pageSize: number = PAGE_SIZE.POSTS,
+  sort: 'popular' | 'new' = 'popular',
+  enabled: boolean = true
+) {
+  return useQuery({
+    queryKey: forumKeys.threadView(threadId, page, sort),
+    queryFn: async (): Promise<ThreadViewResponse> => {
+      const { data, error } = await supabase.rpc('get_thread_view', {
+        p_thread_id: threadId,
+        p_limit: pageSize,
+        p_offset: (page - 1) * pageSize,
+        p_sort: sort,
+      })
+      if (error) throw error
+
+      // Parse response: first row with is_op=true is OP, rest are replies
+      const rows = (data ?? []) as Array<Post & { is_op: boolean; total_count: number }>
+      const opRow = rows.find((r) => r.is_op)
+      const replyRows = rows.filter((r) => !r.is_op)
+      const totalCount = rows[0]?.total_count ?? 0
+
+      // Convert to Post type (remove is_op and total_count fields)
+      const toPost = (row: Post & { is_op: boolean; total_count: number }): Post => {
+        const { is_op: _isOp, total_count: _totalCount, ...post } = row
+        return post as Post
+      }
+
+      return {
+        originalPost: opRow ? toPost(opRow) : undefined,
+        replies: replyRows.map(toPost),
+        totalCount,
+      }
     },
     enabled,
     staleTime: STALE_TIME.SHORT,
@@ -129,11 +178,39 @@ function prependOptimisticReply(
   return { posts: [optimisticReply, ...old.posts], totalCount: old.totalCount + 1 }
 }
 
-// Add reply mutation with optimistic update using factory pattern
+// Helper to prepend optimistic reply to threadView cache (level-1 replies only)
+function prependOptimisticReplyToThreadView(
+  old: ThreadViewResponse | undefined,
+  variables: AddReplyVariables
+): ThreadViewResponse {
+  const optimisticReply = createOptimisticReply(variables)
+  if (!old) return { originalPost: undefined, replies: [optimisticReply], totalCount: 1 }
+  return { ...old, replies: [optimisticReply, ...old.replies], totalCount: old.totalCount + 1 }
+}
+
+// Helper to find all threadView queries for a thread
+function findThreadViewQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  threadId: number
+) {
+  return queryClient.getQueryCache().findAll({
+    predicate: (query) => {
+      const key = query.queryKey
+      return (
+        key[0] === 'forum' &&
+        key[1] === 'posts' &&
+        key[2] === threadId &&
+        key[3] === 'threadView'
+      )
+    },
+  })
+}
+
+// Add reply mutation with optimistic update for both paginatedPosts and threadView
 export function useAddReply() {
   const queryClient = useQueryClient()
 
-  return useOptimisticMutation<GetPaginatedPostsResponse, AddReplyVariables, number>({
+  return useMutation<number, Error, AddReplyVariables, { previousData: Map<string, unknown> }>({
     mutationFn: async ({ threadId, content, parentId }): Promise<number> => {
       // Check content for inappropriate words
       const flagCheck = checkContent(content)
@@ -148,19 +225,61 @@ export function useAddReply() {
       if (error) throw error
       return data as number // Returns the new post ID
     },
-    cacheUpdates: [
-      // Update current page/sort cache the user is viewing
-      {
-        queryKey: ({ threadId, parentId, page, sort }) =>
-          forumKeys.paginatedPosts(threadId, parentId, page, sort),
-        updater: prependOptimisticReply,
-      },
-    ],
-    invalidateOnSettled: false, // Keep optimistic position until user navigates away or refreshes
+
+    onMutate: async (variables) => {
+      // Cancel outgoing queries
+      await queryClient.cancelQueries({ queryKey: forumKeys.postsAll() })
+
+      // Store previous data for ALL caches (unified rollback)
+      const previousData = new Map<string, unknown>()
+
+      // Optimistically update paginatedPosts cache
+      const paginatedKey = forumKeys.paginatedPosts(variables.threadId, variables.parentId, variables.page, variables.sort)
+      const oldPaginated = queryClient.getQueryData<GetPaginatedPostsResponse>(paginatedKey)
+      if (oldPaginated) {
+        previousData.set(JSON.stringify(paginatedKey), oldPaginated)
+      }
+      queryClient.setQueryData<GetPaginatedPostsResponse>(paginatedKey, (old) =>
+        prependOptimisticReply(old, variables)
+      )
+
+      // Only update threadView for level-1 replies (direct replies to OP)
+      // Level-1 replies have parentId = OP's ID, sub-replies have parentId = some reply's ID
+      // We detect level-1 replies by checking if parentId matches the OP's ID in the cache
+      const threadViewQueries = findThreadViewQueries(queryClient, variables.threadId)
+      for (const query of threadViewQueries) {
+        const oldData = queryClient.getQueryData<ThreadViewResponse>(query.queryKey)
+        if (!oldData) continue
+
+        // Check if this is a level-1 reply (parentId === OP's ID)
+        const opId = oldData.originalPost?.id
+        const isLevel1Reply = opId !== undefined && variables.parentId === opId
+
+        if (isLevel1Reply) {
+          const keyStr = JSON.stringify(query.queryKey)
+          previousData.set(keyStr, oldData)
+          queryClient.setQueryData<ThreadViewResponse>(query.queryKey, (old) =>
+            prependOptimisticReplyToThreadView(old, variables)
+          )
+        }
+      }
+
+      return { previousData }
+    },
+
+    onError: (_error, _variables, context) => {
+      // Rollback ALL caches
+      if (context?.previousData) {
+        for (const [keyStr, data] of context.previousData) {
+          queryClient.setQueryData(JSON.parse(keyStr), data)
+        }
+      }
+    },
+
     onSuccess: (realPostId, variables) => {
-      // Replace optimistic ID with real ID in the cache
-      const cacheKey = forumKeys.paginatedPosts(variables.threadId, variables.parentId, variables.page, variables.sort)
-      queryClient.setQueryData<GetPaginatedPostsResponse>(cacheKey, (old) => {
+      // Replace optimistic ID with real ID in paginatedPosts cache
+      const paginatedKey = forumKeys.paginatedPosts(variables.threadId, variables.parentId, variables.page, variables.sort)
+      queryClient.setQueryData<GetPaginatedPostsResponse>(paginatedKey, (old) => {
         if (!old) return old
         return {
           ...old,
@@ -170,9 +289,47 @@ export function useAddReply() {
         }
       })
 
-      // Update reply_count in all root posts caches (for sub-replies)
+      // Replace optimistic ID in threadView (only for level-1 replies)
+      const threadViewQueries = findThreadViewQueries(queryClient, variables.threadId)
+      for (const query of threadViewQueries) {
+        const data = queryClient.getQueryData<ThreadViewResponse>(query.queryKey)
+        if (!data) continue
+
+        // Check if this was a level-1 reply (parentId === OP's ID)
+        const opId = data.originalPost?.id
+        const isLevel1Reply = opId !== undefined && variables.parentId === opId
+
+        if (isLevel1Reply) {
+          queryClient.setQueryData<ThreadViewResponse>(query.queryKey, (old) => {
+            if (!old) return old
+            return {
+              ...old,
+              replies: old.replies.map((p) =>
+                p.id === variables.optimisticId ? { ...p, id: realPostId } : p
+              ),
+            }
+          })
+        }
+      }
+
+      // Update reply_count in parent post (for sub-replies)
       if (variables.parentId !== null) {
-        // Handle both paginated ({ posts, totalCount }) and legacy (Post[]) formats
+        // Update reply_count in threadView caches (parent is a level-1 reply)
+        for (const query of threadViewQueries) {
+          queryClient.setQueryData<ThreadViewResponse>(query.queryKey, (old) => {
+            if (!old) return old
+            return {
+              ...old,
+              replies: old.replies.map((p) =>
+                p.id === variables.parentId
+                  ? { ...p, reply_count: p.reply_count + 1 }
+                  : p
+              ),
+            }
+          })
+        }
+
+        // Update reply_count in paginated and legacy caches
         const updateParentReplyCount = (oldData: GetPaginatedPostsResponse | GetThreadPostsResponse | undefined) => {
           if (!oldData) return oldData
 
@@ -199,14 +356,14 @@ export function useAddReply() {
 
           return oldData
         }
-        // Use partial key match to update all root posts caches (paginated and legacy)
+        // Update root posts caches (doesn't include threadView due to different key structure)
         queryClient.setQueriesData(
           { queryKey: forumKeys.posts(variables.threadId, null) },
           updateParentReplyCount
         )
       }
 
-      // Surgically update reply_count in all paginated thread caches instead of invalidating
+      // Surgically update reply_count in all paginated thread caches
       const updatePaginatedThreadReplyCount = (oldData: { threads: Thread[]; totalCount: number } | undefined) => {
         if (!oldData) return oldData
         return {
@@ -218,7 +375,6 @@ export function useAddReply() {
           ),
         }
       }
-      // Update all cached paginated thread pages across all sort types
       queryClient.setQueriesData(
         { queryKey: forumKeys.threadsAll() },
         updatePaginatedThreadReplyCount

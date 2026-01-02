@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { forumKeys } from './forumQueryKeys'
-import { useOptimisticMutation } from './useOptimisticMutation'
 import {
   extractSingleResult,
   type Post,
@@ -11,6 +10,7 @@ import {
   type DeletePostResponse,
   type GetPaginatedPostsResponse,
 } from '../types'
+import type { ThreadViewResponse } from './usePostQueries'
 
 // ============================================================================
 // SHARED HELPERS
@@ -100,7 +100,7 @@ function updatePostInAllCaches(
   const cache = queryClient.getQueryCache()
 
   // Find all post-related caches for this thread
-  // This matches both legacy and paginated formats
+  // This matches legacy, paginated, and threadView formats
   const queries = cache.findAll({ queryKey: ['forum', 'posts', threadId] })
 
   for (const query of queries) {
@@ -109,8 +109,25 @@ function updatePostInAllCaches(
 
     if (!data) continue
 
+    // Handle threadView format: { originalPost: Post | undefined, replies: Post[], totalCount: number }
+    if (typeof data === 'object' && 'originalPost' in data && 'replies' in data) {
+      const threadViewData = data as ThreadViewResponse
+      const isOpMatch = threadViewData.originalPost?.id === postId
+      const replyIndex = threadViewData.replies.findIndex((p) => p.id === postId)
+
+      if (isOpMatch || replyIndex !== -1) {
+        previousData.set(JSON.stringify(key), threadViewData)
+        queryClient.setQueryData<ThreadViewResponse>(key, {
+          ...threadViewData,
+          originalPost: isOpMatch && threadViewData.originalPost
+            ? updater(threadViewData.originalPost)
+            : threadViewData.originalPost,
+          replies: threadViewData.replies.map((p) => (p.id === postId ? updater(p) : p)),
+        })
+      }
+    }
     // Handle paginated format: { posts: Post[], totalCount: number }
-    if (typeof data === 'object' && 'posts' in data && Array.isArray((data as GetPaginatedPostsResponse).posts)) {
+    else if (typeof data === 'object' && 'posts' in data && Array.isArray((data as GetPaginatedPostsResponse).posts)) {
       const paginatedData = data as GetPaginatedPostsResponse
       const postIndex = paginatedData.posts.findIndex((p) => p.id === postId)
 
@@ -318,10 +335,13 @@ interface DeletePostVariables {
   threadId: number
   parentId: number | null
   userId?: string
+  isDeleted: boolean // Current state to toggle
 }
 
 export function useDeletePost() {
-  return useOptimisticMutation<Post[], DeletePostVariables, DeletePostResponse>({
+  const queryClient = useQueryClient()
+
+  return useMutation<DeletePostResponse, Error, DeletePostVariables, { previousData: Map<string, unknown> }>({
     mutationFn: async ({ postId }): Promise<DeletePostResponse> => {
       const { data, error } = await supabase.rpc('delete_post', {
         p_post_id: postId,
@@ -333,24 +353,37 @@ export function useDeletePost() {
       }
       return result
     },
-    cacheUpdates: [
-      {
-        queryKey: ({ threadId, parentId }) => forumKeys.posts(threadId, parentId),
-        updater: (posts, { postId, userId }) => {
-          if (!posts) return posts
-          return posts.map((post) => {
-            if (post.id !== postId) return post
-            const willBeDeleted = !post.is_deleted
-            return {
-              ...post,
-              is_deleted: willBeDeleted,
-              deleted_by: willBeDeleted ? userId : null,
-            }
-          })
-        },
-      },
-    ],
-    invalidateOnSettled: true,
-    invalidateKeys: [forumKeys.authorPostsAll(), forumKeys.postsAll()],
+
+    onMutate: async ({ postId, threadId, userId, isDeleted }) => {
+      await queryClient.cancelQueries({ queryKey: forumKeys.postsAll() })
+
+      const previousData = new Map<string, unknown>()
+      const willBeDeleted = !isDeleted
+
+      updatePostInAllCaches(
+        queryClient,
+        threadId,
+        postId,
+        (post) => ({
+          ...post,
+          is_deleted: willBeDeleted,
+          deleted_by: willBeDeleted ? userId ?? null : null,
+        }),
+        previousData
+      )
+
+      return { previousData }
+    },
+
+    onError: (_err, _variables, context) => {
+      if (context?.previousData) {
+        rollbackCacheChanges(queryClient, context.previousData)
+      }
+    },
+
+    onSettled: () => {
+      // Invalidate related caches to ensure consistency
+      queryClient.invalidateQueries({ queryKey: forumKeys.authorPostsAll() })
+    },
   })
 }

@@ -34,6 +34,9 @@ export const forumKeys = {
     [...forumKeys.all, 'posts', threadId, parentId === null ? 'root' : parentId] as const,
   paginatedPosts: (threadId: number, parentId: number | null, page: number, sort: string = 'popular') =>
     [...forumKeys.all, 'posts', threadId, parentId === null ? 'root' : parentId, 'page', page, sort] as const,
+  // Thread view: OP + paginated replies in single query (uses 'posts' prefix for mutation compatibility)
+  threadView: (threadId: number, page: number, sort: string = 'popular') =>
+    [...forumKeys.all, 'posts', threadId, 'threadView', page, sort] as const,
   flaggedPosts: () => [...forumKeys.all, 'flagged-posts'] as const,
   paginatedFlaggedPosts: (page: number) => [...forumKeys.all, 'flagged-posts', 'page', page] as const,
   authorPostsAll: () => [...forumKeys.all, 'author-posts'] as const,

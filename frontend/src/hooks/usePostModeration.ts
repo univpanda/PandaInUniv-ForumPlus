@@ -171,6 +171,7 @@ export function usePostModeration({
         threadId: postToDelete.thread_id,
         parentId: cacheParentId,
         userId,
+        isDeleted: postToDelete.is_deleted ?? false,
       },
       {
         onSuccess: () => {
