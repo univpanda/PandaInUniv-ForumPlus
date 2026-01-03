@@ -205,32 +205,56 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION refresh_thread_search_document_from_thread()
+RETURNS TRIGGER AS $$
+BEGIN
+  PERFORM refresh_thread_search_document(NEW.id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION refresh_thread_search_document_from_post()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_thread_id INTEGER;
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    v_thread_id := OLD.thread_id;
+  ELSE
+    v_thread_id := NEW.thread_id;
+  END IF;
+
+  PERFORM refresh_thread_search_document(v_thread_id);
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
 DROP TRIGGER IF EXISTS trigger_refresh_thread_search_document ON forum_threads;
 CREATE TRIGGER trigger_refresh_thread_search_document
   AFTER INSERT OR UPDATE OF title ON forum_threads
   FOR EACH ROW
-  EXECUTE FUNCTION refresh_thread_search_document(NEW.id);
+  EXECUTE FUNCTION refresh_thread_search_document_from_thread();
 
 DROP TRIGGER IF EXISTS trigger_refresh_thread_search_document_op_insert ON forum_posts;
 CREATE TRIGGER trigger_refresh_thread_search_document_op_insert
   AFTER INSERT ON forum_posts
   FOR EACH ROW
   WHEN (NEW.parent_id IS NULL)
-  EXECUTE FUNCTION refresh_thread_search_document(NEW.thread_id);
+  EXECUTE FUNCTION refresh_thread_search_document_from_post();
 
 DROP TRIGGER IF EXISTS trigger_refresh_thread_search_document_op_update ON forum_posts;
 CREATE TRIGGER trigger_refresh_thread_search_document_op_update
   AFTER UPDATE OF content, additional_comments ON forum_posts
   FOR EACH ROW
   WHEN (NEW.parent_id IS NULL)
-  EXECUTE FUNCTION refresh_thread_search_document(NEW.thread_id);
+  EXECUTE FUNCTION refresh_thread_search_document_from_post();
 
 DROP TRIGGER IF EXISTS trigger_refresh_thread_search_document_op_delete ON forum_posts;
 CREATE TRIGGER trigger_refresh_thread_search_document_op_delete
   AFTER DELETE ON forum_posts
   FOR EACH ROW
   WHEN (OLD.parent_id IS NULL)
-  EXECUTE FUNCTION refresh_thread_search_document(OLD.thread_id);
+  EXECUTE FUNCTION refresh_thread_search_document_from_post();
 
 -- Trigger to maintain likes/dislikes counters on forum_posts
 CREATE OR REPLACE FUNCTION update_post_vote_counts()
@@ -294,6 +318,27 @@ CREATE TRIGGER trigger_update_post_vote_counts_delete
 -- =============================================================================
 -- Updated RPCs and security-sensitive functions
 -- =============================================================================
+
+DROP FUNCTION IF EXISTS get_public_user_profile(UUID);
+DROP FUNCTION IF EXISTS is_username_available(TEXT);
+DROP FUNCTION IF EXISTS set_user_role(UUID, TEXT);
+DROP FUNCTION IF EXISTS set_user_blocked(UUID, BOOLEAN);
+DROP FUNCTION IF EXISTS create_thread(TEXT, INTEGER, TEXT, BOOLEAN, TEXT);
+DROP FUNCTION IF EXISTS add_reply(INTEGER, TEXT, INTEGER, BOOLEAN, TEXT);
+DROP FUNCTION IF EXISTS delete_post(INTEGER);
+DROP FUNCTION IF EXISTS edit_post(INTEGER, TEXT, TEXT);
+DROP FUNCTION IF EXISTS vote_post(INTEGER, INTEGER);
+DROP FUNCTION IF EXISTS toggle_post_flagged(INTEGER);
+DROP FUNCTION IF EXISTS vote_poll(INTEGER, INTEGER[]);
+DROP FUNCTION IF EXISTS toggle_ignore_user(UUID);
+DROP FUNCTION IF EXISTS toggle_bookmark(INTEGER);
+DROP FUNCTION IF EXISTS toggle_thread_bookmark(INTEGER);
+DROP FUNCTION IF EXISTS toggle_post_bookmark(INTEGER);
+DROP FUNCTION IF EXISTS get_paginated_forum_threads(INTEGER[], INTEGER, INTEGER, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN);
+DROP FUNCTION IF EXISTS get_bookmarked_posts(UUID, INTEGER, INTEGER, TEXT);
+DROP FUNCTION IF EXISTS get_posts_by_author(TEXT, TEXT, INTEGER, INTEGER, BOOLEAN, BOOLEAN, TEXT);
+DROP FUNCTION IF EXISTS get_users_with_stats();
+DROP FUNCTION IF EXISTS get_users_paginated(INTEGER, INTEGER, TEXT);
 
 -- Public profile lookup (safe fields only)
 CREATE OR REPLACE FUNCTION get_public_user_profile(p_user_id UUID)
@@ -882,7 +927,8 @@ BEGIN
   JOIN forum_threads t ON t.id = p.thread_id
   WHERE b.user_id = p_user_id
     AND COALESCE(p.is_deleted, FALSE) = FALSE
-    AND (p_search_text IS NULL OR (p.search_document || t.search_document) @@ websearch_to_tsquery('simple', p_search_text));
+    AND (p_search_text IS NULL OR p.search_document @@ websearch_to_tsquery('simple', p_search_text)
+         OR t.search_document @@ websearch_to_tsquery('simple', p_search_text));
 
   SELECT json_agg(row_to_json(posts_data)) INTO v_posts
   FROM (
@@ -918,7 +964,8 @@ BEGIN
     JOIN user_profiles u ON u.id = p.author_id
     WHERE b.user_id = p_user_id
       AND COALESCE(p.is_deleted, FALSE) = FALSE
-      AND (p_search_text IS NULL OR (p.search_document || t.search_document) @@ websearch_to_tsquery('simple', p_search_text))
+      AND (p_search_text IS NULL OR p.search_document @@ websearch_to_tsquery('simple', p_search_text)
+           OR t.search_document @@ websearch_to_tsquery('simple', p_search_text))
     ORDER BY b.created_at DESC
     LIMIT p_limit OFFSET p_offset
   ) posts_data;
@@ -976,7 +1023,8 @@ BEGIN
   FROM forum_posts p
   JOIN forum_threads t ON t.id = p.thread_id
   WHERE (v_author_id IS NULL OR p.author_id = v_author_id)
-    AND (p_search_text IS NULL OR (p.search_document || t.search_document) @@ websearch_to_tsquery('simple', p_search_text))
+    AND (p_search_text IS NULL OR p.search_document @@ websearch_to_tsquery('simple', p_search_text)
+         OR t.search_document @@ websearch_to_tsquery('simple', p_search_text))
     AND (NOT p_flagged_only OR p.is_flagged = TRUE)
     AND (NOT p_deleted_only OR COALESCE(p.is_deleted, FALSE) = TRUE)
     AND (v_is_admin OR COALESCE(p.is_deleted, FALSE) = FALSE)
@@ -1008,7 +1056,8 @@ BEGIN
     JOIN forum_threads t ON t.id = p.thread_id
     JOIN user_profiles u ON u.id = p.author_id
     WHERE (v_author_id IS NULL OR p.author_id = v_author_id)
-      AND (p_search_text IS NULL OR (p.search_document || t.search_document) @@ websearch_to_tsquery('simple', p_search_text))
+      AND (p_search_text IS NULL OR p.search_document @@ websearch_to_tsquery('simple', p_search_text)
+           OR t.search_document @@ websearch_to_tsquery('simple', p_search_text))
       AND (NOT p_flagged_only OR p.is_flagged = TRUE)
       AND (NOT p_deleted_only OR COALESCE(p.is_deleted, FALSE) = TRUE)
       AND (v_is_admin OR COALESCE(p.is_deleted, FALSE) = FALSE)
