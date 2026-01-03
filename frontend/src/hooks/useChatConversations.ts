@@ -51,6 +51,8 @@ interface UseChatConversationsReturn {
   // Search
   searchQuery: string
   setSearchQuery: (query: string) => void
+  includeOlder: boolean
+  setIncludeOlder: (include: boolean) => void
 
   // Paginated data
   conversations: NonNullable<ReturnType<typeof useConversations>['data']>
@@ -67,6 +69,7 @@ export function useChatConversations({
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
+  const [includeOlder, setIncludeOlder] = useState(false)
 
   // Pagination state - only admins can use stored page size
   const [conversationsPage, setConversationsPage] = useState(1)
@@ -76,6 +79,7 @@ export function useChatConversations({
   // Query
   const conversationsQuery = useConversations(userId, {
     enabled: view === 'conversations',
+    includeOlder,
   })
 
   // Get ignored users
@@ -166,6 +170,8 @@ export function useChatConversations({
     ignoredCount: ignoredConversations.length,
     searchQuery,
     setSearchQuery,
+    includeOlder,
+    setIncludeOlder,
     conversations,
     pagination: {
       page: conversationsPage,

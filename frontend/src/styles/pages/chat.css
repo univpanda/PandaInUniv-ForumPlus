@@ -107,6 +107,23 @@
   font-size: 0.875rem;
 }
 
+.chat-older-toggle {
+  border: 1px solid var(--color-border);
+  background: white;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+
+.chat-older-toggle:hover {
+  border-color: var(--color-primary);
+  color: var(--color-text);
+}
+
 .chat-avatar {
   width: 36px;
   height: 36px;
@@ -690,4 +707,3 @@
   font-size: 0.8rem;
   color: var(--color-text-light);
 }
-

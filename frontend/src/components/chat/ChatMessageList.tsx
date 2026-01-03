@@ -17,6 +17,8 @@ interface ChatMessageListProps {
   onLoadMore?: () => void
   /** Whether more messages are currently being loaded */
   isLoadingMore?: boolean
+  includeOlder?: boolean
+  onShowOlder?: () => void
 }
 
 export const ChatMessageList = memo(function ChatMessageList({
@@ -29,6 +31,8 @@ export const ChatMessageList = memo(function ChatMessageList({
   hasMore = false,
   onLoadMore,
   isLoadingMore = false,
+  includeOlder = false,
+  onShowOlder,
 }: ChatMessageListProps) {
   const avatarUrl = getAvatarUrl(partnerAvatar, partnerUsername, partnerAvatarPath)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -76,6 +80,13 @@ export const ChatMessageList = memo(function ChatMessageList({
         />
       ) : (
         <>
+          {!includeOlder && onShowOlder && (
+            <div className="chat-load-more">
+              <button type="button" className="chat-older-toggle" onClick={onShowOlder}>
+                Show older messages
+              </button>
+            </div>
+          )}
           {/* Load more indicator at top */}
           {hasMore && (
             <div className="chat-load-more">

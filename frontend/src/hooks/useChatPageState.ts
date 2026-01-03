@@ -104,7 +104,7 @@ export function useChatPageState({ resetToList }: UseChatPageStateOptions = {}) 
     setSelectedPartner(null)
     setView('conversations')
     // Force refetch conversations to update unread counts immediately
-    queryClient.refetchQueries({ queryKey: chatKeys.conversations(user?.id || '') })
+    queryClient.refetchQueries({ queryKey: chatKeys.conversationsBase(user?.id || '') })
   }, [queryClient, user?.id])
 
   return {
@@ -126,10 +126,14 @@ export function useChatPageState({ resetToList }: UseChatPageStateOptions = {}) 
     activeTab: conversationsData.activeTab,
     setActiveTab: conversationsData.setActiveTab,
     ignoredCount: conversationsData.ignoredCount,
+    includeOlderConversations: conversationsData.includeOlder,
+    setIncludeOlderConversations: conversationsData.setIncludeOlder,
 
     // Data
     messages: messagesData.messages,
     conversations: conversationsData.conversations,
+    includeOlderMessages: messagesData.includeOlder,
+    setIncludeOlderMessages: messagesData.setIncludeOlder,
 
     // Pagination
     pagination: {

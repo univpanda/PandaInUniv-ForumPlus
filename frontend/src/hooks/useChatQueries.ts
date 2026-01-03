@@ -1,6 +1,6 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { STALE_TIME, POLL_INTERVAL, PAGE_SIZE } from '../utils/constants'
+import { STALE_TIME, POLL_INTERVAL, PAGE_SIZE, CHAT_RECENT_DAYS, MS_PER_DAY } from '../utils/constants'
 import type {
   ChatMessage,
   UserConversation,
@@ -10,9 +10,13 @@ import type {
 // Query key factory for chat
 export const chatKeys = {
   all: ['chat'] as const,
-  conversations: (userId: string) => [...chatKeys.all, 'conversations', userId] as const,
-  messagesInfinite: (userId: string, partnerId: string) =>
+  conversationsBase: (userId: string) => [...chatKeys.all, 'conversations', userId] as const,
+  conversations: (userId: string, includeOlder?: boolean) =>
+    [...chatKeys.conversationsBase(userId), { includeOlder: !!includeOlder }] as const,
+  messagesInfiniteBase: (userId: string, partnerId: string) =>
     [...chatKeys.all, 'messages', 'infinite', userId, partnerId] as const,
+  messagesInfinite: (userId: string, partnerId: string, includeOlder?: boolean) =>
+    [...chatKeys.messagesInfiniteBase(userId, partnerId), { includeOlder: !!includeOlder }] as const,
   unreadCount: (userId: string) => [...chatKeys.all, 'unread', userId] as const,
   ignoredUsers: (userId: string) => [...chatKeys.all, 'ignored', userId] as const,
   isUserIgnored: (userId: string, targetId: string) =>
@@ -22,14 +26,23 @@ export const chatKeys = {
 /**
  * Hook to fetch user's conversations list
  */
-export function useConversations(userId: string | null, options?: { enabled?: boolean }) {
+export function useConversations(
+  userId: string | null,
+  options?: { enabled?: boolean; includeOlder?: boolean }
+) {
   return useQuery({
-    queryKey: chatKeys.conversations(userId || ''),
+    queryKey: chatKeys.conversations(userId || '', options?.includeOlder),
     queryFn: async () => {
       if (!userId) return []
 
+      const since =
+        options?.includeOlder === true
+          ? null
+          : new Date(Date.now() - CHAT_RECENT_DAYS * MS_PER_DAY).toISOString()
+
       const { data, error } = await supabase.rpc('get_user_conversations', {
         p_user_id: userId,
+        p_since: since,
       })
 
       if (error) throw error
@@ -64,18 +77,24 @@ function transformConversationMessage(msg: RawConversationMessage): ChatMessage 
 export function useConversationMessages(
   userId: string | null,
   partnerId: string | null,
-  options?: { enabled?: boolean }
+  options?: { enabled?: boolean; includeOlder?: boolean }
 ) {
   return useInfiniteQuery({
-    queryKey: chatKeys.messagesInfinite(userId || '', partnerId || ''),
+    queryKey: chatKeys.messagesInfinite(userId || '', partnerId || '', options?.includeOlder) as const,
     queryFn: async ({ pageParam }) => {
       if (!userId || !partnerId) return { messages: [], nextCursor: null, hasMore: false }
+
+      const since =
+        options?.includeOlder === true
+          ? null
+          : new Date(Date.now() - CHAT_RECENT_DAYS * MS_PER_DAY).toISOString()
 
       const { data, error } = await supabase.rpc('get_conversation_messages', {
         p_user_id: userId,
         p_partner_id: partnerId,
         p_limit: PAGE_SIZE.POSTS,
         p_before_cursor: pageParam || null,
+        p_since: since,
       })
 
       if (error) throw error
@@ -210,7 +229,7 @@ export function useToggleIgnore(currentUserId: string | null) {
       )
       // Invalidate conversations to refresh the list
       queryClient.invalidateQueries({
-        queryKey: chatKeys.conversations(currentUserId || ''),
+        queryKey: chatKeys.conversationsBase(currentUserId || ''),
       })
     },
   })

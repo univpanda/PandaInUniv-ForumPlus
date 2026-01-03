@@ -32,10 +32,12 @@ export function useChatMessages({ userId, selectedPartner, senderInfo, view }: U
   // ============ Form State ============
   const [newMessage, setNewMessage] = useState('')
   const [sendError, setSendError] = useState<string | null>(null)
+  const [includeOlder, setIncludeOlder] = useState(false)
 
   // ============ Messages Query ============
   const messagesQuery = useConversationMessages(userId, selectedPartner?.id || null, {
     enabled: view === 'chat' && !!selectedPartner,
+    includeOlder,
   })
 
   // ============ Mutations ============
@@ -56,6 +58,10 @@ export function useChatMessages({ userId, selectedPartner, senderInfo, view }: U
   const isLoadingMoreMessages = messagesQuery.isFetchingNextPage
   const isLoading = messagesQuery.isLoading
   const isSending = sendMessageMutation.isPending
+
+  useEffect(() => {
+    setIncludeOlder(false)
+  }, [selectedPartner?.id])
 
   // Mark messages as read when viewing a conversation
   useEffect(() => {
@@ -120,6 +126,8 @@ export function useChatMessages({ userId, selectedPartner, senderInfo, view }: U
     // Loading states
     isLoading,
     isSending,
+    includeOlder,
+    setIncludeOlder,
 
     // Error state
     sendError,

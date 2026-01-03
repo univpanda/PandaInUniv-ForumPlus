@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { forumKeys } from './forumQueryKeys'
 import { chatKeys } from './useChatQueries'
 import { profileKeys } from './useUserProfile'
-import { PAGE_SIZE } from '../utils/constants'
+import { PAGE_SIZE, CHAT_RECENT_DAYS, MS_PER_DAY } from '../utils/constants'
 import type { UserConversation, BookmarkedPost } from '../types'
 
 /**
@@ -64,10 +64,11 @@ export function usePrefetchUserData() {
 
       // Prefetch conversations (top 5 recent)
       queryClient.prefetchQuery({
-        queryKey: chatKeys.conversations(userId),
+        queryKey: chatKeys.conversations(userId, false),
         queryFn: async () => {
           const { data, error } = await supabase.rpc('get_user_conversations', {
             p_user_id: userId,
+            p_since: new Date(Date.now() - CHAT_RECENT_DAYS * MS_PER_DAY).toISOString(),
           })
           if (error) throw error
           return (data || []) as UserConversation[]

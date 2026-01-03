@@ -19,10 +19,10 @@ function invalidateChatQueries(
   userId: string,
   partnerId?: string
 ) {
-  queryClient.invalidateQueries({ queryKey: chatKeys.conversations(userId) })
+  queryClient.invalidateQueries({ queryKey: chatKeys.conversationsBase(userId) })
   queryClient.invalidateQueries({ queryKey: chatKeys.unreadCount(userId) })
   if (partnerId) {
-    queryClient.invalidateQueries({ queryKey: chatKeys.messagesInfinite(userId, partnerId) })
+    queryClient.invalidateQueries({ queryKey: chatKeys.messagesInfiniteBase(userId, partnerId) })
   }
 }
 
@@ -58,13 +58,13 @@ export function useSendChatMessage() {
     },
     onMutate: async (variables) => {
       const { senderId, recipientId, content, senderUsername, senderAvatar } = variables
-      const queryKey = chatKeys.messagesInfinite(senderId, recipientId)
+      const queryKeyBase = chatKeys.messagesInfiniteBase(senderId, recipientId)
 
       // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey })
+      await queryClient.cancelQueries({ queryKey: queryKeyBase })
 
       // Snapshot previous data for rollback
-      const previousData = queryClient.getQueryData<InfiniteData<MessagesPage>>(queryKey)
+      const previousData = queryClient.getQueryData<InfiniteData<MessagesPage>>(queryKeyBase)
 
       // Create optimistic message with temp ID
       const optimisticMessage: ChatMessage = {
@@ -79,47 +79,56 @@ export function useSendChatMessage() {
       }
 
       // Optimistically prepend message to first page
-      queryClient.setQueryData<InfiniteData<MessagesPage>>(queryKey, (old) => {
-        if (!old) return old
-        return {
-          ...old,
-          pages: old.pages.map((page, index) =>
-            index === 0
-              ? { ...page, messages: [optimisticMessage, ...page.messages] }
-              : page
-          ),
-        }
-      })
+      const matchingQueries = queryClient.getQueryCache().findAll({ queryKey: queryKeyBase })
+      for (const query of matchingQueries) {
+        queryClient.setQueryData<InfiniteData<MessagesPage>>(query.queryKey, (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            pages: old.pages.map((page, index) =>
+              index === 0
+                ? { ...page, messages: [optimisticMessage, ...page.messages] }
+                : page
+            ),
+          }
+        })
+      }
 
       return { previousData, optimisticId: optimisticMessage.id }
     },
     onError: (_err, variables, context) => {
       // Rollback on error
       if (context?.previousData) {
-        const queryKey = chatKeys.messagesInfinite(variables.senderId, variables.recipientId)
-        queryClient.setQueryData(queryKey, context.previousData)
+        const queryKeyBase = chatKeys.messagesInfiniteBase(variables.senderId, variables.recipientId)
+        const matchingQueries = queryClient.getQueryCache().findAll({ queryKey: queryKeyBase })
+        for (const query of matchingQueries) {
+          queryClient.setQueryData(query.queryKey, context.previousData)
+        }
       }
     },
     onSuccess: (data, variables, context) => {
       // Replace optimistic ID with real ID
-      const queryKey = chatKeys.messagesInfinite(variables.senderId, variables.recipientId)
-      queryClient.setQueryData<InfiniteData<MessagesPage>>(queryKey, (old) => {
-        if (!old) return old
-        return {
-          ...old,
-          pages: old.pages.map((page) => ({
-            ...page,
-            messages: page.messages.map((msg) =>
-              msg.id === context?.optimisticId
-                ? { ...msg, id: data.id, created_at: data.created_at }
-                : msg
-            ),
-          })),
-        }
-      })
+      const queryKeyBase = chatKeys.messagesInfiniteBase(variables.senderId, variables.recipientId)
+      const matchingQueries = queryClient.getQueryCache().findAll({ queryKey: queryKeyBase })
+      for (const query of matchingQueries) {
+        queryClient.setQueryData<InfiniteData<MessagesPage>>(query.queryKey, (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              messages: page.messages.map((msg) =>
+                msg.id === context?.optimisticId
+                  ? { ...msg, id: data.id, created_at: data.created_at }
+                  : msg
+              ),
+            })),
+          }
+        })
+      }
 
       // Invalidate conversations list (to update last message preview)
-      queryClient.invalidateQueries({ queryKey: chatKeys.conversations(variables.senderId) })
+      queryClient.invalidateQueries({ queryKey: chatKeys.conversationsBase(variables.senderId) })
       // Also invalidate recipient's unread count
       queryClient.invalidateQueries({ queryKey: chatKeys.unreadCount(variables.recipientId) })
     },
@@ -150,17 +159,19 @@ export function useMarkConversationRead() {
     invalidateOnSettled: false,
     onSuccess: (_, variables) => {
       // Optimistically update conversations cache to clear unread badge immediately
-      queryClient.setQueryData<UserConversation[]>(
-        chatKeys.conversations(variables.userId),
-        (old) => {
+      const convoQueries = queryClient.getQueryCache().findAll({
+        queryKey: chatKeys.conversationsBase(variables.userId),
+      })
+      for (const query of convoQueries) {
+        queryClient.setQueryData<UserConversation[]>(query.queryKey, (old) => {
           if (!old) return old
           return old.map((conv) =>
             conv.conversation_partner_id === variables.partnerId
               ? { ...conv, unread_count: 0 }
               : conv
           )
-        }
-      )
+        })
+      }
       // Still invalidate to ensure fresh data when query re-enables
       invalidateChatQueries(queryClient, variables.userId, variables.partnerId)
     },

@@ -18,6 +18,8 @@ interface ChatConversationListProps {
   pageSizeInput?: string
   onPageSizeInputChange?: (value: string) => void
   onPageSizeBlur?: () => void
+  includeOlder?: boolean
+  onToggleOlder?: () => void
 }
 
 export function ChatConversationList({
@@ -33,6 +35,8 @@ export function ChatConversationList({
   pageSizeInput,
   onPageSizeInputChange,
   onPageSizeBlur,
+  includeOlder,
+  onToggleOlder,
 }: ChatConversationListProps) {
   return (
     <>
@@ -58,6 +62,16 @@ export function ChatConversationList({
           className="chat-search"
           showHelp
         />
+        {activeTab === 'conversations' && onToggleOlder && (
+          <button
+            type="button"
+            className="chat-older-toggle"
+            onClick={onToggleOlder}
+            title={includeOlder ? 'Show recent only' : 'Show older conversations'}
+          >
+            {includeOlder ? 'Recent only' : 'Show older'}
+          </button>
+        )}
         {isAdmin && onPageSizeInputChange && onPageSizeBlur && (
           <input
             type="number"

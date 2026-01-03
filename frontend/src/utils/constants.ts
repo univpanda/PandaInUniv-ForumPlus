@@ -18,6 +18,9 @@ export const POLL_INTERVAL = {
   NOTIFICATIONS: 30 * MS_PER_SECOND, // 30 seconds
 } as const
 
+// Chat defaults
+export const CHAT_RECENT_DAYS = 7
+
 // Toast/notification durations
 export const TOAST_DURATION = {
   SUCCESS: 3 * MS_PER_SECOND, // 3 seconds
