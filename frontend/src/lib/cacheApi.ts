@@ -223,6 +223,26 @@ export async function invalidateThreadCache(
   }
 }
 
+// Update login metadata via cache API (captures IP server-side)
+export async function updateLoginMetadata(authToken: string): Promise<boolean> {
+  if (!CACHE_API_URL) {
+    return false
+  }
+
+  try {
+    const response = await fetch(`${CACHE_API_URL}/login-metadata`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+      },
+    })
+    return response.ok
+  } catch (error) {
+    console.warn('Login metadata update failed:', error)
+    return false
+  }
+}
+
 // Get cached thread list for anonymous users
 export async function getCachedThreads(params: CachedThreadsParams): Promise<unknown[] | null> {
   if (!CACHE_API_URL) {

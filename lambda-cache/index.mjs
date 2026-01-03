@@ -8,6 +8,8 @@ const docClient = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = process.env.CACHE_TABLE || process.env.DYNAMODB_TABLE || 'panda-user-cache';
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_KEY;
+const GEOLOOKUP_URL = process.env.GEOLOOKUP_URL || 'https://ipapi.co';
+const GEOLOOKUP_TIMEOUT_MS = parseInt(process.env.GEOLOOKUP_TIMEOUT_MS || '2000', 10);
 
 const JWKS_TTL_MS = 10 * 60 * 1000;
 let jwksCache = { keys: [], fetchedAt: 0 };
@@ -45,6 +47,39 @@ function buildCorsHeaders(requestOrigin) {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Content-Type': 'application/json',
   };
+}
+
+function getRequestIp(event) {
+  const forwarded = event.headers?.['x-forwarded-for'] || event.headers?.['X-Forwarded-For'];
+  if (forwarded) {
+    const first = forwarded.split(',')[0]?.trim();
+    if (first) return first;
+  }
+  const realIp = event.headers?.['x-real-ip'] || event.headers?.['X-Real-IP'];
+  if (realIp) return realIp.trim();
+  return event.requestContext?.http?.sourceIp || null;
+}
+
+async function getIpLocation(ip) {
+  if (!ip || !GEOLOOKUP_URL) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GEOLOOKUP_TIMEOUT_MS);
+
+  try {
+    const url = `${GEOLOOKUP_URL.replace(/\/$/, '')}/${encodeURIComponent(ip)}/json/`;
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const city = data?.city || null;
+    const country = data?.country_name || data?.country || null;
+    if (city && country) return `${city}, ${country}`;
+    return country || null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // Response helper
@@ -724,6 +759,25 @@ export const handler = async (event) => {
 
       await invalidatePublicThreadCache(threadId);
       return response(200, { success: true, invalidated: threadId }, requestOrigin);
+    }
+
+    // POST /login-metadata (capture IP server-side)
+    if (method === 'POST' && pathParts[0] === 'login-metadata') {
+      if (!token) {
+        return response(401, { error: 'Unauthorized' }, requestOrigin);
+      }
+
+      const userToken = authHeader?.slice(7);
+      const ip = getRequestIp(event);
+      const location = await getIpLocation(ip);
+
+      await callSupabaseRpc('update_login_metadata', {
+        p_last_login: new Date().toISOString(),
+        p_last_ip: ip,
+        p_last_location: location,
+      }, userToken);
+
+      return response(200, { success: true }, requestOrigin);
     }
 
     return response(404, { error: 'Not found' }, requestOrigin);

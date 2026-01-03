@@ -4,7 +4,7 @@ import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { AuthContext } from './AuthContextType'
 import { cleanOAuthHash } from '../utils/url'
-import { invalidateUserCache } from '../lib/cacheApi'
+import { invalidateUserCache, updateLoginMetadata } from '../lib/cacheApi'
 import { generateNewUserIdentity } from '../utils/avatars'
 
 // ============================================================================
@@ -212,38 +212,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const updateLoginInfo = async (userId: string, authToken?: string) => {
-    const enableGeoLookup = import.meta.env.VITE_ENABLE_GEOLOOKUP === 'true'
-    let ip: string | null = null
-    let location: string | null = null
-
-    if (enableGeoLookup) {
-      // Optional: avoid CORS issues by enabling via server-side proxy/edge function.
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5s timeout
-
-      try {
-        const geoRes = await fetch('https://ipapi.co/json/', { signal: controller.signal })
-        if (geoRes.ok) {
-          const geo = await geoRes.json()
-          ip = geo?.ip || null
-          location =
-            geo?.city && geo?.country_name
-              ? `${geo.city}, ${geo.country_name}`
-              : geo?.country_name || null
-        }
-      } catch {
-        // IP/geo fetch failed - continue with null values
-      } finally {
-        clearTimeout(timeoutId)
-      }
-    }
-
-    // Always update login info, even if IP/location failed
     try {
+      if (authToken) {
+        const cached = await updateLoginMetadata(authToken)
+        if (cached) {
+          invalidateUserCache(userId, authToken)
+          return
+        }
+      }
+
       await supabase.rpc('update_login_metadata', {
         p_last_login: new Date().toISOString(),
-        p_last_ip: ip,
-        p_last_location: location,
+        p_last_ip: null,
+        p_last_location: null,
       })
 
       // Invalidate cache after profile update
