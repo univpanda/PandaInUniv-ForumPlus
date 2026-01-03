@@ -961,9 +961,9 @@ BEGIN
       u.avatar_path,
       CASE WHEN p_sort_by = 'recent' THEN COALESCE(t.last_activity, t.created_at) ELSE t.created_at END AS created_at,
       op.content,
-      COALESCE(op.reply_count, 0) AS reply_count,
-      COALESCE(op.likes, 0) AS total_likes,
-      COALESCE(op.dislikes, 0) AS total_dislikes,
+      COALESCE(op.reply_count, 0)::BIGINT AS reply_count,
+      COALESCE(op.likes, 0)::BIGINT AS total_likes,
+      COALESCE(op.dislikes, 0)::BIGINT AS total_dislikes,
       COALESCE(op.is_deleted, FALSE) AS is_op_deleted,
       v_total AS total_count
     FROM forum_threads t
