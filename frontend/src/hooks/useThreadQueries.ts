@@ -43,7 +43,9 @@ export function usePaginatedThreads(
           deleted: isDeleted,
         })
         if (cached) {
-          const { items: threads, totalCount } = extractPaginatedResponse<Thread>(cached)
+          const { items: threads, totalCount } = extractPaginatedResponse<Thread>(
+            cached as Array<Thread & { total_count: number }>
+          )
           return { threads, totalCount }
         }
       }

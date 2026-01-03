@@ -35,8 +35,6 @@ export function usePaginatedPosts(
   sort: 'popular' | 'new' = 'popular',
   enabled: boolean = true
 ) {
-  const { session, isAdmin } = useAuth()
-
   return useQuery({
     queryKey: forumKeys.paginatedPosts(threadId, parentId, page, sort),
     queryFn: async (): Promise<GetPaginatedPostsResponse> => {
@@ -72,7 +70,7 @@ export function useThreadView(
   sort: 'popular' | 'new' = 'popular',
   enabled: boolean = true
 ) {
-  const { session } = useAuth()
+  const { session, isAdmin } = useAuth()
 
   return useQuery({
     queryKey: forumKeys.threadView(threadId, page, sort),
