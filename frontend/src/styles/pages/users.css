@@ -147,6 +147,21 @@
   background: var(--color-danger-bg-dark);
 }
 
+@media (max-width: 900px) {
+  .user-management {
+    padding: 1.5rem 1rem;
+  }
+
+  .user-list {
+    overflow-x: auto;
+  }
+
+  .user-list-header,
+  .user-row {
+    min-width: 900px;
+  }
+}
+
 .user-avatar {
   width: 32px;
   height: 32px;
@@ -491,4 +506,3 @@ button.engagement-stat.flagged.clickable:hover {
     gap: 1rem;
   }
 }
-
