@@ -1785,10 +1785,7 @@ END;
 $$;
 
 -- Get user conversations
-CREATE OR REPLACE FUNCTION get_user_conversations(
-  p_user_id UUID,
-  p_since TIMESTAMPTZ DEFAULT NULL
-)
+CREATE OR REPLACE FUNCTION get_user_conversations(p_user_id UUID)
 RETURNS TABLE (
   conversation_partner_id UUID,
   partner_username TEXT,
@@ -1829,8 +1826,7 @@ BEGIN
       fm.created_at,
       fm.user_id = p_user_id AS is_from_me
     FROM feedback_messages fm
-    WHERE (fm.user_id = p_user_id OR fm.recipient_id = p_user_id)
-      AND (p_since IS NULL OR fm.created_at >= p_since)
+    WHERE fm.user_id = p_user_id OR fm.recipient_id = p_user_id
     ORDER BY
       CASE WHEN fm.user_id = p_user_id THEN fm.recipient_id ELSE fm.user_id END,
       fm.created_at DESC
@@ -1856,7 +1852,6 @@ BEGIN
   JOIN last_messages lm ON lm.partner_id = c.partner_id
   LEFT JOIN unread_counts uc ON uc.partner_id = c.partner_id
   WHERE NOT COALESCE(u.is_deleted, FALSE)
-    AND (p_since IS NULL OR lm.created_at >= p_since)
   ORDER BY lm.created_at DESC;
 END;
 $$;
@@ -1866,8 +1861,7 @@ CREATE OR REPLACE FUNCTION get_conversation_messages(
   p_user_id UUID,
   p_partner_id UUID,
   p_limit INTEGER DEFAULT 50,
-  p_before_cursor TIMESTAMPTZ DEFAULT NULL,
-  p_since TIMESTAMPTZ DEFAULT NULL
+  p_before_cursor TIMESTAMPTZ DEFAULT NULL
 )
 RETURNS TABLE (
   id UUID,
@@ -1908,7 +1902,6 @@ BEGIN
   WHERE ((fm.user_id = p_user_id AND fm.recipient_id = p_partner_id)
       OR (fm.user_id = p_partner_id AND fm.recipient_id = p_user_id))
     AND (p_before_cursor IS NULL OR fm.created_at < p_before_cursor)
-    AND (p_since IS NULL OR fm.created_at >= p_since)
   ORDER BY fm.created_at DESC
   LIMIT p_limit;
 END;
@@ -1958,8 +1951,8 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION get_user_conversations(UUID, TIMESTAMPTZ) TO authenticated;
-GRANT EXECUTE ON FUNCTION get_conversation_messages(UUID, UUID, INTEGER, TIMESTAMPTZ, TIMESTAMPTZ) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_conversations(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_conversation_messages(UUID, UUID, INTEGER, TIMESTAMPTZ) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_unread_message_count(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION mark_conversation_read(UUID, UUID) TO authenticated;
 

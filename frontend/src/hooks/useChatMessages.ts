@@ -1,10 +1,13 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import {
   useConversationMessages,
   useSendChatMessage,
   useMarkConversationRead,
+  chatKeys,
 } from './useChatQueries'
-import type { ChatView } from '../types'
+import { PAGE_SIZE } from '../utils/constants'
+import type { ChatView, ChatMessage } from '../types'
 
 interface SelectedPartner {
   id: string
@@ -32,12 +35,11 @@ export function useChatMessages({ userId, selectedPartner, senderInfo, view }: U
   // ============ Form State ============
   const [newMessage, setNewMessage] = useState('')
   const [sendError, setSendError] = useState<string | null>(null)
-  const [includeOlder, setIncludeOlder] = useState(false)
+  const queryClient = useQueryClient()
 
   // ============ Messages Query ============
   const messagesQuery = useConversationMessages(userId, selectedPartner?.id || null, {
     enabled: view === 'chat' && !!selectedPartner,
-    includeOlder,
   })
 
   // ============ Mutations ============
@@ -54,7 +56,53 @@ export function useChatMessages({ userId, selectedPartner, senderInfo, view }: U
   }, [messagesQuery.data])
 
   const hasMoreMessages = messagesQuery.hasNextPage ?? false
-  const loadMoreMessages = messagesQuery.fetchNextPage
+  const loadMoreMessages = useCallback(async () => {
+    if (!userId || !selectedPartner) {
+      return
+    }
+
+    const prefetchKey = chatKeys.messagesPrefetch(userId, selectedPartner.id)
+    const prefetch = queryClient.getQueryData<{
+      messages: ChatMessage[]
+      assumeMore: boolean
+    }>(prefetchKey)
+
+    if (prefetch?.messages?.length) {
+      const nextMessages = prefetch.messages.slice(0, PAGE_SIZE.POSTS)
+      const remaining = prefetch.messages.slice(PAGE_SIZE.POSTS)
+      const nextCursor = nextMessages[nextMessages.length - 1]?.created_at ?? null
+      const queryKey = chatKeys.messagesInfinite(userId, selectedPartner.id)
+
+      queryClient.setQueryData<InfiniteData<{ messages: ChatMessage[]; nextCursor: string | null; hasMore: boolean }>>(
+        queryKey,
+        (old) => {
+          if (!old) return old
+          const hasMore = remaining.length > 0 || prefetch.assumeMore
+          return {
+            ...old,
+            pages: [
+              ...old.pages,
+              {
+                messages: nextMessages,
+                nextCursor,
+                hasMore,
+              },
+            ],
+            pageParams: [...old.pageParams, nextCursor],
+          }
+        }
+      )
+
+      if (remaining.length > 0 || prefetch.assumeMore) {
+        queryClient.setQueryData(prefetchKey, { messages: remaining, assumeMore: prefetch.assumeMore })
+      } else {
+        queryClient.removeQueries({ queryKey: prefetchKey })
+      }
+      return
+    }
+
+    await messagesQuery.fetchNextPage()
+  }, [messagesQuery, queryClient, selectedPartner, userId])
   const isLoadingMoreMessages = messagesQuery.isFetchingNextPage
   const isLoading = messagesQuery.isLoading
   const isSending = sendMessageMutation.isPending
@@ -122,8 +170,6 @@ export function useChatMessages({ userId, selectedPartner, senderInfo, view }: U
     // Loading states
     isLoading,
     isSending,
-    includeOlder,
-    setIncludeOlder,
 
     // Error state
     sendError,

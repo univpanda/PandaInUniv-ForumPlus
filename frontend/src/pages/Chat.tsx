@@ -30,12 +30,8 @@ export function Chat({ initialPartner, onInitialPartnerConsumed, resetToList }: 
     activeTab,
     setActiveTab,
     ignoredCount,
-    includeOlderConversations,
-    setIncludeOlderConversations,
     messages,
     conversations,
-    includeOlderMessages,
-    setIncludeOlderMessages,
     pagination,
     hasMoreMessages,
     loadMoreMessages,
@@ -117,8 +113,6 @@ export function Chat({ initialPartner, onInitialPartnerConsumed, resetToList }: 
             activeTab={activeTab}
             onTabChange={setActiveTab}
             ignoredCount={ignoredCount}
-            includeOlder={includeOlderConversations}
-            onToggleOlder={() => setIncludeOlderConversations(!includeOlderConversations)}
             isAdmin={isAdmin}
             pageSizeInput={pageSizeInput}
             onPageSizeInputChange={setPageSizeInput}
@@ -165,8 +159,6 @@ export function Chat({ initialPartner, onInitialPartnerConsumed, resetToList }: 
           onLoadMoreMessages={() => loadMoreMessages()}
           isLoadingMoreMessages={isLoadingMoreMessages}
           onIgnoreToggled={handleIgnoreToggled}
-          includeOlder={includeOlderMessages}
-          onShowOlder={() => setIncludeOlderMessages(true)}
         />
       </div>
     )

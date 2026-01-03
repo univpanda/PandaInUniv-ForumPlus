@@ -17,8 +17,6 @@ interface ChatMessageListProps {
   onLoadMore?: () => void
   /** Whether more messages are currently being loaded */
   isLoadingMore?: boolean
-  includeOlder?: boolean
-  onShowOlder?: () => void
 }
 
 export const ChatMessageList = memo(function ChatMessageList({
@@ -31,8 +29,6 @@ export const ChatMessageList = memo(function ChatMessageList({
   hasMore = false,
   onLoadMore,
   isLoadingMore = false,
-  includeOlder = false,
-  onShowOlder,
 }: ChatMessageListProps) {
   const avatarUrl = getAvatarUrl(partnerAvatar, partnerUsername, partnerAvatarPath)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -73,27 +69,13 @@ export const ChatMessageList = memo(function ChatMessageList({
       {loading ? (
         <LoadingSpinner className="chat-loading" />
       ) : messages.length === 0 ? (
-        <div className="chat-empty">
-          <EmptyState
-            icon={MessageSquare}
-            description={includeOlder ? 'No messages yet. Say hello!' : 'No recent messages.'}
-            className="chat-empty"
-          />
-          {!includeOlder && onShowOlder && (
-            <button type="button" className="chat-older-toggle" onClick={onShowOlder}>
-              Show older messages
-            </button>
-          )}
-        </div>
+        <EmptyState
+          icon={MessageSquare}
+          description="No messages yet. Say hello!"
+          className="chat-empty"
+        />
       ) : (
         <>
-          {!includeOlder && onShowOlder && (
-            <div className="chat-load-more">
-              <button type="button" className="chat-older-toggle" onClick={onShowOlder}>
-                Show older messages
-              </button>
-            </div>
-          )}
           {/* Load more indicator at top */}
           {hasMore && (
             <div className="chat-load-more">

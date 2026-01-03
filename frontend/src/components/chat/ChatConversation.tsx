@@ -26,8 +26,6 @@ interface ChatConversationProps {
   onLoadMoreMessages?: () => void
   isLoadingMoreMessages?: boolean
   onIgnoreToggled?: (username: string, isNowIgnored: boolean) => void
-  includeOlder?: boolean
-  onShowOlder?: () => void
 }
 
 export function ChatConversation({
@@ -44,8 +42,6 @@ export function ChatConversation({
   onLoadMoreMessages,
   isLoadingMoreMessages,
   onIgnoreToggled,
-  includeOlder,
-  onShowOlder,
 }: ChatConversationProps) {
   const { data: partnerStats } = usePublicUserStats(partner.id)
   const { data: isIgnored } = useIsUserIgnored(currentUserId, partner.id)
@@ -133,8 +129,6 @@ export function ChatConversation({
         hasMore={hasMoreMessages}
         onLoadMore={onLoadMoreMessages}
         isLoadingMore={isLoadingMoreMessages}
-        includeOlder={includeOlder}
-        onShowOlder={onShowOlder}
       />
 
       {/* Input */}

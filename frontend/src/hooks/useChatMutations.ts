@@ -19,10 +19,10 @@ function invalidateChatQueries(
   userId: string,
   partnerId?: string
 ) {
-  queryClient.invalidateQueries({ queryKey: chatKeys.conversationsBase(userId) })
+  queryClient.invalidateQueries({ queryKey: chatKeys.conversations(userId) })
   queryClient.invalidateQueries({ queryKey: chatKeys.unreadCount(userId) })
   if (partnerId) {
-    queryClient.invalidateQueries({ queryKey: chatKeys.messagesInfiniteBase(userId, partnerId) })
+    queryClient.invalidateQueries({ queryKey: chatKeys.messagesInfinite(userId, partnerId) })
   }
 }
 
@@ -58,7 +58,7 @@ export function useSendChatMessage() {
     },
     onMutate: async (variables) => {
       const { senderId, recipientId, content, senderUsername, senderAvatar } = variables
-      const queryKeyBase = chatKeys.messagesInfiniteBase(senderId, recipientId)
+      const queryKeyBase = chatKeys.messagesInfinite(senderId, recipientId)
 
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: queryKeyBase })
@@ -99,7 +99,7 @@ export function useSendChatMessage() {
     onError: (_err, variables, context) => {
       // Rollback on error
       if (context?.previousData) {
-        const queryKeyBase = chatKeys.messagesInfiniteBase(variables.senderId, variables.recipientId)
+        const queryKeyBase = chatKeys.messagesInfinite(variables.senderId, variables.recipientId)
         const matchingQueries = queryClient.getQueryCache().findAll({ queryKey: queryKeyBase })
         for (const query of matchingQueries) {
           queryClient.setQueryData(query.queryKey, context.previousData)
@@ -108,7 +108,7 @@ export function useSendChatMessage() {
     },
     onSuccess: (data, variables, context) => {
       // Replace optimistic ID with real ID
-      const queryKeyBase = chatKeys.messagesInfiniteBase(variables.senderId, variables.recipientId)
+      const queryKeyBase = chatKeys.messagesInfinite(variables.senderId, variables.recipientId)
       const matchingQueries = queryClient.getQueryCache().findAll({ queryKey: queryKeyBase })
       for (const query of matchingQueries) {
         queryClient.setQueryData<InfiniteData<MessagesPage>>(query.queryKey, (old) => {
@@ -128,7 +128,7 @@ export function useSendChatMessage() {
       }
 
       // Invalidate conversations list (to update last message preview)
-      queryClient.invalidateQueries({ queryKey: chatKeys.conversationsBase(variables.senderId) })
+      queryClient.invalidateQueries({ queryKey: chatKeys.conversations(variables.senderId) })
       // Also invalidate recipient's unread count
       queryClient.invalidateQueries({ queryKey: chatKeys.unreadCount(variables.recipientId) })
     },
@@ -160,7 +160,7 @@ export function useMarkConversationRead() {
     onSuccess: (_, variables) => {
       // Optimistically update conversations cache to clear unread badge immediately
       const convoQueries = queryClient.getQueryCache().findAll({
-        queryKey: chatKeys.conversationsBase(variables.userId),
+        queryKey: chatKeys.conversations(variables.userId),
       })
       for (const query of convoQueries) {
         queryClient.setQueryData<UserConversation[]>(query.queryKey, (old) => {

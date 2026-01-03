@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useConversations, useIgnoredUsers } from './useChatQueries'
+import { useQueryClient } from '@tanstack/react-query'
+import { useConversations, useIgnoredUsers, chatKeys } from './useChatQueries'
+import { supabase } from '../lib/supabase'
 import { PAGE_SIZE } from '../utils/constants'
 import { parseSearchQuery, matchesAllWords, matchesUsername } from '../utils/search'
-import type { ChatView } from '../types'
+import type { ChatView, ChatMessage, RawConversationMessage } from '../types'
 
 export type ChatTab = 'conversations' | 'ignored'
 
@@ -13,6 +15,12 @@ interface PaginationState {
   totalCount: number
   pageSize: number
   setPageSize: (size: number) => void
+}
+
+interface MessagesPage {
+  messages: ChatMessage[]
+  nextCursor: string | null
+  hasMore: boolean
 }
 
 // Persist page size to localStorage (admin only)
@@ -51,8 +59,6 @@ interface UseChatConversationsReturn {
   // Search
   searchQuery: string
   setSearchQuery: (query: string) => void
-  includeOlder: boolean
-  setIncludeOlder: (include: boolean) => void
 
   // Paginated data
   conversations: NonNullable<ReturnType<typeof useConversations>['data']>
@@ -69,17 +75,16 @@ export function useChatConversations({
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
-  const [includeOlder, setIncludeOlder] = useState(false)
 
   // Pagination state - only admins can use stored page size
   const [conversationsPage, setConversationsPage] = useState(1)
   const initialPageSize = isAdmin ? getStoredPageSize() : PAGE_SIZE.POSTS
   const [pageSize, setPageSize] = useState(initialPageSize)
+  const queryClient = useQueryClient()
 
   // Query
   const conversationsQuery = useConversations(userId, {
     enabled: view === 'conversations',
-    includeOlder,
   })
 
   // Get ignored users
@@ -89,6 +94,70 @@ export function useChatConversations({
     () => conversationsQuery.data ?? [],
     [conversationsQuery.data]
   )
+
+  useEffect(() => {
+    if (!userId || view !== 'conversations') return
+    if (!conversationsQuery.data || conversationsQuery.data.length === 0) return
+
+    const topConversations = conversationsQuery.data.slice(0, 5)
+
+    const prefetchMessages = async (partnerId: string) => {
+      const queryKey = chatKeys.messagesInfinite(userId, partnerId)
+      const prefetchKey = chatKeys.messagesPrefetch(userId, partnerId)
+      const existing = queryClient.getQueryData(queryKey)
+      if (existing) return
+
+      const { data, error } = await supabase.rpc('get_conversation_messages', {
+        p_user_id: userId,
+        p_partner_id: partnerId,
+        p_limit: 50,
+        p_before_cursor: null,
+      })
+
+      if (error) return
+
+      const rawMessages = (data || []) as RawConversationMessage[]
+      const messages = rawMessages.map((msg) => ({
+        id: msg.id,
+        user_id: msg.user_id,
+        recipient_id: msg.recipient_id,
+        content: msg.content,
+        is_read: msg.is_read,
+        created_at: msg.created_at,
+        sender_username: msg.sender_username,
+        sender_avatar: msg.sender_avatar,
+      }))
+
+      if (messages.length === 0) return
+
+      const firstPageMessages = messages.slice(0, PAGE_SIZE.POSTS)
+      const remaining = messages.slice(PAGE_SIZE.POSTS)
+      const nextCursor = firstPageMessages[firstPageMessages.length - 1]?.created_at ?? null
+      const assumeMore = messages.length === 50
+
+      const pages: MessagesPage[] = [
+        {
+          messages: firstPageMessages,
+          nextCursor,
+          hasMore: remaining.length > 0 || assumeMore,
+        },
+      ]
+
+      queryClient.setQueryData(queryKey, {
+        pages,
+        pageParams: [null],
+      })
+
+      if (remaining.length > 0) {
+        queryClient.setQueryData(prefetchKey, { messages: remaining, assumeMore })
+      }
+    }
+
+    for (const convo of topConversations) {
+      if (!convo?.conversation_partner_id) continue
+      void prefetchMessages(convo.conversation_partner_id)
+    }
+  }, [conversationsQuery.data, queryClient, userId, view])
 
   // Split conversations into ignored and non-ignored
   const { nonIgnoredConversations, ignoredConversations } = useMemo(() => {
@@ -170,8 +239,6 @@ export function useChatConversations({
     ignoredCount: ignoredConversations.length,
     searchQuery,
     setSearchQuery,
-    includeOlder,
-    setIncludeOlder,
     conversations,
     pagination: {
       page: conversationsPage,
