@@ -82,7 +82,7 @@ export function usePaginatedUsers(
       const offset = (page - 1) * pageSize
       return fetchPaginatedUsers(pageSize, offset, search, session?.access_token)
     },
-    enabled: isAdmin && options?.enabled !== false,
+    enabled: isAdmin && !!session && options?.enabled !== false,
     staleTime: STALE_TIME.MEDIUM,
     placeholderData: (previousData) => previousData, // Keep previous data while fetching
   })
