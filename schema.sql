@@ -63,6 +63,21 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   last_location TEXT
 );
 
+CREATE TABLE IF NOT EXISTS user_stats (
+  user_id UUID PRIMARY KEY REFERENCES user_profiles(id) ON DELETE CASCADE,
+  thread_count BIGINT DEFAULT 0,
+  post_count BIGINT DEFAULT 0,
+  deleted_count BIGINT DEFAULT 0,
+  flagged_count BIGINT DEFAULT 0,
+  upvotes_received BIGINT DEFAULT 0,
+  downvotes_received BIGINT DEFAULT 0,
+  upvotes_given BIGINT DEFAULT 0,
+  downvotes_given BIGINT DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_stats_updated ON user_stats(updated_at DESC);
+
 -- Case-insensitive username uniqueness
 CREATE UNIQUE INDEX IF NOT EXISTS user_profiles_username_lower_idx
   ON user_profiles (LOWER(username));
@@ -147,6 +162,10 @@ BEGIN
   INSERT INTO user_profiles (id, username, role, avatar_path)
   VALUES (p_user_id, v_final_username, 'user', p_avatar_path);
 
+  INSERT INTO user_stats (user_id)
+  VALUES (p_user_id)
+  ON CONFLICT (user_id) DO NOTHING;
+
   -- Send welcome message from PandaKeeper
   SELECT up.id INTO v_pandakeeper_id FROM user_profiles up WHERE up.username = 'PandaKeeper' LIMIT 1;
 
@@ -180,6 +199,23 @@ CREATE POLICY "Users can insert own profile" ON user_profiles
 
 -- Prevent direct profile updates; use RPCs instead
 REVOKE UPDATE ON user_profiles FROM anon, authenticated;
+
+-- Ensure stats row exists for every user profile
+CREATE OR REPLACE FUNCTION ensure_user_stats()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO user_stats (user_id)
+  VALUES (NEW.id)
+  ON CONFLICT (user_id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_ensure_user_stats ON user_profiles;
+CREATE TRIGGER trigger_ensure_user_stats
+  AFTER INSERT ON user_profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION ensure_user_stats();
 
 
 -- =============================================================================
@@ -541,6 +577,306 @@ CREATE TRIGGER trigger_update_post_vote_counts_delete
   FOR EACH ROW
   EXECUTE FUNCTION update_post_vote_counts();
 
+-- =============================================================================
+-- 4B. USER STATS (denormalized counters for admin views)
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION apply_user_stats_delta(
+  p_user_id UUID,
+  p_thread_delta BIGINT DEFAULT 0,
+  p_post_delta BIGINT DEFAULT 0,
+  p_deleted_delta BIGINT DEFAULT 0,
+  p_flagged_delta BIGINT DEFAULT 0,
+  p_upvotes_received_delta BIGINT DEFAULT 0,
+  p_downvotes_received_delta BIGINT DEFAULT 0,
+  p_upvotes_given_delta BIGINT DEFAULT 0,
+  p_downvotes_given_delta BIGINT DEFAULT 0
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  INSERT INTO user_stats (
+    user_id,
+    thread_count,
+    post_count,
+    deleted_count,
+    flagged_count,
+    upvotes_received,
+    downvotes_received,
+    upvotes_given,
+    downvotes_given,
+    updated_at
+  )
+  VALUES (
+    p_user_id,
+    p_thread_delta,
+    p_post_delta,
+    p_deleted_delta,
+    p_flagged_delta,
+    p_upvotes_received_delta,
+    p_downvotes_received_delta,
+    p_upvotes_given_delta,
+    p_downvotes_given_delta,
+    NOW()
+  )
+  ON CONFLICT (user_id)
+  DO UPDATE SET
+    thread_count = GREATEST(user_stats.thread_count + EXCLUDED.thread_count, 0),
+    post_count = GREATEST(user_stats.post_count + EXCLUDED.post_count, 0),
+    deleted_count = GREATEST(user_stats.deleted_count + EXCLUDED.deleted_count, 0),
+    flagged_count = GREATEST(user_stats.flagged_count + EXCLUDED.flagged_count, 0),
+    upvotes_received = GREATEST(user_stats.upvotes_received + EXCLUDED.upvotes_received, 0),
+    downvotes_received = GREATEST(user_stats.downvotes_received + EXCLUDED.downvotes_received, 0),
+    upvotes_given = GREATEST(user_stats.upvotes_given + EXCLUDED.upvotes_given, 0),
+    downvotes_given = GREATEST(user_stats.downvotes_given + EXCLUDED.downvotes_given, 0),
+    updated_at = NOW();
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION update_user_stats_on_thread_change()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    PERFORM apply_user_stats_delta(NEW.author_id, 1, 0, 0, 0, 0, 0, 0, 0);
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    PERFORM apply_user_stats_delta(OLD.author_id, -1, 0, 0, 0, 0, 0, 0, 0);
+    RETURN OLD;
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_update_user_stats_thread_insert ON forum_threads;
+CREATE TRIGGER trigger_update_user_stats_thread_insert
+  AFTER INSERT ON forum_threads
+  FOR EACH ROW
+  EXECUTE FUNCTION update_user_stats_on_thread_change();
+
+DROP TRIGGER IF EXISTS trigger_update_user_stats_thread_delete ON forum_threads;
+CREATE TRIGGER trigger_update_user_stats_thread_delete
+  AFTER DELETE ON forum_threads
+  FOR EACH ROW
+  EXECUTE FUNCTION update_user_stats_on_thread_change();
+
+CREATE OR REPLACE FUNCTION update_user_stats_on_post_insert()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_deleted_delta BIGINT := 0;
+  v_flagged_delta BIGINT := 0;
+BEGIN
+  IF COALESCE(NEW.is_deleted, FALSE) THEN
+    v_deleted_delta := 1;
+  END IF;
+  IF COALESCE(NEW.is_flagged, FALSE) THEN
+    v_flagged_delta := 1;
+  END IF;
+
+  PERFORM apply_user_stats_delta(NEW.author_id, 0, 1, v_deleted_delta, v_flagged_delta, 0, 0, 0, 0);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION update_user_stats_on_post_delete()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_deleted_delta BIGINT := 0;
+  v_flagged_delta BIGINT := 0;
+BEGIN
+  IF COALESCE(OLD.is_deleted, FALSE) THEN
+    v_deleted_delta := -1;
+  END IF;
+  IF COALESCE(OLD.is_flagged, FALSE) THEN
+    v_flagged_delta := -1;
+  END IF;
+
+  PERFORM apply_user_stats_delta(OLD.author_id, 0, -1, v_deleted_delta, v_flagged_delta, 0, 0, 0, 0);
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION update_user_stats_on_post_visibility()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_deleted_delta BIGINT := 0;
+  v_flagged_delta BIGINT := 0;
+BEGIN
+  IF COALESCE(OLD.is_deleted, FALSE) <> COALESCE(NEW.is_deleted, FALSE) THEN
+    v_deleted_delta := CASE WHEN COALESCE(NEW.is_deleted, FALSE) THEN 1 ELSE -1 END;
+  END IF;
+
+  IF COALESCE(OLD.is_flagged, FALSE) <> COALESCE(NEW.is_flagged, FALSE) THEN
+    v_flagged_delta := CASE WHEN COALESCE(NEW.is_flagged, FALSE) THEN 1 ELSE -1 END;
+  END IF;
+
+  IF v_deleted_delta != 0 OR v_flagged_delta != 0 THEN
+    PERFORM apply_user_stats_delta(NEW.author_id, 0, 0, v_deleted_delta, v_flagged_delta, 0, 0, 0, 0);
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_update_user_stats_post_insert ON forum_posts;
+CREATE TRIGGER trigger_update_user_stats_post_insert
+  AFTER INSERT ON forum_posts
+  FOR EACH ROW
+  EXECUTE FUNCTION update_user_stats_on_post_insert();
+
+DROP TRIGGER IF EXISTS trigger_update_user_stats_post_delete ON forum_posts;
+CREATE TRIGGER trigger_update_user_stats_post_delete
+  AFTER DELETE ON forum_posts
+  FOR EACH ROW
+  EXECUTE FUNCTION update_user_stats_on_post_delete();
+
+DROP TRIGGER IF EXISTS trigger_update_user_stats_post_visibility ON forum_posts;
+CREATE TRIGGER trigger_update_user_stats_post_visibility
+  AFTER UPDATE OF is_deleted, is_flagged ON forum_posts
+  FOR EACH ROW
+  EXECUTE FUNCTION update_user_stats_on_post_visibility();
+
+CREATE OR REPLACE FUNCTION update_user_stats_on_vote_change()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_author_id UUID;
+  v_up_received_delta BIGINT := 0;
+  v_down_received_delta BIGINT := 0;
+  v_up_given_delta BIGINT := 0;
+  v_down_given_delta BIGINT := 0;
+BEGIN
+  SELECT author_id INTO v_author_id
+  FROM forum_posts WHERE id = NEW.post_id;
+
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.vote_type = 1 THEN
+      v_up_received_delta := 1;
+      v_up_given_delta := 1;
+    ELSE
+      v_down_received_delta := 1;
+      v_down_given_delta := 1;
+    END IF;
+  ELSIF TG_OP = 'UPDATE' THEN
+    IF OLD.vote_type = NEW.vote_type THEN
+      RETURN NEW;
+    END IF;
+
+    IF OLD.vote_type = 1 THEN
+      v_up_received_delta := v_up_received_delta - 1;
+      v_up_given_delta := v_up_given_delta - 1;
+    ELSE
+      v_down_received_delta := v_down_received_delta - 1;
+      v_down_given_delta := v_down_given_delta - 1;
+    END IF;
+
+    IF NEW.vote_type = 1 THEN
+      v_up_received_delta := v_up_received_delta + 1;
+      v_up_given_delta := v_up_given_delta + 1;
+    ELSE
+      v_down_received_delta := v_down_received_delta + 1;
+      v_down_given_delta := v_down_given_delta + 1;
+    END IF;
+  END IF;
+
+  IF v_author_id IS NOT NULL THEN
+    PERFORM apply_user_stats_delta(
+      v_author_id,
+      0,
+      0,
+      0,
+      0,
+      v_up_received_delta,
+      v_down_received_delta,
+      0,
+      0
+    );
+  END IF;
+
+  PERFORM apply_user_stats_delta(
+    NEW.user_id,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    v_up_given_delta,
+    v_down_given_delta
+  );
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION update_user_stats_on_vote_delete()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_author_id UUID;
+  v_up_received_delta BIGINT := 0;
+  v_down_received_delta BIGINT := 0;
+  v_up_given_delta BIGINT := 0;
+  v_down_given_delta BIGINT := 0;
+BEGIN
+  SELECT author_id INTO v_author_id
+  FROM forum_posts WHERE id = OLD.post_id;
+
+  IF OLD.vote_type = 1 THEN
+    v_up_received_delta := -1;
+    v_up_given_delta := -1;
+  ELSE
+    v_down_received_delta := -1;
+    v_down_given_delta := -1;
+  END IF;
+
+  IF v_author_id IS NOT NULL THEN
+    PERFORM apply_user_stats_delta(
+      v_author_id,
+      0,
+      0,
+      0,
+      0,
+      v_up_received_delta,
+      v_down_received_delta,
+      0,
+      0
+    );
+  END IF;
+
+  PERFORM apply_user_stats_delta(
+    OLD.user_id,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    v_up_given_delta,
+    v_down_given_delta
+  );
+
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_update_user_stats_vote_insert ON post_votes;
+CREATE TRIGGER trigger_update_user_stats_vote_insert
+  AFTER INSERT ON post_votes
+  FOR EACH ROW
+  EXECUTE FUNCTION update_user_stats_on_vote_change();
+
+DROP TRIGGER IF EXISTS trigger_update_user_stats_vote_update ON post_votes;
+CREATE TRIGGER trigger_update_user_stats_vote_update
+  AFTER UPDATE ON post_votes
+  FOR EACH ROW
+  EXECUTE FUNCTION update_user_stats_on_vote_change();
+
+DROP TRIGGER IF EXISTS trigger_update_user_stats_vote_delete ON post_votes;
+CREATE TRIGGER trigger_update_user_stats_vote_delete
+  AFTER DELETE ON post_votes
+  FOR EACH ROW
+  EXECUTE FUNCTION update_user_stats_on_vote_delete();
+
 
 -- =============================================================================
 -- 5. BOOKMARKS
@@ -790,6 +1126,31 @@ AS $$
     AND b.post_id = ANY(p_post_ids);
 $$;
 
+-- Get current user's vote + bookmark overlay for a list of posts
+CREATE OR REPLACE FUNCTION get_user_post_overlays(p_post_ids INTEGER[])
+RETURNS TABLE (
+  post_id INTEGER,
+  vote_type INTEGER,
+  is_bookmarked BOOLEAN
+)
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT
+    pid AS post_id,
+    pv.vote_type,
+    (b.post_id IS NOT NULL) AS is_bookmarked
+  FROM unnest(p_post_ids) AS pid
+  LEFT JOIN post_votes pv
+    ON pv.post_id = pid
+    AND pv.user_id = auth.uid()
+  LEFT JOIN bookmarks b
+    ON b.post_id = pid
+    AND b.user_id = auth.uid()
+  WHERE auth.uid() IS NOT NULL;
+$$;
+
 -- Update own login metadata (last login/IP/location)
 CREATE OR REPLACE FUNCTION update_login_metadata(
   p_last_login TIMESTAMPTZ DEFAULT NULL,
@@ -905,6 +1266,7 @@ GRANT EXECUTE ON FUNCTION get_my_profile_status() TO authenticated;
 GRANT EXECUTE ON FUNCTION update_login_metadata(TIMESTAMPTZ, INET, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_user_post_votes(INTEGER[]) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_user_post_bookmarks(INTEGER[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_post_overlays(INTEGER[]) TO authenticated;
 GRANT EXECUTE ON FUNCTION is_username_available(TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION set_user_role(UUID, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION set_user_blocked(UUID, BOOLEAN) TO authenticated;
@@ -1171,18 +1533,6 @@ BEGIN
   END IF;
 
   RETURN QUERY
-  WITH thread_counts AS (
-    SELECT author_id, COUNT(*) AS thread_count
-    FROM forum_threads
-    GROUP BY author_id
-  ),
-  post_counts AS (
-    SELECT author_id,
-           COUNT(*) FILTER (WHERE parent_id IS NOT NULL) AS post_count,
-           COUNT(*) FILTER (WHERE is_flagged = TRUE) AS flagged_count
-    FROM forum_posts
-    GROUP BY author_id
-  )
   SELECT
     up.id,
     up.username,
@@ -1193,13 +1543,12 @@ BEGIN
     COALESCE(up.is_deleted, FALSE),
     up.created_at,
     up.last_login,
-    COALESCE(tc.thread_count, 0),
-    COALESCE(pc.post_count, 0),
-    COALESCE(pc.flagged_count, 0)
+    COALESCE(us.thread_count, 0),
+    GREATEST(COALESCE(us.post_count, 0) - COALESCE(us.thread_count, 0), 0),
+    COALESCE(us.flagged_count, 0)
   FROM user_profiles up
   JOIN auth.users au ON au.id = up.id
-  LEFT JOIN thread_counts tc ON tc.author_id = up.id
-  LEFT JOIN post_counts pc ON pc.author_id = up.id
+  LEFT JOIN user_stats us ON us.user_id = up.id
   ORDER BY up.created_at DESC;
 END;
 $$;
@@ -1263,34 +1612,6 @@ BEGIN
     OR LOWER(au.email::TEXT) LIKE v_search_pattern);
 
   RETURN QUERY
-  WITH thread_counts AS (
-    SELECT author_id, COUNT(*) AS thread_count
-    FROM forum_threads
-    GROUP BY author_id
-  ),
-  post_counts AS (
-    SELECT author_id,
-           COUNT(*) AS post_count,
-           COUNT(*) FILTER (WHERE forum_posts.is_deleted = TRUE) AS deleted_count,
-           COUNT(*) FILTER (WHERE forum_posts.is_flagged = TRUE) AS flagged_count
-    FROM forum_posts
-    GROUP BY author_id
-  ),
-  vote_received AS (
-    SELECT fp.author_id,
-           COUNT(*) FILTER (WHERE pv.vote_type = 1) AS upvotes_received,
-           COUNT(*) FILTER (WHERE pv.vote_type = -1) AS downvotes_received
-    FROM post_votes pv
-    JOIN forum_posts fp ON pv.post_id = fp.id
-    GROUP BY fp.author_id
-  ),
-  vote_given AS (
-    SELECT user_id,
-           COUNT(*) FILTER (WHERE vote_type = 1) AS upvotes_given,
-           COUNT(*) FILTER (WHERE vote_type = -1) AS downvotes_given
-    FROM post_votes
-    GROUP BY user_id
-  )
   SELECT
     up.id,
     up.username,
@@ -1304,21 +1625,18 @@ BEGIN
     up.last_login,
     up.last_ip,
     up.last_location,
-    COALESCE(tc.thread_count, 0),
-    COALESCE(pc.post_count, 0),
-    COALESCE(pc.deleted_count, 0),
-    COALESCE(pc.flagged_count, 0),
-    COALESCE(vr.upvotes_received, 0),
-    COALESCE(vr.downvotes_received, 0),
-    COALESCE(vg.upvotes_given, 0),
-    COALESCE(vg.downvotes_given, 0),
+    COALESCE(us.thread_count, 0),
+    COALESCE(us.post_count, 0),
+    COALESCE(us.deleted_count, 0),
+    COALESCE(us.flagged_count, 0),
+    COALESCE(us.upvotes_received, 0),
+    COALESCE(us.downvotes_received, 0),
+    COALESCE(us.upvotes_given, 0),
+    COALESCE(us.downvotes_given, 0),
     v_total
   FROM user_profiles up
   JOIN auth.users au ON au.id = up.id
-  LEFT JOIN thread_counts tc ON tc.author_id = up.id
-  LEFT JOIN post_counts pc ON pc.author_id = up.id
-  LEFT JOIN vote_received vr ON vr.author_id = up.id
-  LEFT JOIN vote_given vg ON vg.user_id = up.id
+  LEFT JOIN user_stats us ON us.user_id = up.id
   WHERE (v_search_pattern IS NULL
     OR LOWER(up.username) LIKE v_search_pattern
     OR LOWER(au.email::TEXT) LIKE v_search_pattern)
@@ -2750,84 +3068,220 @@ CREATE POLICY "Users can update own notifications" ON notifications
 CREATE POLICY "Users can delete own notifications" ON notifications
   FOR DELETE USING (auth.uid() = user_id);
 
--- Trigger: notify on reply (creates notification for parent post author)
-CREATE OR REPLACE FUNCTION notify_on_reply()
+-- Trigger: notify on reply insert (incremental)
+CREATE OR REPLACE FUNCTION notify_on_reply_insert()
 RETURNS TRIGGER AS $$
 DECLARE
   v_parent_author_id UUID;
-  v_current_reply_count INTEGER;
 BEGIN
-  -- If replying to a specific post
-  IF NEW.parent_id IS NOT NULL THEN
-    SELECT author_id INTO v_parent_author_id
-    FROM forum_posts WHERE id = NEW.parent_id;
-
-    -- Notify parent post author (if not self)
-    IF v_parent_author_id IS NOT NULL AND v_parent_author_id != NEW.author_id THEN
-      SELECT COUNT(*) INTO v_current_reply_count
-      FROM forum_posts
-      WHERE parent_id = NEW.parent_id
-        AND COALESCE(is_deleted, FALSE) = FALSE;
-
-      INSERT INTO notifications (user_id, post_id, thread_id, reply_count)
-      VALUES (v_parent_author_id, NEW.parent_id, NEW.thread_id, v_current_reply_count)
-      ON CONFLICT (user_id, post_id)
-      DO UPDATE SET
-        reply_count = EXCLUDED.reply_count,
-        updated_at = NOW();
-    END IF;
-  END IF;
-
-  RETURN NEW;
-EXCEPTION WHEN OTHERS THEN
-  -- Don't fail the post creation if notification fails
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-DROP TRIGGER IF EXISTS trigger_notify_on_reply ON forum_posts;
-CREATE TRIGGER trigger_notify_on_reply
-  AFTER INSERT ON forum_posts
-  FOR EACH ROW
-  EXECUTE FUNCTION notify_on_reply();
-
--- Trigger: notify on vote (aggregated with replies)
-CREATE OR REPLACE FUNCTION notify_on_vote()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_post_author_id UUID;
-  v_thread_id INTEGER;
-  v_current_upvotes INTEGER;
-  v_current_downvotes INTEGER;
-BEGIN
-  SELECT author_id, thread_id INTO v_post_author_id, v_thread_id
-  FROM forum_posts WHERE id = NEW.post_id;
-
-  -- Don't notify for own votes
-  IF v_post_author_id = NEW.user_id THEN
+  IF NEW.parent_id IS NULL THEN
     RETURN NEW;
   END IF;
 
-  -- Calculate current vote counts
-  SELECT
-    COALESCE(SUM(CASE WHEN vote_type = 1 THEN 1 ELSE 0 END), 0),
-    COALESCE(SUM(CASE WHEN vote_type = -1 THEN 1 ELSE 0 END), 0)
-  INTO v_current_upvotes, v_current_downvotes
-  FROM post_votes WHERE post_id = NEW.post_id;
+  SELECT author_id INTO v_parent_author_id
+  FROM forum_posts WHERE id = NEW.parent_id;
 
-  -- Upsert notification (aggregated with replies)
-  INSERT INTO notifications (user_id, post_id, thread_id, upvotes, downvotes)
-  VALUES (v_post_author_id, NEW.post_id, v_thread_id, v_current_upvotes, v_current_downvotes)
+  IF v_parent_author_id IS NULL OR v_parent_author_id = NEW.author_id THEN
+    RETURN NEW;
+  END IF;
+
+  INSERT INTO notifications (user_id, post_id, thread_id, reply_count)
+  VALUES (v_parent_author_id, NEW.parent_id, NEW.thread_id, 1)
   ON CONFLICT (user_id, post_id)
   DO UPDATE SET
-    upvotes = EXCLUDED.upvotes,
-    downvotes = EXCLUDED.downvotes,
+    reply_count = notifications.reply_count + 1,
     updated_at = NOW();
 
   RETURN NEW;
 EXCEPTION WHEN OTHERS THEN
-  -- Don't fail the vote if notification fails
   RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger: notify on reply visibility change (soft delete/restore)
+CREATE OR REPLACE FUNCTION notify_on_reply_visibility()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_parent_author_id UUID;
+  v_delta INTEGER;
+BEGIN
+  IF NEW.parent_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF COALESCE(OLD.is_deleted, FALSE) = COALESCE(NEW.is_deleted, FALSE) THEN
+    RETURN NEW;
+  END IF;
+
+  v_delta := CASE WHEN COALESCE(NEW.is_deleted, FALSE) THEN -1 ELSE 1 END;
+
+  SELECT author_id INTO v_parent_author_id
+  FROM forum_posts WHERE id = NEW.parent_id;
+
+  IF v_parent_author_id IS NULL OR v_parent_author_id = NEW.author_id THEN
+    RETURN NEW;
+  END IF;
+
+  IF v_delta > 0 THEN
+    INSERT INTO notifications (user_id, post_id, thread_id, reply_count)
+    VALUES (v_parent_author_id, NEW.parent_id, NEW.thread_id, 1)
+    ON CONFLICT (user_id, post_id)
+    DO UPDATE SET
+      reply_count = notifications.reply_count + 1,
+      updated_at = NOW();
+  ELSE
+    UPDATE notifications
+    SET reply_count = GREATEST(reply_count - 1, 0),
+        updated_at = NOW()
+    WHERE user_id = v_parent_author_id AND post_id = NEW.parent_id;
+  END IF;
+
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger: notify on reply hard delete (defensive)
+CREATE OR REPLACE FUNCTION notify_on_reply_delete()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_parent_author_id UUID;
+BEGIN
+  IF OLD.parent_id IS NULL THEN
+    RETURN OLD;
+  END IF;
+
+  IF COALESCE(OLD.is_deleted, FALSE) = TRUE THEN
+    RETURN OLD;
+  END IF;
+
+  SELECT author_id INTO v_parent_author_id
+  FROM forum_posts WHERE id = OLD.parent_id;
+
+  IF v_parent_author_id IS NULL OR v_parent_author_id = OLD.author_id THEN
+    RETURN OLD;
+  END IF;
+
+  UPDATE notifications
+  SET reply_count = GREATEST(reply_count - 1, 0),
+      updated_at = NOW()
+  WHERE user_id = v_parent_author_id AND post_id = OLD.parent_id;
+
+  RETURN OLD;
+EXCEPTION WHEN OTHERS THEN
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trigger_notify_on_reply_insert ON forum_posts;
+CREATE TRIGGER trigger_notify_on_reply_insert
+  AFTER INSERT ON forum_posts
+  FOR EACH ROW
+  EXECUTE FUNCTION notify_on_reply_insert();
+
+DROP TRIGGER IF EXISTS trigger_notify_on_reply_visibility ON forum_posts;
+CREATE TRIGGER trigger_notify_on_reply_visibility
+  AFTER UPDATE OF is_deleted ON forum_posts
+  FOR EACH ROW
+  EXECUTE FUNCTION notify_on_reply_visibility();
+
+DROP TRIGGER IF EXISTS trigger_notify_on_reply_delete ON forum_posts;
+CREATE TRIGGER trigger_notify_on_reply_delete
+  AFTER DELETE ON forum_posts
+  FOR EACH ROW
+  EXECUTE FUNCTION notify_on_reply_delete();
+
+-- Trigger: notify on vote change (incremental)
+CREATE OR REPLACE FUNCTION notify_on_vote_change()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_post_author_id UUID;
+  v_thread_id INTEGER;
+  v_up_delta INTEGER := 0;
+  v_down_delta INTEGER := 0;
+BEGIN
+  SELECT author_id, thread_id INTO v_post_author_id, v_thread_id
+  FROM forum_posts WHERE id = NEW.post_id;
+
+  IF v_post_author_id IS NULL OR v_post_author_id = NEW.user_id THEN
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.vote_type = 1 THEN
+      v_up_delta := 1;
+    ELSE
+      v_down_delta := 1;
+    END IF;
+  ELSIF TG_OP = 'UPDATE' THEN
+    IF OLD.vote_type = NEW.vote_type THEN
+      RETURN NEW;
+    END IF;
+
+    IF OLD.vote_type = 1 THEN
+      v_up_delta := v_up_delta - 1;
+    ELSE
+      v_down_delta := v_down_delta - 1;
+    END IF;
+
+    IF NEW.vote_type = 1 THEN
+      v_up_delta := v_up_delta + 1;
+    ELSE
+      v_down_delta := v_down_delta + 1;
+    END IF;
+  END IF;
+
+  INSERT INTO notifications (user_id, post_id, thread_id, upvotes, downvotes)
+  VALUES (
+    v_post_author_id,
+    NEW.post_id,
+    v_thread_id,
+    GREATEST(v_up_delta, 0),
+    GREATEST(v_down_delta, 0)
+  )
+  ON CONFLICT (user_id, post_id)
+  DO UPDATE SET
+    upvotes = GREATEST(notifications.upvotes + v_up_delta, 0),
+    downvotes = GREATEST(notifications.downvotes + v_down_delta, 0),
+    updated_at = NOW();
+
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger: notify on vote delete (incremental)
+CREATE OR REPLACE FUNCTION notify_on_vote_delete()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_post_author_id UUID;
+  v_down_delta INTEGER := 0;
+  v_up_delta INTEGER := 0;
+BEGIN
+  SELECT author_id INTO v_post_author_id
+  FROM forum_posts WHERE id = OLD.post_id;
+
+  IF v_post_author_id IS NULL OR v_post_author_id = OLD.user_id THEN
+    RETURN OLD;
+  END IF;
+
+  IF OLD.vote_type = 1 THEN
+    v_up_delta := -1;
+  ELSE
+    v_down_delta := -1;
+  END IF;
+
+  UPDATE notifications
+  SET upvotes = GREATEST(upvotes + v_up_delta, 0),
+      downvotes = GREATEST(downvotes + v_down_delta, 0),
+      updated_at = NOW()
+  WHERE user_id = v_post_author_id AND post_id = OLD.post_id;
+
+  RETURN OLD;
+EXCEPTION WHEN OTHERS THEN
+  RETURN OLD;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -2835,43 +3289,13 @@ DROP TRIGGER IF EXISTS trigger_notify_on_vote_insert ON post_votes;
 CREATE TRIGGER trigger_notify_on_vote_insert
   AFTER INSERT ON post_votes
   FOR EACH ROW
-  EXECUTE FUNCTION notify_on_vote();
+  EXECUTE FUNCTION notify_on_vote_change();
 
 DROP TRIGGER IF EXISTS trigger_notify_on_vote_update ON post_votes;
 CREATE TRIGGER trigger_notify_on_vote_update
   AFTER UPDATE ON post_votes
   FOR EACH ROW
-  EXECUTE FUNCTION notify_on_vote();
-
--- Trigger: handle vote deletion (update counts only, never delete - baseline system handles visibility)
-CREATE OR REPLACE FUNCTION notify_on_vote_delete()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_post_author_id UUID;
-  v_current_upvotes INTEGER;
-  v_current_downvotes INTEGER;
-BEGIN
-  SELECT author_id INTO v_post_author_id
-  FROM forum_posts WHERE id = OLD.post_id;
-
-  -- Recalculate vote counts
-  SELECT
-    COALESCE(SUM(CASE WHEN vote_type = 1 THEN 1 ELSE 0 END), 0),
-    COALESCE(SUM(CASE WHEN vote_type = -1 THEN 1 ELSE 0 END), 0)
-  INTO v_current_upvotes, v_current_downvotes
-  FROM post_votes WHERE post_id = OLD.post_id;
-
-  -- Update counts (don't delete - baseline system handles visibility)
-  UPDATE notifications
-  SET upvotes = v_current_upvotes, downvotes = v_current_downvotes, updated_at = NOW()
-  WHERE user_id = v_post_author_id AND post_id = OLD.post_id;
-
-  RETURN OLD;
-EXCEPTION WHEN OTHERS THEN
-  -- Don't fail the vote removal if notification update fails
-  RETURN OLD;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+  EXECUTE FUNCTION notify_on_vote_change();
 
 DROP TRIGGER IF EXISTS trigger_notify_on_vote_delete ON post_votes;
 CREATE TRIGGER trigger_notify_on_vote_delete
