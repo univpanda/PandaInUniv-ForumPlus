@@ -1332,80 +1332,6 @@ $$;
 -- 10. FUNCTIONS - Forum Threads
 -- =============================================================================
 
--- Helper: Count visible replies (excludes deleted for non-admins)
-CREATE OR REPLACE FUNCTION count_visible_replies(
-  p_parent_id INTEGER,
-  p_is_admin BOOLEAN
-)
-RETURNS BIGINT
-LANGUAGE sql
-STABLE
-AS $$
-  SELECT COUNT(*)
-  FROM forum_posts r
-  WHERE r.parent_id = p_parent_id
-    AND (
-      p_is_admin
-      OR COALESCE(r.is_deleted, FALSE) = FALSE
-      -- Include deleted posts that have visible sub-replies (shown as placeholder)
-      OR EXISTS (
-        SELECT 1 FROM forum_posts sub
-        WHERE sub.parent_id = r.id
-        AND COALESCE(sub.is_deleted, FALSE) = FALSE
-      )
-    );
-$$;
-
--- Helper: Count visible thread replies (excludes deleted for non-admins, but includes deleted with visible sub-replies)
-CREATE OR REPLACE FUNCTION count_visible_thread_replies(
-  p_thread_id INTEGER,
-  p_is_admin BOOLEAN
-)
-RETURNS BIGINT
-LANGUAGE sql
-STABLE
-AS $$
-  SELECT COUNT(*)
-  FROM forum_posts r
-  WHERE r.thread_id = p_thread_id
-    AND r.parent_id IS NOT NULL
-    AND (
-      p_is_admin
-      OR COALESCE(r.is_deleted, FALSE) = FALSE
-      -- Include deleted posts that have visible sub-replies (shown as placeholder)
-      OR EXISTS (
-        SELECT 1 FROM forum_posts sub
-        WHERE sub.parent_id = r.id
-        AND COALESCE(sub.is_deleted, FALSE) = FALSE
-      )
-    );
-$$;
-
--- Helper function to check if text contains all space-separated words
-CREATE OR REPLACE FUNCTION text_contains_all_words(p_text TEXT, p_search_text TEXT)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-IMMUTABLE
-AS $$
-DECLARE
-  v_word TEXT;
-BEGIN
-  IF p_search_text IS NULL OR p_search_text = '' THEN
-    RETURN TRUE;
-  END IF;
-
-  -- Split by whitespace and check each word
-  FOREACH v_word IN ARRAY string_to_array(LOWER(p_search_text), ' ')
-  LOOP
-    IF v_word != '' AND LOWER(p_text) NOT LIKE '%' || v_word || '%' THEN
-      RETURN FALSE;
-    END IF;
-  END LOOP;
-
-  RETURN TRUE;
-END;
-$$;
-
 -- Create thread with first post
 CREATE OR REPLACE FUNCTION create_thread(
   p_title TEXT,
@@ -1477,9 +1403,8 @@ DECLARE
   v_is_admin BOOLEAN;
   v_total BIGINT;
 BEGIN
-  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
-    RETURN QUERY SELECT FALSE, FALSE, 'Permission denied'::TEXT;
-    RETURN;
+  IF auth.uid() IS NOT NULL AND NOT public.is_not_blocked() THEN
+    RAISE EXCEPTION 'Permission denied';
   END IF;
 
   SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE user_profiles.id = auth.uid();
@@ -2260,6 +2185,16 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  IF p_user_id <> auth.uid() AND NOT EXISTS (
+    SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   RETURN QUERY
   WITH conversations AS (
     SELECT DISTINCT
@@ -2320,6 +2255,16 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  IF p_user_id <> auth.uid() AND NOT EXISTS (
+    SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   RETURN QUERY
   SELECT
     fm.id,
@@ -2347,6 +2292,16 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  IF p_user_id <> auth.uid() AND NOT EXISTS (
+    SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   RETURN (SELECT COUNT(*) FROM feedback_messages WHERE recipient_id = p_user_id AND is_read = FALSE);
 END;
 $$;
@@ -2358,6 +2313,16 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  IF p_user_id <> auth.uid() AND NOT EXISTS (
+    SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   UPDATE feedback_messages
   SET is_read = TRUE
   WHERE recipient_id = p_user_id AND user_id = p_partner_id AND is_read = FALSE;
@@ -2427,73 +2392,6 @@ $$;
 -- 16. FUNCTIONS - Bookmarks
 -- =============================================================================
 
--- Get user bookmarks
-CREATE OR REPLACE FUNCTION get_user_bookmarks(p_user_id UUID)
-RETURNS TABLE (
-  bookmark_id INTEGER,
-  post_id INTEGER,
-  thread_id INTEGER,
-  thread_title TEXT,
-  post_content TEXT,
-  post_author_id UUID,
-  post_author_name TEXT,
-  post_author_avatar TEXT,
-  post_author_avatar_path TEXT,
-  post_created_at TIMESTAMPTZ,
-  bookmarked_at TIMESTAMPTZ
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  RETURN QUERY
-  SELECT
-    b.id,
-    p.id,
-    p.thread_id,
-    t.title,
-    p.content,
-    p.author_id,
-    u.username,
-    u.avatar_url,
-    u.avatar_path,
-    p.created_at,
-    b.created_at
-  FROM bookmarks b
-  JOIN forum_posts p ON p.id = b.post_id
-  JOIN forum_threads t ON t.id = p.thread_id
-  JOIN user_profiles u ON u.id = p.author_id
-  WHERE b.user_id = p_user_id
-    AND COALESCE(p.is_deleted, FALSE) = FALSE
-  ORDER BY b.created_at DESC;
-END;
-$$;
-
--- Toggle bookmark
-CREATE OR REPLACE FUNCTION toggle_bookmark(p_post_id INTEGER)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_exists BOOLEAN;
-BEGIN
-  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
-    RAISE EXCEPTION 'Permission denied';
-  END IF;
-
-  SELECT EXISTS(SELECT 1 FROM bookmarks WHERE user_id = auth.uid() AND post_id = p_post_id) INTO v_exists;
-
-  IF v_exists THEN
-    DELETE FROM bookmarks WHERE user_id = auth.uid() AND post_id = p_post_id;
-    RETURN FALSE;
-  ELSE
-    INSERT INTO bookmarks (user_id, post_id) VALUES (auth.uid(), p_post_id);
-    RETURN TRUE;
-  END IF;
-END;
-$$;
-
 
 -- =============================================================================
 -- POST BOOKMARKS (view for frontend compatibility)
@@ -2504,15 +2402,33 @@ SELECT id, user_id, post_id, created_at FROM bookmarks;
 -- Get user's bookmarked post IDs (excluding deleted posts)
 CREATE OR REPLACE FUNCTION get_user_bookmark_post_ids(p_user_id UUID)
 RETURNS INTEGER[]
-LANGUAGE sql
+LANGUAGE plpgsql
 SECURITY DEFINER
 STABLE
 AS $$
-  SELECT COALESCE(ARRAY_AGG(b.post_id), ARRAY[]::INTEGER[])
+DECLARE
+  v_is_admin BOOLEAN;
+  v_post_ids INTEGER[];
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE id = auth.uid();
+  v_is_admin := COALESCE(v_is_admin, FALSE);
+
+  IF NOT v_is_admin AND p_user_id <> auth.uid() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
+  SELECT COALESCE(ARRAY_AGG(b.post_id), ARRAY[]::INTEGER[]) INTO v_post_ids
   FROM bookmarks b
   JOIN forum_posts p ON p.id = b.post_id
   WHERE b.user_id = p_user_id
     AND COALESCE(p.is_deleted, false) = false;
+
+  RETURN v_post_ids;
+END;
 $$;
 
 -- Toggle thread bookmark (bookmarks the OP post of a thread)
@@ -2581,7 +2497,20 @@ RETURNS SETOF INTEGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
+DECLARE
+  v_is_admin BOOLEAN;
 BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE id = auth.uid();
+  v_is_admin := COALESCE(v_is_admin, FALSE);
+
+  IF NOT v_is_admin AND p_user_id <> auth.uid() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   RETURN QUERY
   SELECT DISTINCT p.thread_id
   FROM bookmarks b
@@ -2605,7 +2534,19 @@ AS $$
 DECLARE
   v_posts JSON;
   v_total BIGINT;
+  v_is_admin BOOLEAN;
 BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE id = auth.uid();
+  v_is_admin := COALESCE(v_is_admin, FALSE);
+
+  IF NOT v_is_admin AND p_user_id <> auth.uid() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   SELECT COUNT(*) INTO v_total
   FROM bookmarks b
   JOIN forum_posts p ON p.id = b.post_id

@@ -347,9 +347,19 @@ DROP FUNCTION IF EXISTS toggle_thread_bookmark(INTEGER);
 DROP FUNCTION IF EXISTS toggle_post_bookmark(INTEGER);
 DROP FUNCTION IF EXISTS get_paginated_forum_threads(INTEGER[], INTEGER, INTEGER, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN);
 DROP FUNCTION IF EXISTS get_bookmarked_posts(UUID, INTEGER, INTEGER, TEXT);
+DROP FUNCTION IF EXISTS get_user_bookmark_post_ids(UUID);
+DROP FUNCTION IF EXISTS get_bookmarked_thread_ids(UUID);
 DROP FUNCTION IF EXISTS get_posts_by_author(TEXT, TEXT, INTEGER, INTEGER, BOOLEAN, BOOLEAN, TEXT);
 DROP FUNCTION IF EXISTS get_users_with_stats();
 DROP FUNCTION IF EXISTS get_users_paginated(INTEGER, INTEGER, TEXT);
+DROP FUNCTION IF EXISTS get_user_conversations(UUID);
+DROP FUNCTION IF EXISTS get_conversation_messages(UUID, UUID, INTEGER, TIMESTAMPTZ);
+DROP FUNCTION IF EXISTS get_unread_message_count(UUID);
+DROP FUNCTION IF EXISTS mark_conversation_read(UUID, UUID);
+DROP FUNCTION IF EXISTS get_user_bookmarks(UUID);
+DROP FUNCTION IF EXISTS count_visible_replies(INTEGER, BOOLEAN);
+DROP FUNCTION IF EXISTS count_visible_thread_replies(INTEGER, BOOLEAN);
+DROP FUNCTION IF EXISTS text_contains_all_words(TEXT, TEXT);
 
 -- Public profile lookup (safe fields only)
 CREATE OR REPLACE FUNCTION get_public_user_profile(p_user_id UUID)
@@ -821,31 +831,6 @@ BEGIN
 END;
 $$;
 
--- Toggle bookmark (blocked users denied)
-CREATE OR REPLACE FUNCTION toggle_bookmark(p_post_id INTEGER)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_exists BOOLEAN;
-BEGIN
-  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
-    RAISE EXCEPTION 'Permission denied';
-  END IF;
-
-  SELECT EXISTS(SELECT 1 FROM bookmarks WHERE user_id = auth.uid() AND post_id = p_post_id) INTO v_exists;
-
-  IF v_exists THEN
-    DELETE FROM bookmarks WHERE user_id = auth.uid() AND post_id = p_post_id;
-    RETURN FALSE;
-  ELSE
-    INSERT INTO bookmarks (user_id, post_id) VALUES (auth.uid(), p_post_id);
-    RETURN TRUE;
-  END IF;
-END;
-$$;
-
 -- Toggle thread bookmark (blocked users denied)
 CREATE OR REPLACE FUNCTION toggle_thread_bookmark(p_thread_id INTEGER)
 RETURNS BOOLEAN
@@ -906,6 +891,67 @@ BEGIN
 END;
 $$;
 
+-- Get user's bookmarked post IDs (excluding deleted posts)
+CREATE OR REPLACE FUNCTION get_user_bookmark_post_ids(p_user_id UUID)
+RETURNS INTEGER[]
+LANGUAGE plpgsql
+SECURITY DEFINER
+STABLE
+AS $$
+DECLARE
+  v_is_admin BOOLEAN;
+  v_post_ids INTEGER[];
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE id = auth.uid();
+  v_is_admin := COALESCE(v_is_admin, FALSE);
+
+  IF NOT v_is_admin AND p_user_id <> auth.uid() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
+  SELECT COALESCE(ARRAY_AGG(b.post_id), ARRAY[]::INTEGER[]) INTO v_post_ids
+  FROM bookmarks b
+  JOIN forum_posts p ON p.id = b.post_id
+  WHERE b.user_id = p_user_id
+    AND COALESCE(p.is_deleted, false) = false;
+
+  RETURN v_post_ids;
+END;
+$$;
+
+-- Get bookmarked thread IDs (threads where OP is bookmarked)
+CREATE OR REPLACE FUNCTION get_bookmarked_thread_ids(p_user_id UUID)
+RETURNS SETOF INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_is_admin BOOLEAN;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE id = auth.uid();
+  v_is_admin := COALESCE(v_is_admin, FALSE);
+
+  IF NOT v_is_admin AND p_user_id <> auth.uid() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
+  RETURN QUERY
+  SELECT DISTINCT p.thread_id
+  FROM bookmarks b
+  JOIN forum_posts p ON p.id = b.post_id
+  WHERE b.user_id = p_user_id
+    AND p.parent_id IS NULL;
+END;
+$$;
+
 -- Get paginated forum threads (search via tsvector)
 CREATE OR REPLACE FUNCTION get_paginated_forum_threads(
   p_category_ids INTEGER[] DEFAULT NULL,
@@ -939,6 +985,10 @@ DECLARE
   v_is_admin BOOLEAN;
   v_total BIGINT;
 BEGIN
+  IF auth.uid() IS NOT NULL AND NOT public.is_not_blocked() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE user_profiles.id = auth.uid();
   v_is_admin := COALESCE(v_is_admin, FALSE);
 
@@ -1004,7 +1054,19 @@ AS $$
 DECLARE
   v_posts JSON;
   v_total BIGINT;
+  v_is_admin BOOLEAN;
 BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE id = auth.uid();
+  v_is_admin := COALESCE(v_is_admin, FALSE);
+
+  IF NOT v_is_admin AND p_user_id <> auth.uid() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   SELECT COUNT(*) INTO v_total
   FROM bookmarks b
   JOIN forum_posts p ON p.id = b.post_id
@@ -1060,6 +1122,171 @@ BEGIN
   );
 END;
 $$;
+
+-- Get user conversations
+CREATE OR REPLACE FUNCTION get_user_conversations(p_user_id UUID)
+RETURNS TABLE (
+  conversation_partner_id UUID,
+  partner_username TEXT,
+  partner_avatar TEXT,
+  partner_avatar_path TEXT,
+  last_message TEXT,
+  last_message_at TIMESTAMPTZ,
+  last_message_is_from_me BOOLEAN,
+  unread_count BIGINT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  IF p_user_id <> auth.uid() AND NOT EXISTS (
+    SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
+  RETURN QUERY
+  WITH conversations AS (
+    SELECT DISTINCT
+      CASE WHEN user_id = p_user_id THEN recipient_id ELSE user_id END AS partner_id
+    FROM feedback_messages
+    WHERE user_id = p_user_id OR recipient_id = p_user_id
+  ),
+  last_messages AS (
+    SELECT DISTINCT ON (
+      CASE WHEN fm.user_id = p_user_id THEN fm.recipient_id ELSE fm.user_id END
+    )
+      CASE WHEN fm.user_id = p_user_id THEN fm.recipient_id ELSE fm.user_id END AS partner_id,
+      fm.content,
+      fm.created_at,
+      fm.user_id = p_user_id AS is_from_me
+    FROM feedback_messages fm
+    WHERE fm.user_id = p_user_id OR fm.recipient_id = p_user_id
+    ORDER BY
+      CASE WHEN fm.user_id = p_user_id THEN fm.recipient_id ELSE fm.user_id END,
+      fm.created_at DESC
+  )
+  SELECT
+    c.partner_id,
+    u.username,
+    u.avatar_url,
+    u.avatar_path,
+    lm.content,
+    lm.created_at,
+    lm.is_from_me,
+    (SELECT COUNT(*) FROM feedback_messages fm
+     WHERE fm.user_id = c.partner_id AND fm.recipient_id = p_user_id AND fm.is_read = FALSE)
+  FROM conversations c
+  JOIN user_profiles u ON u.id = c.partner_id
+  JOIN last_messages lm ON lm.partner_id = c.partner_id
+  WHERE NOT COALESCE(u.is_deleted, FALSE)
+  ORDER BY lm.created_at DESC;
+END;
+$$;
+
+-- Get conversation messages
+CREATE OR REPLACE FUNCTION get_conversation_messages(
+  p_user_id UUID,
+  p_partner_id UUID,
+  p_limit INTEGER DEFAULT 50,
+  p_before_cursor TIMESTAMPTZ DEFAULT NULL
+)
+RETURNS TABLE (
+  id UUID,
+  user_id UUID,
+  recipient_id UUID,
+  content TEXT,
+  is_read BOOLEAN,
+  created_at TIMESTAMPTZ,
+  sender_username TEXT,
+  sender_avatar TEXT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  IF p_user_id <> auth.uid() AND NOT EXISTS (
+    SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    fm.id,
+    fm.user_id,
+    fm.recipient_id,
+    fm.content,
+    fm.is_read,
+    fm.created_at,
+    u.username,
+    u.avatar_url
+  FROM feedback_messages fm
+  JOIN user_profiles u ON u.id = fm.user_id
+  WHERE ((fm.user_id = p_user_id AND fm.recipient_id = p_partner_id)
+      OR (fm.user_id = p_partner_id AND fm.recipient_id = p_user_id))
+    AND (p_before_cursor IS NULL OR fm.created_at < p_before_cursor)
+  ORDER BY fm.created_at DESC
+  LIMIT p_limit;
+END;
+$$;
+
+-- Get unread message count
+CREATE OR REPLACE FUNCTION get_unread_message_count(p_user_id UUID)
+RETURNS BIGINT
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  IF p_user_id <> auth.uid() AND NOT EXISTS (
+    SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
+  RETURN (SELECT COUNT(*) FROM feedback_messages WHERE recipient_id = p_user_id AND is_read = FALSE);
+END;
+$$;
+
+-- Mark conversation as read
+CREATE OR REPLACE FUNCTION mark_conversation_read(p_user_id UUID, p_partner_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  IF p_user_id <> auth.uid() AND NOT EXISTS (
+    SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
+  UPDATE feedback_messages
+  SET is_read = TRUE
+  WHERE recipient_id = p_user_id AND user_id = p_partner_id AND is_read = FALSE;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION get_user_conversations(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_conversation_messages(UUID, UUID, INTEGER, TIMESTAMPTZ) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_unread_message_count(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION mark_conversation_read(UUID, UUID) TO authenticated;
 
 -- Author posts search (search via tsvector)
 CREATE OR REPLACE FUNCTION get_posts_by_author(

@@ -296,7 +296,7 @@ async function getUserProfile(userId) {
   const profile = data[0];
 
   // Cache it
-  await putToCache(pk, sk, profile, TTL.PUBLIC_USER_PROFILE);
+  await putToCache(pk, sk, profile, TTL.USER_PROFILE);
 
   return { ...profile, _cached: false };
 }
@@ -322,7 +322,7 @@ async function getPublicUserProfile(userId) {
 
   const profile = data[0];
 
-  await putToCache(pk, sk, profile, TTL.USER_PROFILE);
+  await putToCache(pk, sk, profile, TTL.PUBLIC_USER_PROFILE);
 
   return { ...profile, _cached: false };
 }
