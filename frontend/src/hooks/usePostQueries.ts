@@ -105,36 +105,29 @@ export function useThreadView(
       if (session?.access_token && rows.length > 0) {
         try {
           const postIds = Array.from(new Set(rows.map((row) => row.id)))
-          const overlayCalls = [
-            supabase.rpc('get_user_post_bookmarks', { p_post_ids: postIds }),
-          ]
-          if (usedCache) {
-            overlayCalls.push(supabase.rpc('get_user_post_votes', { p_post_ids: postIds }))
-          }
+          const { data, error } = await supabase.rpc('get_user_post_overlays', {
+            p_post_ids: postIds,
+          })
 
-          const [bookmarksRes, votesRes] = await Promise.all(overlayCalls)
-
-          if (votesRes && !votesRes.error) {
-            const voteMap = new Map<number, number>(
-              (votesRes.data as Array<{ post_id: number; vote_type: number }> | null)?.map((row) => [
-                row.post_id,
-                row.vote_type,
-              ]) || []
+          if (!error) {
+            const overlayMap = new Map<
+              number,
+              { vote_type: number | null; is_bookmarked: boolean }
+            >(
+              (data as Array<{ post_id: number; vote_type: number | null; is_bookmarked: boolean }> | null)?.map(
+                (row) => [row.post_id, { vote_type: row.vote_type ?? null, is_bookmarked: row.is_bookmarked }]
+              ) || []
             )
-            rows = rows.map((row) => ({
-              ...row,
-              user_vote: voteMap.get(row.id) ?? null,
-            }))
-          }
 
-          if (!bookmarksRes.error) {
-            const bookmarkedIds = new Set<number>(
-              (bookmarksRes.data as Array<{ post_id: number }> | null)?.map((row) => row.post_id) || []
-            )
-            rows = rows.map((row) => ({
-              ...row,
-              is_bookmarked: bookmarkedIds.has(row.id),
-            }))
+            rows = rows.map((row) => {
+              const overlay = overlayMap.get(row.id)
+              if (!overlay) return row
+              return {
+                ...row,
+                user_vote: overlay.vote_type ?? null,
+                is_bookmarked: overlay.is_bookmarked,
+              }
+            })
           }
         } catch {
           // If overlay fails, fall back to base data

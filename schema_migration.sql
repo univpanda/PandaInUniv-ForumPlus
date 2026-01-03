@@ -50,6 +50,10 @@ CREATE INDEX IF NOT EXISTS idx_post_votes_user_post ON post_votes(user_id, post_
 CREATE INDEX IF NOT EXISTS idx_bookmarks_user_created ON bookmarks(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_feedback_messages_unread ON feedback_messages(recipient_id, user_id, created_at DESC) WHERE is_read = FALSE;
 CREATE INDEX IF NOT EXISTS idx_feedback_messages_recipient_unread ON feedback_messages(recipient_id) WHERE is_read = FALSE;
+CREATE INDEX IF NOT EXISTS idx_feedback_messages_pair_created
+  ON feedback_messages(user_id, recipient_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_feedback_messages_pair_created_reverse
+  ON feedback_messages(recipient_id, user_id, created_at DESC);
 
 -- RLS policy adjustments
 DROP POLICY IF EXISTS "Anyone can view profiles" ON user_profiles;
@@ -1824,6 +1828,13 @@ BEGIN
     ORDER BY
       CASE WHEN fm.user_id = p_user_id THEN fm.recipient_id ELSE fm.user_id END,
       fm.created_at DESC
+  ),
+  unread_counts AS (
+    SELECT fm.user_id AS partner_id, COUNT(*) AS unread_count
+    FROM feedback_messages fm
+    WHERE fm.recipient_id = p_user_id
+      AND fm.is_read = FALSE
+    GROUP BY fm.user_id
   )
   SELECT
     c.partner_id,
@@ -1833,11 +1844,11 @@ BEGIN
     lm.content,
     lm.created_at,
     lm.is_from_me,
-    (SELECT COUNT(*) FROM feedback_messages fm
-     WHERE fm.user_id = c.partner_id AND fm.recipient_id = p_user_id AND fm.is_read = FALSE)
+    COALESCE(uc.unread_count, 0)
   FROM conversations c
   JOIN user_profiles u ON u.id = c.partner_id
   JOIN last_messages lm ON lm.partner_id = c.partner_id
+  LEFT JOIN unread_counts uc ON uc.partner_id = c.partner_id
   WHERE NOT COALESCE(u.is_deleted, FALSE)
   ORDER BY lm.created_at DESC;
 END;
