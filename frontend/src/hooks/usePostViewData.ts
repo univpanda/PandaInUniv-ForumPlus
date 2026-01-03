@@ -216,7 +216,8 @@ export function usePostViewData({
     }
 
     if (threadId !== null) {
-      const key = forumKeys.posts(threadId, repliesViewOpId ?? null)
+      // Search all post-related caches for this thread (threadView, root, replies pages).
+      const key = ['forum', 'posts', threadId] as const
       const queries = cache.findAll({ queryKey: key })
       for (const query of queries) {
         const found = findPostInData(query.state.data)
