@@ -16,7 +16,6 @@ export { useDiscussionActions } from './useDiscussionActions'
 // Forum queries
 export {
   usePaginatedThreads,
-  usePosts,
   usePaginatedPosts,
   usePrefetchPosts,
   useCreateThread,

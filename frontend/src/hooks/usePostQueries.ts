@@ -7,19 +7,19 @@ import { extractPaginatedResponse } from '../utils/queryHelpers'
 import { forumKeys } from './forumQueryKeys'
 import { profileKeys } from './useUserProfile'
 import { useAuth } from './useAuth'
-import type { Post, Thread, GetThreadPostsResponse, GetPaginatedPostsResponse } from '../types'
+import type { Post, Thread, GetPaginatedPostsResponse, GetThreadPostsResponse } from '../types'
 
-// Posts query (used to fetch all posts for a thread, then filtered/sorted client-side)
-export function usePosts(threadId: number, parentId: number | null, enabled: boolean = true) {
+// Fetch a single post by ID (used to resolve stub posts in replies view)
+export function usePostById(postId: number, enabled: boolean = true) {
   return useQuery({
-    queryKey: forumKeys.posts(threadId, parentId),
-    queryFn: async (): Promise<GetThreadPostsResponse> => {
-      const { data, error } = await supabase.rpc('get_thread_posts', {
-        p_thread_id: threadId,
-        p_parent_id: parentId,
+    queryKey: ['forum', 'post', postId],
+    queryFn: async (): Promise<Post | null> => {
+      const { data, error } = await supabase.rpc('get_post_by_id', {
+        p_post_id: postId,
       })
       if (error) throw error
-      return (data ?? []) as GetThreadPostsResponse
+      const rows = (data ?? []) as Post[]
+      return rows[0] ?? null
     },
     enabled,
     staleTime: STALE_TIME.SHORT,
@@ -163,14 +163,32 @@ export function usePrefetchPosts() {
 
   return (threadId: number) => {
     queryClient.prefetchQuery({
-      queryKey: forumKeys.posts(threadId, null),
-      queryFn: async (): Promise<GetThreadPostsResponse> => {
-        const { data, error } = await supabase.rpc('get_thread_posts', {
+      queryKey: forumKeys.threadView(threadId, 1, 'popular'),
+      queryFn: async (): Promise<ThreadViewResponse> => {
+        const { data, error } = await supabase.rpc('get_thread_view', {
           p_thread_id: threadId,
-          p_parent_id: null,
+          p_limit: PAGE_SIZE.POSTS,
+          p_offset: 0,
+          p_sort: 'popular',
         })
         if (error) throw error
-        return (data ?? []) as GetThreadPostsResponse
+        const rows = (data ?? []) as Array<Post & { is_op: boolean; total_count: number }>
+        const totalCount = rows[0]?.total_count ?? 0
+        const opRow = rows.find((row) => row.is_op)
+        const replyRows = rows.filter((row) => !row.is_op)
+
+        const toPost = (row: Post & { is_op: boolean; total_count: number }): Post => {
+          const { is_op: _isOp, total_count: _totalCount, ...post } = row
+          void _isOp
+          void _totalCount
+          return post as Post
+        }
+
+        return {
+          originalPost: opRow ? toPost(opRow) : undefined,
+          replies: replyRows.map(toPost),
+          totalCount,
+        }
       },
       staleTime: STALE_TIME.SHORT,
     })

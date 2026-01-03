@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { usePosts, usePaginatedPosts, usePaginatedAuthorPosts, useThreadView, forumKeys } from './useForumQueries'
+import { usePostById, usePaginatedPosts, usePaginatedAuthorPosts, useThreadView, forumKeys } from './useForumQueries'
 import { PAGE_SIZE } from '../utils/constants'
 import { isPostStub, isFullPost } from '../types'
 import type { View, SelectedThread, SelectedPost } from './useDiscussionNavigation'
@@ -121,7 +121,14 @@ export function usePostViewData({
 
   // Only fetch if we don't have OP from any cache
   const needsOpFetch = view === 'replies' && threadId !== null && !cachedOp && !cachedRootPosts
-  const threadRootPostsQuery = usePosts(threadId ?? 0, null, needsOpFetch)
+  const threadRootPostsQuery = usePaginatedPosts(
+    threadId ?? 0,
+    null,
+    1,
+    1,
+    'new',
+    needsOpFetch
+  )
 
   // Get OP ID for replies view (needed to fetch level-1 replies where selectedPost lives)
   const repliesViewOpId = useMemo(() => {
@@ -129,7 +136,7 @@ export function usePostViewData({
     // Try cached OP first
     if (cachedOp) return cachedOp.id
     // Then legacy cache
-    const rootPosts = cachedRootPosts ?? threadRootPostsQuery.data ?? []
+    const rootPosts = cachedRootPosts ?? threadRootPostsQuery.data?.posts ?? []
     const op = rootPosts.find((p) => p.parent_id === null)
     return op?.id ?? null
   }, [view, cachedOp, cachedRootPosts, threadRootPostsQuery.data])
@@ -138,10 +145,9 @@ export function usePostViewData({
   const isSelectedPostStub = view === 'replies' && isPostStub(selectedPost)
 
   // Fetch level-1 replies to find selectedPost when it's a stub
-  const level1RepliesQuery = usePosts(
-    threadId ?? 0,
-    repliesViewOpId ?? 0,
-    view === 'replies' && threadId !== null && repliesViewOpId !== null && isSelectedPostStub
+  const selectedPostQuery = usePostById(
+    selectedPost?.id ?? 0,
+    view === 'replies' && threadId !== null && isSelectedPostStub
   )
 
   // ============ POSTS SEARCH ============
@@ -226,13 +232,11 @@ export function usePostViewData({
     }
 
     // Otherwise, find it in the level-1 replies
-    const level1Replies = level1RepliesQuery.data ?? []
-    const resolved = level1Replies.find((p) => p.id === targetId)
-    if (resolved) return resolved
+    if (selectedPostQuery.data?.id === targetId) return selectedPostQuery.data
 
     // Fallback to original selected post (stub or full)
     return isPostStub(selectedPost) ? undefined : selectedPost
-  }, [queryClient, repliesViewOpId, selectedPost, threadId, view, level1RepliesQuery.data])
+  }, [queryClient, repliesViewOpId, selectedPost, threadId, view, selectedPostQuery.data])
 
   // Sub-replies for replies view
   const sortedSubReplies = useMemo(() => {
@@ -257,7 +261,7 @@ export function usePostViewData({
   // ============ LOADING & ERROR STATES ============
 
   const needsRootPostsLoading = needsOpFetch && threadRootPostsQuery.isLoading
-  const needsLevel1RepliesLoading = isSelectedPostStub && level1RepliesQuery.isLoading
+  const needsLevel1RepliesLoading = isSelectedPostStub && selectedPostQuery.isLoading
 
   // Thread view: simple loading - just wait for single query
   const isThreadViewLoading = view === 'thread' && threadViewQuery.isLoading

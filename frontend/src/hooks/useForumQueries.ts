@@ -13,7 +13,7 @@ export {
 
 // Post queries
 export {
-  usePosts,
+  usePostById,
   usePaginatedPosts,
   useThreadView,
   usePrefetchPosts,

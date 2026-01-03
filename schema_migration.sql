@@ -2213,3 +2213,67 @@ CREATE POLICY "Recipients can mark messages as read" ON feedback_messages
     recipient_id = auth.uid()
     OR EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
   );
+
+-- =============================================================================
+-- Add get_post_by_id RPC for resolving stub posts
+-- =============================================================================
+CREATE OR REPLACE FUNCTION get_post_by_id(p_post_id INTEGER)
+RETURNS TABLE (
+  id INTEGER,
+  thread_id INTEGER,
+  parent_id INTEGER,
+  author_id UUID,
+  author_name TEXT,
+  author_avatar TEXT,
+  author_avatar_path TEXT,
+  content TEXT,
+  additional_comments TEXT,
+  created_at TIMESTAMPTZ,
+  edited_at TIMESTAMPTZ,
+  likes BIGINT,
+  dislikes BIGINT,
+  user_vote INTEGER,
+  reply_count BIGINT,
+  is_flagged BOOLEAN,
+  flag_reason TEXT,
+  is_deleted BOOLEAN,
+  deleted_by UUID,
+  is_author_deleted BOOLEAN
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_is_admin BOOLEAN;
+BEGIN
+  SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE user_profiles.id = auth.uid();
+  v_is_admin := COALESCE(v_is_admin, FALSE);
+
+  RETURN QUERY
+  SELECT
+    p.id,
+    p.thread_id,
+    p.parent_id,
+    p.author_id,
+    u.username,
+    u.avatar_url,
+    u.avatar_path,
+    p.content,
+    p.additional_comments,
+    p.created_at,
+    p.edited_at,
+    COALESCE(p.likes, 0) AS likes,
+    COALESCE(p.dislikes, 0) AS dislikes,
+    (SELECT pv.vote_type FROM post_votes pv WHERE pv.post_id = p.id AND pv.user_id = auth.uid()),
+    COALESCE(p.reply_count, 0),
+    p.is_flagged,
+    p.flag_reason,
+    COALESCE(p.is_deleted, FALSE),
+    p.deleted_by,
+    COALESCE(u.is_deleted, FALSE)
+  FROM forum_posts p
+  JOIN user_profiles u ON u.id = p.author_id
+  WHERE p.id = p_post_id
+    AND (v_is_admin OR COALESCE(p.is_deleted, FALSE) = FALSE);
+END;
+$$;
