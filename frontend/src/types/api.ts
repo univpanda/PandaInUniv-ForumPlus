@@ -19,9 +19,6 @@ export interface GetPaginatedThreadsResponse {
   totalCount: number
 }
 
-/** Response from get_thread_posts RPC (legacy, no pagination) */
-export type GetThreadPostsResponse = Post[]
-
 /** Response from get_paginated_thread_posts RPC */
 export interface GetPaginatedPostsResponse {
   posts: Post[]

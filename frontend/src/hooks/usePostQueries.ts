@@ -7,7 +7,7 @@ import { extractPaginatedResponse } from '../utils/queryHelpers'
 import { forumKeys } from './forumQueryKeys'
 import { profileKeys } from './useUserProfile'
 import { useAuth } from './useAuth'
-import type { Post, Thread, GetPaginatedPostsResponse, GetThreadPostsResponse } from '../types'
+import type { Post, Thread, GetPaginatedPostsResponse } from '../types'
 
 // Fetch a single post by ID (used to resolve stub posts in replies view)
 export function usePostById(postId: number, enabled: boolean = true) {
@@ -392,7 +392,7 @@ export function useAddReply() {
 
       // Update reply_count in paginated and legacy caches (for sub-replies)
       if (variables.parentId !== null) {
-        const updateParentReplyCount = (oldData: GetPaginatedPostsResponse | GetThreadPostsResponse | undefined) => {
+        const updateParentReplyCount = (oldData: GetPaginatedPostsResponse | Post[] | undefined) => {
           if (!oldData) return oldData
 
           // Paginated format: { posts: Post[], totalCount: number }

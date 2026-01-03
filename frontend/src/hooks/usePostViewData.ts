@@ -278,7 +278,7 @@ export function usePostViewData({
     view === 'replies' &&
     ((hasSubReplies && paginatedSubRepliesQuery.isFetching) ||
       (needsOpFetch && threadRootPostsQuery.isFetching) ||
-      (isSelectedPostStub && level1RepliesQuery.isFetching))
+      (isSelectedPostStub && selectedPostQuery.isFetching))
 
   const isFetching = isThreadViewFetching || isRepliesViewFetching
 
@@ -287,7 +287,7 @@ export function usePostViewData({
     view === 'replies' &&
     ((hasSubReplies && paginatedSubRepliesQuery.isError) ||
       (needsOpFetch && threadRootPostsQuery.isError) ||
-      (isSelectedPostStub && level1RepliesQuery.isError))
+      (isSelectedPostStub && selectedPostQuery.isError))
 
   const isError = isThreadViewError || isRepliesViewError
 
@@ -313,6 +313,6 @@ export function usePostViewData({
     refetchSubReplies: paginatedSubRepliesQuery.refetch,
     refetchPostsSearch: paginatedPostsSearchQuery.refetch,
     refetchRootPosts: threadRootPostsQuery.refetch,
-    refetchLevel1Replies: level1RepliesQuery.refetch,
+    refetchLevel1Replies: selectedPostQuery.refetch,
   }
 }

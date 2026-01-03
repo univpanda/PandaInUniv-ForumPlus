@@ -2000,3 +2000,8 @@ BEGIN
     AND (v_is_admin OR COALESCE(p.is_deleted, FALSE) = FALSE);
 END;
 $$;
+
+-- =============================================================================
+-- Remove legacy RPCs
+-- =============================================================================
+DROP FUNCTION IF EXISTS get_thread_posts(INTEGER, INTEGER);

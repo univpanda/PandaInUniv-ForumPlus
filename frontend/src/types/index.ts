@@ -24,7 +24,6 @@ export { STORAGE_BUCKET } from './feedback'
 export type {
   GetForumThreadsResponse,
   GetPaginatedThreadsResponse,
-  GetThreadPostsResponse,
   GetPaginatedPostsResponse,
   GetFlaggedPostsResponse,
   GetPaginatedFlaggedPostsResponse,
