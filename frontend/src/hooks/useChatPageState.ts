@@ -5,6 +5,7 @@ import { useUserProfile } from './useUserProfile'
 import { chatKeys } from './useChatQueries'
 import { useChatConversations } from './useChatConversations'
 import { useChatMessages } from './useChatMessages'
+import { CHAT_RECENT_DAYS, MS_PER_DAY } from '../utils/constants'
 import { useQueryClient } from '@tanstack/react-query'
 import type { ChatView, UserConversation } from '../types'
 
@@ -73,6 +74,11 @@ export function useChatPageState({ resetToList }: UseChatPageStateOptions = {}) 
   // ============ Navigation Handlers ============
   const openConversation = useCallback(
     (partner: UserConversation) => {
+      const cutoff = Date.now() - CHAT_RECENT_DAYS * MS_PER_DAY
+      const lastActive = new Date(partner.last_message_at).getTime()
+      const shouldIncludeOlder = Number.isFinite(lastActive) ? lastActive < cutoff : false
+
+      messagesData.setIncludeOlder(shouldIncludeOlder)
       setSelectedPartner({
         id: partner.conversation_partner_id,
         username: partner.partner_username,
@@ -88,6 +94,7 @@ export function useChatPageState({ resetToList }: UseChatPageStateOptions = {}) 
   // Used by Discussion username hover to start a new chat
   const startNewChat = useCallback(
     (partnerId: string, partnerUsername: string, partnerAvatar: string | null, partnerAvatarPath?: string | null) => {
+      messagesData.setIncludeOlder(false)
       setSelectedPartner({
         id: partnerId,
         username: partnerUsername,

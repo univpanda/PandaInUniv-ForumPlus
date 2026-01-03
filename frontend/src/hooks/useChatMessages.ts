@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import {
   useConversationMessages,
   useSendChatMessage,
@@ -58,10 +58,6 @@ export function useChatMessages({ userId, selectedPartner, senderInfo, view }: U
   const isLoadingMoreMessages = messagesQuery.isFetchingNextPage
   const isLoading = messagesQuery.isLoading
   const isSending = sendMessageMutation.isPending
-
-  useEffect(() => {
-    setIncludeOlder(false)
-  }, [selectedPartner?.id])
 
   // Mark messages as read when viewing a conversation
   useEffect(() => {

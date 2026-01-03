@@ -73,11 +73,18 @@ export const ChatMessageList = memo(function ChatMessageList({
       {loading ? (
         <LoadingSpinner className="chat-loading" />
       ) : messages.length === 0 ? (
-        <EmptyState
-          icon={MessageSquare}
-          description="No messages yet. Say hello!"
-          className="chat-empty"
-        />
+        <div className="chat-empty">
+          <EmptyState
+            icon={MessageSquare}
+            description={includeOlder ? 'No messages yet. Say hello!' : 'No recent messages.'}
+            className="chat-empty"
+          />
+          {!includeOlder && onShowOlder && (
+            <button type="button" className="chat-older-toggle" onClick={onShowOlder}>
+              Show older messages
+            </button>
+          )}
+        </div>
       ) : (
         <>
           {!includeOlder && onShowOlder && (
