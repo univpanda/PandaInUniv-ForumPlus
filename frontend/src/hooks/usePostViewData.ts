@@ -5,7 +5,7 @@ import { PAGE_SIZE } from '../utils/constants'
 import { isPostStub, isFullPost } from '../types'
 import type { View, SelectedThread, SelectedPost } from './useDiscussionNavigation'
 import type { ReplySortBy } from './useDiscussionFilters'
-import type { Post, AuthorPost } from '../types'
+import type { Post, AuthorPost, GetPaginatedPostsResponse, ThreadViewResponse } from '../types'
 
 interface UsePostViewDataProps {
   view: View
@@ -193,12 +193,45 @@ export function usePostViewData({
   // Resolve selectedPost from fetched data when it's a stub
   const resolvedSelectedPost = useMemo(() => {
     if (view !== 'replies' || !selectedPost) return undefined
-    // If selectedPost is a full Post (not a stub), use it as-is
-    if (!isPostStub(selectedPost)) return selectedPost
+    const targetId = selectedPost.id
+    const cache = queryClient.getQueryCache()
+
+    const findPostInData = (data: unknown): Post | undefined => {
+      if (!data) return undefined
+      if (Array.isArray(data)) {
+        return (data as Post[]).find((p) => p.id === targetId)
+      }
+      if (typeof data === 'object' && data) {
+        if ('posts' in data && Array.isArray((data as GetPaginatedPostsResponse).posts)) {
+          return (data as GetPaginatedPostsResponse).posts.find((p) => p.id === targetId)
+        }
+        if ('originalPost' in data && 'replies' in data) {
+          const threadView = data as ThreadViewResponse
+          const opMatch = threadView.originalPost?.id === targetId ? threadView.originalPost : undefined
+          if (opMatch) return opMatch
+          return threadView.replies.find((p) => p.id === targetId)
+        }
+      }
+      return undefined
+    }
+
+    if (threadId !== null) {
+      const key = forumKeys.posts(threadId, repliesViewOpId ?? null)
+      const queries = cache.findAll({ queryKey: key })
+      for (const query of queries) {
+        const found = findPostInData(query.state.data)
+        if (found) return found
+      }
+    }
+
     // Otherwise, find it in the level-1 replies
     const level1Replies = level1RepliesQuery.data ?? []
-    return level1Replies.find((p) => p.id === selectedPost.id)
-  }, [view, selectedPost, level1RepliesQuery.data])
+    const resolved = level1Replies.find((p) => p.id === targetId)
+    if (resolved) return resolved
+
+    // Fallback to original selected post (stub or full)
+    return isPostStub(selectedPost) ? undefined : selectedPost
+  }, [queryClient, repliesViewOpId, selectedPost, threadId, view, level1RepliesQuery.data])
 
   // Sub-replies for replies view
   const sortedSubReplies = useMemo(() => {

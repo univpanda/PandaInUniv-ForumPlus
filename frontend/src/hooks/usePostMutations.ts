@@ -339,6 +339,8 @@ export function useEditPost() {
       if (session?.access_token) {
         invalidateThreadCache(variables.threadId, session.access_token)
       }
+      queryClient.invalidateQueries({ queryKey: forumKeys.posts(variables.threadId, null) })
+      queryClient.invalidateQueries({ queryKey: forumKeys.posts(variables.threadId, variables.postId) })
     },
   })
 }
