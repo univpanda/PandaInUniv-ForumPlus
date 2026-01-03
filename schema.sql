@@ -2589,21 +2589,21 @@ BEGIN
   END IF;
 
   IF p_user_id <> auth.uid() AND NOT EXISTS (
-    SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin'
+    SELECT 1 FROM user_profiles up2 WHERE up2.id = auth.uid() AND up2.role = 'admin'
   ) THEN
     RAISE EXCEPTION 'Permission denied';
   END IF;
 
   RETURN QUERY
   SELECT
-    fm.id,
-    fm.user_id,
-    fm.recipient_id,
-    fm.content,
-    fm.is_read,
-    fm.created_at,
-    u.username,
-    u.avatar_url
+    fm.id AS id,
+    fm.user_id AS user_id,
+    fm.recipient_id AS recipient_id,
+    fm.content AS content,
+    fm.is_read AS is_read,
+    fm.created_at AS created_at,
+    u.username AS sender_username,
+    u.avatar_url AS sender_avatar
   FROM feedback_messages fm
   JOIN user_profiles u ON u.id = fm.user_id
   WHERE ((fm.user_id = p_user_id AND fm.recipient_id = p_partner_id)

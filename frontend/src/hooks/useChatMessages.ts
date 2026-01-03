@@ -104,7 +104,8 @@ export function useChatMessages({ userId, selectedPartner, senderInfo, view }: U
     await messagesQuery.fetchNextPage()
   }, [messagesQuery, queryClient, selectedPartner, userId])
   const isLoadingMoreMessages = messagesQuery.isFetchingNextPage
-  const isLoading = messagesQuery.isLoading
+  // Use isPending (no data yet) OR isFetching (actively fetching) to show loading state
+  const isLoading = messagesQuery.isPending || (messagesQuery.isFetching && !messagesQuery.data?.pages?.length)
   const isSending = sendMessageMutation.isPending
 
   // Mark messages as read when viewing a conversation
