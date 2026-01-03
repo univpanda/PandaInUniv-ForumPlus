@@ -107,12 +107,14 @@ export function useThreadView(
       if (session?.access_token && usedCache && rows.length > 0) {
         try {
           const postIds = Array.from(new Set(rows.map((row) => row.id)))
-          const { data, error } = await supabase.rpc('get_user_post_votes', {
-            p_post_ids: postIds,
-          })
-          if (!error) {
+          const [votesRes, bookmarksRes] = await Promise.all([
+            supabase.rpc('get_user_post_votes', { p_post_ids: postIds }),
+            supabase.rpc('get_user_post_bookmarks', { p_post_ids: postIds }),
+          ])
+
+          if (!votesRes.error) {
             const voteMap = new Map<number, number>(
-              (data as Array<{ post_id: number; vote_type: number }> | null)?.map((row) => [
+              (votesRes.data as Array<{ post_id: number; vote_type: number }> | null)?.map((row) => [
                 row.post_id,
                 row.vote_type,
               ]) || []
@@ -120,6 +122,16 @@ export function useThreadView(
             rows = rows.map((row) => ({
               ...row,
               user_vote: voteMap.get(row.id) ?? null,
+            }))
+          }
+
+          if (!bookmarksRes.error) {
+            const bookmarkedIds = new Set<number>(
+              (bookmarksRes.data as Array<{ post_id: number }> | null)?.map((row) => row.post_id) || []
+            )
+            rows = rows.map((row) => ({
+              ...row,
+              is_bookmarked: bookmarkedIds.has(row.id),
             }))
           }
         } catch {

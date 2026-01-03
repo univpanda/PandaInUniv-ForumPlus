@@ -126,7 +126,7 @@ export const PostCardActions = memo(function PostCardActions({
     ? (isBookmarkedProp ?? (threadId ? ctx?.bookmarks.has(threadId) : false) ?? false)
     : false
   const isPostBookmarked = user
-    ? (isPostBookmarkedProp ?? ctx?.postBookmarks?.has(post.id) ?? false)
+    ? (isPostBookmarkedProp ?? post.is_bookmarked ?? ctx?.postBookmarks?.has(post.id) ?? false)
     : false
 
   // Compute derived values from post

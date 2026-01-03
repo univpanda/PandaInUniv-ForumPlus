@@ -326,6 +326,7 @@ DROP FUNCTION IF EXISTS get_public_user_profile(UUID);
 DROP FUNCTION IF EXISTS get_my_profile_status();
 DROP FUNCTION IF EXISTS update_login_metadata(TIMESTAMPTZ, INET, TEXT);
 DROP FUNCTION IF EXISTS get_user_post_votes(INTEGER[]);
+DROP FUNCTION IF EXISTS get_user_post_bookmarks(INTEGER[]);
 DROP FUNCTION IF EXISTS is_username_available(TEXT);
 DROP FUNCTION IF EXISTS set_user_role(UUID, TEXT);
 DROP FUNCTION IF EXISTS set_user_blocked(UUID, BOOLEAN);
@@ -393,6 +394,21 @@ AS $$
   FROM post_votes pv
   WHERE pv.user_id = auth.uid()
     AND pv.post_id = ANY(p_post_ids);
+$$;
+
+-- Get current user's bookmarks for a list of posts
+CREATE OR REPLACE FUNCTION get_user_post_bookmarks(p_post_ids INTEGER[])
+RETURNS TABLE (
+  post_id INTEGER
+)
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT b.post_id
+  FROM bookmarks b
+  WHERE b.user_id = auth.uid()
+    AND b.post_id = ANY(p_post_ids);
 $$;
 
 -- Update own login metadata (last login/IP/location)
@@ -491,6 +507,7 @@ GRANT EXECUTE ON FUNCTION get_public_user_profile(UUID) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION get_my_profile_status() TO authenticated;
 GRANT EXECUTE ON FUNCTION update_login_metadata(TIMESTAMPTZ, INET, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_user_post_votes(INTEGER[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_post_bookmarks(INTEGER[]) TO authenticated;
 GRANT EXECUTE ON FUNCTION is_username_available(TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION set_user_role(UUID, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION set_user_blocked(UUID, BOOLEAN) TO authenticated;

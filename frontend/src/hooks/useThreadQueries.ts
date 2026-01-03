@@ -25,12 +25,14 @@ export function usePaginatedThreads(
   isDeleted: boolean = false,
   isFlagged: boolean = false
 ) {
-  const { session, isAdmin } = useAuth()
+  const { isAdmin } = useAuth()
 
   return useQuery({
     queryKey: forumKeys.paginatedThreads(sortBy, page, authorUsername, searchText, isDeleted, isFlagged),
     queryFn: async (): Promise<GetPaginatedThreadsResponse> => {
-      if (!isAdmin && !isDeleted && !isFlagged && isCacheEnabled()) {
+      const isCachedEligible = !isAdmin && !isDeleted && !isFlagged && isCacheEnabled()
+
+      if (isCachedEligible) {
         const cached = await getCachedThreads({
           limit: pageSize,
           offset: (page - 1) * pageSize,
@@ -58,6 +60,7 @@ export function usePaginatedThreads(
       })
       if (error) throw error
       const { items: threads, totalCount } = extractPaginatedResponse<Thread>(data)
+
       return { threads, totalCount }
     },
     enabled,

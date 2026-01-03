@@ -17,6 +17,7 @@ const TTL = {
   USER_PROFILE: 5 * 60,      // 5 minutes
   USER_LIST: 10 * 60,        // 10 minutes (was 2 min - increased for better cache hits)
   RESERVED_USERNAMES: 60 * 60, // 1 hour
+  PUBLIC_USER_PROFILE: 30 * 60, // 30 minutes
   THREAD_LIST: 60,           // 1 minute
   THREAD_VIEW: 60,           // 1 minute
 };
@@ -295,7 +296,7 @@ async function getUserProfile(userId) {
   const profile = data[0];
 
   // Cache it
-  await putToCache(pk, sk, profile, TTL.USER_PROFILE);
+  await putToCache(pk, sk, profile, TTL.PUBLIC_USER_PROFILE);
 
   return { ...profile, _cached: false };
 }

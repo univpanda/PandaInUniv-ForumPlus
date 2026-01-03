@@ -72,6 +72,7 @@ export interface Thread {
   total_dislikes: number
   is_op_deleted?: boolean
   has_poll?: boolean
+  is_bookmarked?: boolean
 }
 
 export interface Post {
@@ -88,6 +89,7 @@ export interface Post {
   likes: number
   dislikes: number
   user_vote: number | null
+  is_bookmarked?: boolean
   first_reply_content: string | null
   first_reply_author: string | null
   first_reply_avatar: string | null
