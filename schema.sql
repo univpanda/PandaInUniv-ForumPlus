@@ -30,8 +30,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 -- Helper function to check if current user is blocked (used in RLS policies)
 CREATE OR REPLACE FUNCTION public.is_not_blocked()
 RETURNS BOOLEAN
-LANGUAGE sql
-SECURITY DEFINER
+LANGUAGE sql SECURITY DEFINER SET search_path = public
 STABLE
 AS $$
   SELECT NOT EXISTS (
@@ -42,6 +41,15 @@ $$;
 
 -- Grant execute to authenticated users
 GRANT EXECUTE ON FUNCTION public.is_not_blocked() TO authenticated;
+
+-- Helper function to check if a user is admin (used in SECURITY DEFINER RPCs)
+CREATE OR REPLACE FUNCTION public.check_is_admin(p_user_id UUID DEFAULT auth.uid())
+RETURNS BOOLEAN
+LANGUAGE sql SECURITY DEFINER SET search_path = public
+STABLE
+AS $$
+  SELECT COALESCE((SELECT role = 'admin' FROM public.user_profiles WHERE id = p_user_id), FALSE);
+$$;
 
 
 -- =============================================================================
@@ -135,8 +143,7 @@ CREATE OR REPLACE FUNCTION create_user_profile(
   p_avatar_path TEXT DEFAULT NULL
 )
 RETURNS TABLE (success BOOLEAN, username TEXT, message TEXT)
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_final_username TEXT;
@@ -593,8 +600,7 @@ CREATE OR REPLACE FUNCTION apply_user_stats_delta(
   p_downvotes_given_delta BIGINT DEFAULT 0
 )
 RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
   INSERT INTO user_stats (
@@ -1090,8 +1096,7 @@ RETURNS TABLE (
   role TEXT,
   is_blocked BOOLEAN
 )
-LANGUAGE sql
-SECURITY DEFINER
+LANGUAGE sql SECURITY DEFINER SET search_path = public
 STABLE
 AS $$
   SELECT up.role, COALESCE(up.is_blocked, FALSE)
@@ -1105,8 +1110,7 @@ RETURNS TABLE (
   post_id INTEGER,
   vote_type INTEGER
 )
-LANGUAGE sql
-SECURITY DEFINER
+LANGUAGE sql SECURITY DEFINER SET search_path = public
 STABLE
 AS $$
   SELECT pv.post_id, pv.vote_type
@@ -1120,8 +1124,7 @@ CREATE OR REPLACE FUNCTION get_user_post_bookmarks(p_post_ids INTEGER[])
 RETURNS TABLE (
   post_id INTEGER
 )
-LANGUAGE sql
-SECURITY DEFINER
+LANGUAGE sql SECURITY DEFINER SET search_path = public
 STABLE
 AS $$
   SELECT b.post_id
@@ -1137,8 +1140,7 @@ RETURNS TABLE (
   vote_type INTEGER,
   is_bookmarked BOOLEAN
 )
-LANGUAGE sql
-SECURITY DEFINER
+LANGUAGE sql SECURITY DEFINER SET search_path = public
 STABLE
 AS $$
   SELECT
@@ -1162,8 +1164,7 @@ CREATE OR REPLACE FUNCTION update_login_metadata(
   p_last_location TEXT DEFAULT NULL
 )
 RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
   IF auth.uid() IS NULL THEN
@@ -1187,8 +1188,7 @@ RETURNS TABLE (
   avatar_path TEXT,
   is_private BOOLEAN
 )
-LANGUAGE sql
-SECURITY DEFINER
+LANGUAGE sql SECURITY DEFINER SET search_path = public
 STABLE
 AS $$
   SELECT up.id, up.username, up.avatar_url, up.avatar_path, up.is_private
@@ -1199,8 +1199,7 @@ $$;
 -- Check username availability (case-insensitive + reserved words)
 CREATE OR REPLACE FUNCTION is_username_available(p_username TEXT)
 RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 STABLE
 AS $$
 DECLARE
@@ -1223,268 +1222,7 @@ BEGIN
     RETURN FALSE;
   END IF;
 
-  RETURN NOT EXISTS (
-    SELECT 1 FROM user_profiles WHERE LOWER(username) = v_lower_username
-  );
-END;
-$$;
-
--- Admin-only user role update
-CREATE OR REPLACE FUNCTION set_user_role(p_user_id UUID, p_role TEXT)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin') THEN
-    RAISE EXCEPTION 'Admin access required';
-  END IF;
-
-  IF p_role NOT IN ('user', 'admin') THEN
-    RAISE EXCEPTION 'Invalid role';
-  END IF;
-
-  UPDATE user_profiles SET role = p_role WHERE id = p_user_id;
-  RETURN TRUE;
-END;
-$$;
-
--- Admin-only blocked status update
-CREATE OR REPLACE FUNCTION set_user_blocked(p_user_id UUID, p_is_blocked BOOLEAN)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin') THEN
-    RAISE EXCEPTION 'Admin access required';
-  END IF;
-
-  UPDATE user_profiles SET is_blocked = p_is_blocked WHERE id = p_user_id;
-  RETURN TRUE;
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION get_public_user_profile(UUID) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION get_my_profile_status() TO authenticated;
-GRANT EXECUTE ON FUNCTION update_login_metadata(TIMESTAMPTZ, INET, TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION get_user_post_votes(INTEGER[]) TO authenticated;
-GRANT EXECUTE ON FUNCTION get_user_post_bookmarks(INTEGER[]) TO authenticated;
-GRANT EXECUTE ON FUNCTION get_user_post_overlays(INTEGER[]) TO authenticated;
-GRANT EXECUTE ON FUNCTION is_username_available(TEXT) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION set_user_role(UUID, TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION set_user_blocked(UUID, BOOLEAN) TO authenticated;
-
--- Update username with case-insensitive duplicate check and reserved word validation
-CREATE OR REPLACE FUNCTION update_username(p_new_username TEXT)
-RETURNS TABLE (success BOOLEAN, message TEXT)
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_current_username TEXT;
-  v_lower_username TEXT;
-  v_reserved_usernames TEXT[] := get_reserved_usernames();
-BEGIN
-  v_lower_username := LOWER(p_new_username);
-
-  -- Get current username
-  SELECT username INTO v_current_username FROM user_profiles WHERE id = auth.uid();
-
-  -- Check if same as current (case-insensitive)
-  IF LOWER(v_current_username) = v_lower_username THEN
-    RETURN QUERY SELECT TRUE, 'Username unchanged'::TEXT;
-    RETURN;
-  END IF;
-
-  -- Check reserved usernames (use generic message to avoid information leakage)
-  IF v_lower_username = ANY(v_reserved_usernames) THEN
-    RETURN QUERY SELECT FALSE, 'Username not available'::TEXT;
-    RETURN;
-  END IF;
-
-  -- Block any username containing "moderator" or "admin"
-  IF v_lower_username LIKE '%moderator%' OR v_lower_username LIKE '%admin%' THEN
-    RETURN QUERY SELECT FALSE, 'Username not available'::TEXT;
-    RETURN;
-  END IF;
-
-  -- Only exact "PandaKeeper" allowed (no variants like Panda_Keeper, PandaKeeper1, etc.)
-  IF v_lower_username LIKE '%pandakeeper%' AND v_lower_username != 'pandakeeper' THEN
-    RETURN QUERY SELECT FALSE, 'Username not available'::TEXT;
-    RETURN;
-  END IF;
-
-  -- Check if username is taken (case-insensitive, use generic message)
-  IF EXISTS (SELECT 1 FROM user_profiles WHERE LOWER(username) = v_lower_username AND id != auth.uid()) THEN
-    RETURN QUERY SELECT FALSE, 'Username not available'::TEXT;
-    RETURN;
-  END IF;
-
-  -- Update username
-  UPDATE user_profiles SET username = p_new_username WHERE id = auth.uid();
-  RETURN QUERY SELECT TRUE, 'Username updated successfully'::TEXT;
-END;
-$$;
-
--- Delete user account (soft delete - modifies email to allow re-registration)
--- Users can delete their own account; admins can delete any account
--- Keeps user_profiles record with is_deleted=TRUE to preserve username attribution on posts
--- Modifies email in auth.users to email_timestamp format so same email can re-register
--- Also deletes from auth.identities to allow OAuth re-registration
-CREATE OR REPLACE FUNCTION delete_user_account(p_user_id UUID)
-RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_timestamp TEXT;
-  v_current_email TEXT;
-  v_is_admin BOOLEAN;
-  v_current_user_id UUID;
-BEGIN
-  v_current_user_id := auth.uid();
-
-  -- Check permission: must be own account OR admin
-  IF p_user_id <> v_current_user_id THEN
-    SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE id = v_current_user_id;
-    IF NOT COALESCE(v_is_admin, FALSE) THEN
-      RAISE EXCEPTION 'Permission denied: can only delete your own account';
-    END IF;
-  END IF;
-
-  v_timestamp := TO_CHAR(NOW(), 'YYYYMMDDHH24MISS');
-
-  -- Get current email from auth.users
-  SELECT email INTO v_current_email FROM auth.users WHERE id = p_user_id;
-
-  IF v_current_email IS NULL THEN
-    RAISE EXCEPTION 'User not found';
-  END IF;
-
-  -- Mark profile as deleted (keeps username for post attribution)
-  UPDATE user_profiles SET is_deleted = TRUE WHERE id = p_user_id;
-
-  -- Delete OAuth identities to allow re-registration with same provider
-  DELETE FROM auth.identities WHERE user_id = p_user_id;
-
-  -- Modify email in auth.users to allow re-registration with same email
-  UPDATE auth.users SET email = v_current_email || '_deleted_' || v_timestamp WHERE id = p_user_id;
-END;
-$$;
-
--- Delete own account (wrapper for user self-deletion)
-CREATE OR REPLACE FUNCTION delete_own_account()
-RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  PERFORM delete_user_account(auth.uid());
-END;
-$$;
-
--- Toggle user profile privacy
-CREATE OR REPLACE FUNCTION toggle_private(p_user_id UUID)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_new_status BOOLEAN;
-BEGIN
-  IF p_user_id != auth.uid() THEN
-    RAISE EXCEPTION 'Permission denied: can only toggle your own privacy';
-  END IF;
-
-  UPDATE user_profiles
-  SET is_private = NOT COALESCE(is_private, FALSE)
-  WHERE id = p_user_id
-  RETURNING is_private INTO v_new_status;
-
-  RETURN v_new_status;
-END;
-$$;
-
--- Check if username exists and is private (for search protection)
-CREATE OR REPLACE FUNCTION check_username_privacy(p_username TEXT)
-RETURNS TABLE (user_exists BOOLEAN, is_private BOOLEAN)
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_user user_profiles%ROWTYPE;
-BEGIN
-  SELECT * INTO v_user FROM user_profiles WHERE LOWER(username) = LOWER(p_username);
-
-  IF v_user IS NULL THEN
-    RETURN QUERY SELECT FALSE, FALSE;
-  ELSE
-    RETURN QUERY SELECT TRUE, COALESCE(v_user.is_private, FALSE);
-  END IF;
-END;
-$$;
-
--- Get current user's profile stats
-CREATE OR REPLACE FUNCTION get_my_profile_stats()
-RETURNS TABLE (
-  thread_count BIGINT,
-  post_count BIGINT,
-  upvotes_received BIGINT,
-  downvotes_received BIGINT,
-  upvotes_given BIGINT,
-  downvotes_given BIGINT
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  RETURN QUERY
-  SELECT
-    -- Count threads where OP is not deleted
-    (SELECT COUNT(*) FROM forum_threads t
-     JOIN forum_posts op ON op.thread_id = t.id AND op.parent_id IS NULL
-     WHERE t.author_id = auth.uid() AND COALESCE(op.is_deleted, false) = false),
-    -- Count replies only (posts with parent_id, not thread OPs)
-    (SELECT COUNT(*) FROM forum_posts
-     WHERE author_id = auth.uid()
-     AND parent_id IS NOT NULL
-     AND COALESCE(is_deleted, false) = false),
-    (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = 1 THEN 1 ELSE 0 END), 0)
-     FROM post_votes pv JOIN forum_posts fp ON pv.post_id = fp.id WHERE fp.author_id = auth.uid()),
-    (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = -1 THEN 1 ELSE 0 END), 0)
-     FROM post_votes pv JOIN forum_posts fp ON pv.post_id = fp.id WHERE fp.author_id = auth.uid()),
-    (SELECT COUNT(*) FROM post_votes WHERE user_id = auth.uid() AND vote_type = 1),
-    (SELECT COUNT(*) FROM post_votes WHERE user_id = auth.uid() AND vote_type = -1);
-END;
-$$;
-
--- Get public user stats (with privacy check)
-CREATE OR REPLACE FUNCTION get_public_user_stats(p_user_id UUID)
-RETURNS TABLE (
-  is_private BOOLEAN,
-  thread_count BIGINT,
-  post_count BIGINT,
-  upvotes_received BIGINT,
-  downvotes_received BIGINT
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_is_private BOOLEAN;
-  v_is_admin BOOLEAN;
-  v_current_user_id UUID;
-BEGIN
-  v_current_user_id := auth.uid();
-
-  -- Check if target user is private
-  SELECT COALESCE(up.is_private, FALSE) INTO v_is_private
-  FROM user_profiles up WHERE up.id = p_user_id;
-
-  -- Check if current user is admin
-  SELECT COALESCE(up.role = 'admin', FALSE) INTO v_is_admin
-  FROM user_profiles up WHERE up.id = v_current_user_id;
+  v_is_admin := public.check_is_admin(v_current_user_id);
 
   -- If private and not self and not admin, return empty stats with is_private = true
   IF v_is_private AND p_user_id != v_current_user_id AND NOT v_is_admin THEN
@@ -1527,12 +1265,11 @@ RETURNS TABLE (
   post_count BIGINT,
   flagged_count BIGINT
 )
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
   -- Check admin
-  IF NOT EXISTS (SELECT 1 FROM user_profiles WHERE user_profiles.id = auth.uid() AND user_profiles.role = 'admin') THEN
+  IF NOT public.check_is_admin() THEN
     RAISE EXCEPTION 'Admin access required';
   END IF;
 
@@ -1586,15 +1323,14 @@ RETURNS TABLE (
   downvotes_given BIGINT,
   total_count BIGINT
 )
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_total BIGINT;
   v_search_pattern TEXT;
 BEGIN
   -- Check admin
-  IF NOT EXISTS (SELECT 1 FROM user_profiles WHERE user_profiles.id = auth.uid() AND user_profiles.role = 'admin') THEN
+  IF NOT public.check_is_admin() THEN
     RAISE EXCEPTION 'Admin access required';
   END IF;
 
@@ -1663,8 +1399,7 @@ CREATE OR REPLACE FUNCTION create_thread(
   p_flag_reason TEXT DEFAULT NULL
 )
 RETURNS INTEGER
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_thread_id INTEGER;
@@ -1718,8 +1453,7 @@ RETURNS TABLE (
   is_op_deleted BOOLEAN,
   total_count BIGINT
 )
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_is_admin BOOLEAN;
@@ -1729,8 +1463,7 @@ BEGIN
     RAISE EXCEPTION 'Permission denied';
   END IF;
 
-  SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE user_profiles.id = auth.uid();
-  v_is_admin := COALESCE(v_is_admin, FALSE);
+  v_is_admin := public.check_is_admin();
 
   -- Count total matching threads
   SELECT COUNT(*) INTO v_total
@@ -1814,14 +1547,12 @@ RETURNS TABLE (
   deleted_by UUID,
   is_author_deleted BOOLEAN
 )
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_is_admin BOOLEAN;
 BEGIN
-  SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE user_profiles.id = auth.uid();
-  v_is_admin := COALESCE(v_is_admin, FALSE);
+  v_is_admin := public.check_is_admin();
 
   RETURN QUERY
   SELECT
@@ -1878,14 +1609,12 @@ RETURNS TABLE (
   deleted_by UUID,
   is_author_deleted BOOLEAN
 )
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_is_admin BOOLEAN;
 BEGIN
-  SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE user_profiles.id = auth.uid();
-  v_is_admin := COALESCE(v_is_admin, FALSE);
+  v_is_admin := public.check_is_admin();
 
   RETURN QUERY
   SELECT
@@ -1925,8 +1654,7 @@ CREATE OR REPLACE FUNCTION add_reply(
   p_flag_reason TEXT DEFAULT NULL
 )
 RETURNS INTEGER
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_post_id INTEGER;
@@ -1978,15 +1706,13 @@ RETURNS TABLE (
   is_author_deleted BOOLEAN,
   total_count BIGINT
 )
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_is_admin BOOLEAN;
   v_total BIGINT;
 BEGIN
-  SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE user_profiles.id = auth.uid();
-  v_is_admin := COALESCE(v_is_admin, FALSE);
+  v_is_admin := public.check_is_admin();
 
   -- Count total posts
   SELECT COUNT(*) INTO v_total
@@ -2068,16 +1794,14 @@ RETURNS TABLE (
   is_op BOOLEAN,
   total_count BIGINT
 )
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_is_admin BOOLEAN;
   v_op_id INTEGER;
   v_total BIGINT;
 BEGIN
-  SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE user_profiles.id = auth.uid();
-  v_is_admin := COALESCE(v_is_admin, FALSE);
+  v_is_admin := public.check_is_admin();
 
   -- Get the OP's ID (the post with parent_id = NULL for this thread)
   SELECT p.id INTO v_op_id
@@ -2170,8 +1894,7 @@ $$;
 -- Delete/undelete post
 CREATE OR REPLACE FUNCTION delete_post(p_post_id INTEGER)
 RETURNS TABLE (success BOOLEAN, message TEXT)
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_post forum_posts%ROWTYPE;
@@ -2189,8 +1912,7 @@ BEGIN
     RETURN;
   END IF;
 
-  SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE user_profiles.id = auth.uid();
-  v_is_admin := COALESCE(v_is_admin, FALSE);
+  v_is_admin := public.check_is_admin();
 
   -- Check permission: author or admin
   IF v_post.author_id != auth.uid() AND NOT v_is_admin THEN
@@ -2222,8 +1944,7 @@ CREATE OR REPLACE FUNCTION edit_post(
   p_additional_comments TEXT DEFAULT NULL
 )
 RETURNS TABLE (success BOOLEAN, can_edit_content BOOLEAN, message TEXT)
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_post forum_posts%ROWTYPE;
@@ -2275,8 +1996,7 @@ $$;
 -- Vote on post
 CREATE OR REPLACE FUNCTION vote_post(p_post_id INTEGER, p_vote_type INTEGER)
 RETURNS TABLE (likes BIGINT, dislikes BIGINT, user_vote INTEGER)
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_existing_vote INTEGER;
@@ -2319,16 +2039,15 @@ $$;
 -- Toggle post flagged status (admin only)
 CREATE OR REPLACE FUNCTION toggle_post_flagged(p_post_id INTEGER)
 RETURNS TABLE (success BOOLEAN, is_flagged BOOLEAN, message TEXT)
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_is_admin BOOLEAN;
   v_current_flagged BOOLEAN;
 BEGIN
-  SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE user_profiles.id = auth.uid();
+  v_is_admin := public.check_is_admin();
 
-  IF NOT COALESCE(v_is_admin, FALSE) THEN
+  IF NOT v_is_admin THEN
     RETURN QUERY SELECT FALSE, FALSE, 'Admin access required'::TEXT;
     RETURN;
   END IF;
@@ -2365,13 +2084,12 @@ RETURNS TABLE (
   is_thread_op BOOLEAN,
   total_count BIGINT
 )
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_total BIGINT;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM user_profiles WHERE user_profiles.id = auth.uid() AND role = 'admin') THEN
+  IF NOT public.check_is_admin() THEN
     RAISE EXCEPTION 'Admin access required';
   END IF;
 
@@ -2417,8 +2135,7 @@ CREATE OR REPLACE FUNCTION create_poll_thread(
   p_flag_reason TEXT DEFAULT NULL
 )
 RETURNS INTEGER
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_thread_id INTEGER;
@@ -2454,8 +2171,7 @@ $$;
 -- Get poll data
 CREATE OR REPLACE FUNCTION get_poll_data(p_thread_id INTEGER)
 RETURNS JSON
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_poll polls%ROWTYPE;
@@ -2501,8 +2217,7 @@ $$;
 -- Vote on poll
 CREATE OR REPLACE FUNCTION vote_poll(p_poll_id INTEGER, p_option_ids INTEGER[])
 RETURNS JSON
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_poll polls%ROWTYPE;
@@ -2565,17 +2280,14 @@ RETURNS TABLE (
   last_message_is_from_me BOOLEAN,
   unread_count BIGINT
 )
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Unauthorized';
   END IF;
 
-  IF p_user_id <> auth.uid() AND NOT EXISTS (
-    SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin'
-  ) THEN
+  IF p_user_id <> auth.uid() AND NOT public.check_is_admin() THEN
     RAISE EXCEPTION 'Permission denied';
   END IF;
 
@@ -2642,17 +2354,14 @@ RETURNS TABLE (
   sender_username TEXT,
   sender_avatar TEXT
 )
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Unauthorized';
   END IF;
 
-  IF p_user_id <> auth.uid() AND NOT EXISTS (
-    SELECT 1 FROM user_profiles up2 WHERE up2.id = auth.uid() AND up2.role = 'admin'
-  ) THEN
+  IF p_user_id <> auth.uid() AND NOT public.check_is_admin() THEN
     RAISE EXCEPTION 'Permission denied';
   END IF;
 
@@ -2679,17 +2388,14 @@ $$;
 -- Get unread message count
 CREATE OR REPLACE FUNCTION get_unread_message_count(p_user_id UUID)
 RETURNS BIGINT
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Unauthorized';
   END IF;
 
-  IF p_user_id <> auth.uid() AND NOT EXISTS (
-    SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin'
-  ) THEN
+  IF p_user_id <> auth.uid() AND NOT public.check_is_admin() THEN
     RAISE EXCEPTION 'Permission denied';
   END IF;
 
@@ -2700,17 +2406,14 @@ $$;
 -- Mark conversation as read
 CREATE OR REPLACE FUNCTION mark_conversation_read(p_user_id UUID, p_partner_id UUID)
 RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Unauthorized';
   END IF;
 
-  IF p_user_id <> auth.uid() AND NOT EXISTS (
-    SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin'
-  ) THEN
+  IF p_user_id <> auth.uid() AND NOT public.check_is_admin() THEN
     RAISE EXCEPTION 'Permission denied';
   END IF;
 
@@ -2734,8 +2437,7 @@ GRANT EXECUTE ON FUNCTION mark_conversation_read(UUID, UUID) TO authenticated;
 -- Toggle ignore user
 CREATE OR REPLACE FUNCTION toggle_ignore_user(p_ignored_user_id UUID)
 RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_exists BOOLEAN;
@@ -2759,8 +2461,7 @@ $$;
 -- Get ignored users list
 CREATE OR REPLACE FUNCTION get_ignored_users()
 RETURNS TABLE (ignored_user_id UUID)
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
   RETURN QUERY SELECT iu.ignored_user_id FROM ignored_users iu WHERE iu.user_id = auth.uid();
@@ -2770,8 +2471,7 @@ $$;
 -- Check if user is ignored
 CREATE OR REPLACE FUNCTION is_user_ignored(p_user_id UUID)
 RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
   RETURN EXISTS(SELECT 1 FROM ignored_users WHERE user_id = auth.uid() AND ignored_user_id = p_user_id);
@@ -2793,8 +2493,7 @@ SELECT id, user_id, post_id, created_at FROM bookmarks;
 -- Get user's bookmarked post IDs (excluding deleted posts)
 CREATE OR REPLACE FUNCTION get_user_bookmark_post_ids(p_user_id UUID)
 RETURNS INTEGER[]
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 STABLE
 AS $$
 DECLARE
@@ -2805,8 +2504,7 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized';
   END IF;
 
-  SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE id = auth.uid();
-  v_is_admin := COALESCE(v_is_admin, FALSE);
+  v_is_admin := public.check_is_admin();
 
   IF NOT v_is_admin AND p_user_id <> auth.uid() THEN
     RAISE EXCEPTION 'Permission denied';
@@ -2825,8 +2523,7 @@ $$;
 -- Toggle thread bookmark (bookmarks the OP post of a thread)
 CREATE OR REPLACE FUNCTION toggle_thread_bookmark(p_thread_id INTEGER)
 RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_op_post_id INTEGER;
@@ -2860,8 +2557,7 @@ $$;
 -- Toggle post bookmark
 CREATE OR REPLACE FUNCTION toggle_post_bookmark(p_post_id INTEGER)
 RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_exists BOOLEAN;
@@ -2885,8 +2581,7 @@ $$;
 -- Get bookmarked thread IDs (threads where OP is bookmarked)
 CREATE OR REPLACE FUNCTION get_bookmarked_thread_ids(p_user_id UUID)
 RETURNS SETOF INTEGER
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_is_admin BOOLEAN;
@@ -2895,8 +2590,7 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized';
   END IF;
 
-  SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE id = auth.uid();
-  v_is_admin := COALESCE(v_is_admin, FALSE);
+  v_is_admin := public.check_is_admin();
 
   IF NOT v_is_admin AND p_user_id <> auth.uid() THEN
     RAISE EXCEPTION 'Permission denied';
@@ -2919,8 +2613,7 @@ CREATE OR REPLACE FUNCTION get_bookmarked_posts(
   p_search_text TEXT DEFAULT NULL
 )
 RETURNS JSON
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_posts JSON;
@@ -2931,8 +2624,7 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized';
   END IF;
 
-  SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE id = auth.uid();
-  v_is_admin := COALESCE(v_is_admin, FALSE);
+  v_is_admin := public.check_is_admin();
 
   IF NOT v_is_admin AND p_user_id <> auth.uid() THEN
     RAISE EXCEPTION 'Permission denied';
@@ -3007,8 +2699,7 @@ CREATE OR REPLACE FUNCTION get_posts_by_author(
   p_post_type TEXT DEFAULT NULL  -- NULL/'all' = all posts, 'op' = thread OPs only, 'replies' = replies only
 )
 RETURNS JSON
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_posts JSON;
@@ -3021,9 +2712,9 @@ DECLARE
 BEGIN
   v_current_user_id := auth.uid();
 
-  SELECT role = 'admin', username INTO v_is_admin, v_current_username
+  v_is_admin := public.check_is_admin(v_current_user_id);
+  SELECT username INTO v_current_username
   FROM user_profiles WHERE id = v_current_user_id;
-  v_is_admin := COALESCE(v_is_admin, FALSE);
 
   -- Handle @username search with privacy check
   IF p_author_username IS NOT NULL AND p_author_username != '' THEN
@@ -3169,7 +2860,7 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Trigger: notify on reply visibility change (soft delete/restore)
 CREATE OR REPLACE FUNCTION notify_on_reply_visibility()
@@ -3213,7 +2904,7 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Trigger: notify on reply hard delete (defensive)
 CREATE OR REPLACE FUNCTION notify_on_reply_delete()
@@ -3245,7 +2936,7 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RETURN OLD;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 DROP TRIGGER IF EXISTS trigger_notify_on_reply_insert ON forum_posts;
 CREATE TRIGGER trigger_notify_on_reply_insert
@@ -3323,7 +3014,7 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Trigger: notify on vote delete (incremental)
 CREATE OR REPLACE FUNCTION notify_on_vote_delete()
@@ -3356,7 +3047,7 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RETURN OLD;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 DROP TRIGGER IF EXISTS trigger_notify_on_vote_insert ON post_votes;
 CREATE TRIGGER trigger_notify_on_vote_insert
@@ -3383,8 +3074,7 @@ CREATE TRIGGER trigger_notify_on_vote_delete
 -- user cares about "more popular than before" not "any interaction happened".
 CREATE OR REPLACE FUNCTION get_notification_count()
 RETURNS BIGINT
-LANGUAGE sql
-SECURITY DEFINER
+LANGUAGE sql SECURITY DEFINER SET search_path = public
 STABLE
 AS $$
   SELECT COUNT(*) FROM notifications
@@ -3426,8 +3116,7 @@ RETURNS TABLE (
   updated_at TIMESTAMPTZ,
   total_count BIGINT
 )
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_total BIGINT;
@@ -3483,8 +3172,7 @@ $$;
 -- Dismiss a single notification (sets baseline = current, so "new" counts become 0)
 CREATE OR REPLACE FUNCTION dismiss_notification(p_notification_id INTEGER)
 RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
   UPDATE notifications
@@ -3500,8 +3188,7 @@ $$;
 -- Dismiss all notifications (sets baseline = current for all)
 CREATE OR REPLACE FUNCTION dismiss_all_notifications()
 RETURNS INTEGER
-LANGUAGE plpgsql
-SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_count INTEGER;
