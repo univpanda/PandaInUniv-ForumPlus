@@ -11,6 +11,8 @@ import {
   type GetPaginatedPostsResponse,
 } from '../types'
 import type { ThreadViewResponse } from './usePostQueries'
+import { invalidateThreadCache, invalidateThreadsCache } from '../lib/cacheApi'
+import { useAuth } from './useAuth'
 
 // ============================================================================
 // SHARED HELPERS
@@ -230,6 +232,7 @@ export interface VotePostVariables {
 
 export function useVotePost() {
   const queryClient = useQueryClient()
+  const { session } = useAuth()
 
   return useMutation<VotePostResponse | undefined, Error, VotePostVariables, { previousData: Map<string, unknown> }>({
     mutationFn: async ({ postId, voteType }): Promise<VotePostResponse | undefined> => {
@@ -270,6 +273,13 @@ export function useVotePost() {
         rollbackCacheChanges(queryClient, context.previousData)
       }
     },
+
+    onSuccess: (_result, variables) => {
+      if (session?.access_token) {
+        invalidateThreadCache(variables.threadId, session.access_token)
+        invalidateThreadsCache(session.access_token)
+      }
+    },
   })
 }
 
@@ -286,6 +296,7 @@ export interface EditPostVariables {
 
 export function useEditPost() {
   const queryClient = useQueryClient()
+  const { session } = useAuth()
 
   return useMutation<EditPostResponse, Error, EditPostVariables, { previousData: Map<string, unknown> }>({
     mutationFn: async ({ postId, content, additionalComments }) => {
@@ -323,6 +334,12 @@ export function useEditPost() {
         rollbackCacheChanges(queryClient, context.previousData)
       }
     },
+
+    onSuccess: (_result, variables) => {
+      if (session?.access_token) {
+        invalidateThreadCache(variables.threadId, session.access_token)
+      }
+    },
   })
 }
 
@@ -339,6 +356,7 @@ interface DeletePostVariables {
 
 export function useDeletePost() {
   const queryClient = useQueryClient()
+  const { session } = useAuth()
 
   return useMutation<DeletePostResponse, Error, DeletePostVariables, { previousData: Map<string, unknown> }>({
     mutationFn: async ({ postId }): Promise<DeletePostResponse> => {
@@ -383,6 +401,13 @@ export function useDeletePost() {
     onSettled: () => {
       // Invalidate related caches to ensure consistency
       queryClient.invalidateQueries({ queryKey: forumKeys.authorPostsAll() })
+    },
+
+    onSuccess: (_result, variables) => {
+      if (session?.access_token) {
+        invalidateThreadCache(variables.threadId, session.access_token)
+        invalidateThreadsCache(session.access_token)
+      }
     },
   })
 }

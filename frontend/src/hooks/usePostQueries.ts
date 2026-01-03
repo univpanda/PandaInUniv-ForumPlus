@@ -2,7 +2,7 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { checkContent } from '../utils/contentModeration'
 import { STALE_TIME, PAGE_SIZE } from '../utils/constants'
-import { getCachedThreadView, isCacheEnabled } from '../lib/cacheApi'
+import { getCachedThreadView, invalidateThreadCache, invalidateThreadsCache, isCacheEnabled } from '../lib/cacheApi'
 import { extractPaginatedResponse } from '../utils/queryHelpers'
 import { forumKeys } from './forumQueryKeys'
 import { profileKeys } from './useUserProfile'
@@ -268,6 +268,7 @@ function findThreadViewQueries(
 // Add reply mutation with optimistic update for both paginatedPosts and threadView
 export function useAddReply() {
   const queryClient = useQueryClient()
+  const { session } = useAuth()
 
   return useMutation<number, Error, AddReplyVariables, { previousData: Map<string, unknown> }>({
     mutationFn: async ({ threadId, content, parentId }): Promise<number> => {
@@ -429,6 +430,11 @@ export function useAddReply() {
 
       // Update profile stats (post count increased)
       queryClient.invalidateQueries({ queryKey: profileKeys.userStats(variables.userId) })
+
+      if (session?.access_token) {
+        invalidateThreadCache(variables.threadId, session.access_token)
+        invalidateThreadsCache(session.access_token)
+      }
     },
   })
 }

@@ -429,6 +429,46 @@ async function invalidateAllUsersCacheEntries() {
   }
 }
 
+// Invalidate public thread list cache
+async function invalidatePublicThreadsCache() {
+  try {
+    const result = await docClient.send(new QueryCommand({
+      TableName: TABLE_NAME,
+      KeyConditionExpression: 'pk = :pk AND begins_with(sk, :skPrefix)',
+      ExpressionAttributeValues: {
+        ':pk': 'public',
+        ':skPrefix': 'threads:',
+      },
+    }));
+
+    if (result.Items && result.Items.length > 0) {
+      await Promise.all(result.Items.map(item => deleteFromCache(item.pk, item.sk)));
+    }
+  } catch (error) {
+    console.error('Error invalidating public threads cache:', error);
+  }
+}
+
+// Invalidate public thread view cache
+async function invalidatePublicThreadCache(threadId) {
+  try {
+    const pk = `public:thread:${threadId}`;
+    const result = await docClient.send(new QueryCommand({
+      TableName: TABLE_NAME,
+      KeyConditionExpression: 'pk = :pk',
+      ExpressionAttributeValues: {
+        ':pk': pk,
+      },
+    }));
+
+    if (result.Items && result.Items.length > 0) {
+      await Promise.all(result.Items.map(item => deleteFromCache(item.pk, item.sk)));
+    }
+  } catch (error) {
+    console.error('Error invalidating public thread cache:', error);
+  }
+}
+
 // Main handler
 export const handler = async (event) => {
   const requestOrigin = event.headers?.origin || event.headers?.Origin;
@@ -648,6 +688,31 @@ export const handler = async (event) => {
 
       const result = await invalidateUsersCache();
       return response(200, result, requestOrigin);
+    }
+
+    // DELETE /cache/threads (public thread list)
+    if (method === 'DELETE' && pathParts[0] === 'cache' && pathParts[1] === 'threads') {
+      if (!token) {
+        return response(401, { error: 'Unauthorized' }, requestOrigin);
+      }
+
+      await invalidatePublicThreadsCache();
+      return response(200, { success: true }, requestOrigin);
+    }
+
+    // DELETE /cache/thread/:threadId (public thread view)
+    if (method === 'DELETE' && pathParts[0] === 'cache' && pathParts[1] === 'thread' && pathParts[2]) {
+      if (!token) {
+        return response(401, { error: 'Unauthorized' }, requestOrigin);
+      }
+
+      const threadId = parseInt(pathParts[2], 10);
+      if (!Number.isFinite(threadId)) {
+        return response(400, { error: 'Invalid thread ID' }, requestOrigin);
+      }
+
+      await invalidatePublicThreadCache(threadId);
+      return response(200, { success: true, invalidated: threadId }, requestOrigin);
     }
 
     return response(404, { error: 'Not found' }, requestOrigin);

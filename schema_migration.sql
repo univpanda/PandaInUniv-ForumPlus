@@ -9,9 +9,12 @@
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- Add denormalized counters (if missing)
-ALTER TABLE forum_posts ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0;
-ALTER TABLE forum_posts ADD COLUMN IF NOT EXISTS dislikes INTEGER DEFAULT 0;
-ALTER TABLE forum_posts ADD COLUMN IF NOT EXISTS reply_count INTEGER DEFAULT 0;
+ALTER TABLE forum_posts ADD COLUMN IF NOT EXISTS likes BIGINT DEFAULT 0;
+ALTER TABLE forum_posts ADD COLUMN IF NOT EXISTS dislikes BIGINT DEFAULT 0;
+ALTER TABLE forum_posts ADD COLUMN IF NOT EXISTS reply_count BIGINT DEFAULT 0;
+ALTER TABLE forum_posts ALTER COLUMN likes TYPE BIGINT USING likes::BIGINT;
+ALTER TABLE forum_posts ALTER COLUMN dislikes TYPE BIGINT USING dislikes::BIGINT;
+ALTER TABLE forum_posts ALTER COLUMN reply_count TYPE BIGINT USING reply_count::BIGINT;
 
 -- Add search documents for text search
 ALTER TABLE forum_posts ADD COLUMN IF NOT EXISTS search_document TSVECTOR;

@@ -180,6 +180,49 @@ export async function getCachedPaginatedUsers(
   }
 }
 
+// Invalidate public threads cache
+export async function invalidateThreadsCache(authToken: string): Promise<boolean> {
+  if (!CACHE_API_URL) {
+    return false
+  }
+
+  try {
+    const response = await fetch(`${CACHE_API_URL}/cache/threads`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+      },
+    })
+    return response.ok
+  } catch (error) {
+    console.warn('Thread cache invalidation failed:', error)
+    return false
+  }
+}
+
+// Invalidate public thread view cache
+export async function invalidateThreadCache(
+  threadId: number,
+  authToken: string
+): Promise<boolean> {
+  if (!CACHE_API_URL) {
+    return false
+  }
+
+  try {
+    const response = await fetch(`${CACHE_API_URL}/cache/thread/${threadId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+      },
+    })
+    return response.ok
+  } catch (error) {
+    console.warn('Thread view cache invalidation failed:', error)
+    return false
+  }
+}
+
 // Get cached thread list for anonymous users
 export async function getCachedThreads(params: CachedThreadsParams): Promise<unknown[] | null> {
   if (!CACHE_API_URL) {

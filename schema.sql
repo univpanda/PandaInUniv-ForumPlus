@@ -237,9 +237,9 @@ CREATE TABLE IF NOT EXISTS forum_posts (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   edited_at TIMESTAMPTZ,
   search_document TSVECTOR,
-  likes INTEGER DEFAULT 0,
-  dislikes INTEGER DEFAULT 0,
-  reply_count INTEGER DEFAULT 0
+  likes BIGINT DEFAULT 0,
+  dislikes BIGINT DEFAULT 0,
+  reply_count BIGINT DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_forum_posts_thread ON forum_posts(thread_id);

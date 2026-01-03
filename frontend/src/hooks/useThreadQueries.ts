@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { checkThreadContent } from '../utils/contentModeration'
 import { STALE_TIME, PAGE_SIZE } from '../utils/constants'
-import { getCachedThreads, isCacheEnabled } from '../lib/cacheApi'
+import { getCachedThreads, invalidateThreadsCache, isCacheEnabled } from '../lib/cacheApi'
 import { extractPaginatedResponse } from '../utils/queryHelpers'
 import { forumKeys, type ThreadSortBy } from './forumQueryKeys'
 import { profileKeys } from './useUserProfile'
@@ -79,6 +79,7 @@ export interface CreateThreadVariables {
 // Create thread mutation using factory pattern
 export function useCreateThread() {
   const queryClient = useQueryClient()
+  const { session } = useAuth()
 
   return useOptimisticMutation<never, CreateThreadVariables, CreateThreadResponse>({
     mutationFn: async ({ title, content }): Promise<CreateThreadResponse> => {
@@ -103,6 +104,10 @@ export function useCreateThread() {
     onSuccess: (_, { userId }) => {
       // Update profile stats (thread count increased)
       queryClient.invalidateQueries({ queryKey: profileKeys.userStats(userId) })
+
+      if (session?.access_token) {
+        invalidateThreadsCache(session.access_token)
+      }
     },
   })
 }
