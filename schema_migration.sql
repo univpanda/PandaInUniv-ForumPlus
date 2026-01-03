@@ -22,9 +22,12 @@ CREATE INDEX IF NOT EXISTS idx_forum_threads_title_trgm ON forum_threads USING G
 CREATE INDEX IF NOT EXISTS idx_forum_posts_content_trgm ON forum_posts USING GIN (LOWER(content) gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_forum_threads_search_document ON forum_threads USING GIN (search_document);
 CREATE INDEX IF NOT EXISTS idx_forum_posts_search_document ON forum_posts USING GIN (search_document);
+CREATE INDEX IF NOT EXISTS idx_forum_threads_category_last_activity ON forum_threads(category_id, last_activity DESC);
+CREATE INDEX IF NOT EXISTS idx_forum_threads_author_created ON forum_threads(author_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_forum_posts_thread_parent_created ON forum_posts(thread_id, parent_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_forum_posts_thread_op ON forum_posts(thread_id) WHERE parent_id IS NULL;
 CREATE INDEX IF NOT EXISTS idx_post_votes_post_type ON post_votes(post_id, vote_type);
+CREATE INDEX IF NOT EXISTS idx_post_votes_user_post ON post_votes(user_id, post_id);
 CREATE INDEX IF NOT EXISTS idx_bookmarks_user_created ON bookmarks(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_feedback_messages_unread ON feedback_messages(recipient_id, user_id, created_at DESC) WHERE is_read = FALSE;
 CREATE INDEX IF NOT EXISTS idx_feedback_messages_recipient_unread ON feedback_messages(recipient_id) WHERE is_read = FALSE;
@@ -322,6 +325,7 @@ CREATE TRIGGER trigger_update_post_vote_counts_delete
 DROP FUNCTION IF EXISTS get_public_user_profile(UUID);
 DROP FUNCTION IF EXISTS get_my_profile_status();
 DROP FUNCTION IF EXISTS update_login_metadata(TIMESTAMPTZ, INET, TEXT);
+DROP FUNCTION IF EXISTS get_user_post_votes(INTEGER[]);
 DROP FUNCTION IF EXISTS is_username_available(TEXT);
 DROP FUNCTION IF EXISTS set_user_role(UUID, TEXT);
 DROP FUNCTION IF EXISTS set_user_blocked(UUID, BOOLEAN);
@@ -373,6 +377,22 @@ AS $$
   SELECT up.role, COALESCE(up.is_blocked, FALSE)
   FROM user_profiles up
   WHERE up.id = auth.uid();
+$$;
+
+-- Get current user's vote for a list of posts
+CREATE OR REPLACE FUNCTION get_user_post_votes(p_post_ids INTEGER[])
+RETURNS TABLE (
+  post_id INTEGER,
+  vote_type INTEGER
+)
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT pv.post_id, pv.vote_type
+  FROM post_votes pv
+  WHERE pv.user_id = auth.uid()
+    AND pv.post_id = ANY(p_post_ids);
 $$;
 
 -- Update own login metadata (last login/IP/location)
@@ -470,6 +490,7 @@ $$;
 GRANT EXECUTE ON FUNCTION get_public_user_profile(UUID) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION get_my_profile_status() TO authenticated;
 GRANT EXECUTE ON FUNCTION update_login_metadata(TIMESTAMPTZ, INET, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_post_votes(INTEGER[]) TO authenticated;
 GRANT EXECUTE ON FUNCTION is_username_available(TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION set_user_role(UUID, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION set_user_blocked(UUID, BOOLEAN) TO authenticated;

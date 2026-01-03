@@ -17,6 +17,8 @@ const TTL = {
   USER_PROFILE: 5 * 60,      // 5 minutes
   USER_LIST: 10 * 60,        // 10 minutes (was 2 min - increased for better cache hits)
   RESERVED_USERNAMES: 60 * 60, // 1 hour
+  THREAD_LIST: 60,           // 1 minute
+  THREAD_VIEW: 60,           // 1 minute
 };
 
 const DEFAULT_CORS_ORIGIN = 'http://localhost:5173';
@@ -50,6 +52,11 @@ const response = (statusCode, body, requestOrigin) => ({
   headers: buildCorsHeaders(requestOrigin),
   body: JSON.stringify(body),
 });
+
+function parseBoolean(value) {
+  if (!value) return false;
+  return value === 'true' || value === '1';
+}
 
 function base64UrlDecode(value) {
   const padded = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
@@ -490,6 +497,75 @@ export const handler = async (event) => {
       }
 
       return response(200, profile, requestOrigin);
+    }
+
+    // GET /public/threads (no auth) - cached thread list
+    if (method === 'GET' && pathParts[0] === 'public' && pathParts[1] === 'threads') {
+      const queryParams = event.queryStringParameters || {};
+      const parsedLimit = queryParams.limit ? parseInt(queryParams.limit, 10) : NaN;
+      const parsedOffset = queryParams.offset ? parseInt(queryParams.offset, 10) : NaN;
+      const limit = Number.isFinite(parsedLimit) ? parsedLimit : 20;
+      const offset = Number.isFinite(parsedOffset) ? parsedOffset : 0;
+      const sort = queryParams.sort || 'recent';
+      const author = queryParams.author || null;
+      const search = queryParams.search || null;
+      const flagged = parseBoolean(queryParams.flagged);
+      const deleted = parseBoolean(queryParams.deleted);
+
+      const pk = 'public';
+      const sk = `threads:${sort}:${limit}:${offset}:${author || ''}:${search || ''}:${flagged}:${deleted}`;
+
+      const cached = await getFromCache(pk, sk);
+      if (cached) {
+        return response(200, cached, requestOrigin);
+      }
+
+      const data = await callSupabaseRpc('get_paginated_forum_threads', {
+        p_category_ids: null,
+        p_limit: limit,
+        p_offset: offset,
+        p_sort_by: sort,
+        p_author_username: author,
+        p_search_text: search,
+        p_flagged_only: flagged,
+        p_deleted_only: deleted,
+      });
+
+      await putToCache(pk, sk, data, TTL.THREAD_LIST);
+      return response(200, data, requestOrigin);
+    }
+
+    // GET /public/thread/:threadId (no auth) - cached thread view
+    if (method === 'GET' && pathParts[0] === 'public' && pathParts[1] === 'thread' && pathParts[2]) {
+      const threadId = parseInt(pathParts[2], 10);
+      if (!Number.isFinite(threadId)) {
+        return response(400, { error: 'Invalid thread ID' }, requestOrigin);
+      }
+
+      const queryParams = event.queryStringParameters || {};
+      const parsedLimit = queryParams.limit ? parseInt(queryParams.limit, 10) : NaN;
+      const parsedOffset = queryParams.offset ? parseInt(queryParams.offset, 10) : NaN;
+      const limit = Number.isFinite(parsedLimit) ? parsedLimit : 20;
+      const offset = Number.isFinite(parsedOffset) ? parsedOffset : 0;
+      const sort = queryParams.sort || 'popular';
+
+      const pk = `public:thread:${threadId}`;
+      const sk = `view:${sort}:${limit}:${offset}`;
+
+      const cached = await getFromCache(pk, sk);
+      if (cached) {
+        return response(200, cached, requestOrigin);
+      }
+
+      const data = await callSupabaseRpc('get_thread_view', {
+        p_thread_id: threadId,
+        p_limit: limit,
+        p_offset: offset,
+        p_sort: sort,
+      });
+
+      await putToCache(pk, sk, data, TTL.THREAD_VIEW);
+      return response(200, data, requestOrigin);
     }
 
     // GET /users (admin only) - supports pagination via query params

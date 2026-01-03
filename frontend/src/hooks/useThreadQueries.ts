@@ -2,10 +2,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { checkThreadContent } from '../utils/contentModeration'
 import { STALE_TIME, PAGE_SIZE } from '../utils/constants'
+import { getCachedThreads, isCacheEnabled } from '../lib/cacheApi'
 import { extractPaginatedResponse } from '../utils/queryHelpers'
 import { forumKeys, type ThreadSortBy } from './forumQueryKeys'
 import { profileKeys } from './useUserProfile'
 import { useOptimisticMutation } from './useOptimisticMutation'
+import { useAuth } from './useAuth'
 import type {
   Thread,
   GetPaginatedThreadsResponse,
@@ -23,9 +25,27 @@ export function usePaginatedThreads(
   isDeleted: boolean = false,
   isFlagged: boolean = false
 ) {
+  const { session, isAdmin } = useAuth()
+
   return useQuery({
     queryKey: forumKeys.paginatedThreads(sortBy, page, authorUsername, searchText, isDeleted, isFlagged),
     queryFn: async (): Promise<GetPaginatedThreadsResponse> => {
+      if (!isAdmin && !isDeleted && !isFlagged && isCacheEnabled()) {
+        const cached = await getCachedThreads({
+          limit: pageSize,
+          offset: (page - 1) * pageSize,
+          sort: sortBy,
+          author: authorUsername || null,
+          search: searchText || null,
+          flagged: isFlagged,
+          deleted: isDeleted,
+        })
+        if (cached) {
+          const { items: threads, totalCount } = extractPaginatedResponse<Thread>(cached)
+          return { threads, totalCount }
+        }
+      }
+
       const { data, error } = await supabase.rpc('get_paginated_forum_threads', {
         p_category_ids: null,
         p_limit: pageSize,

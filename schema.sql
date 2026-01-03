@@ -204,6 +204,8 @@ CREATE INDEX IF NOT EXISTS idx_forum_threads_last_activity ON forum_threads(last
 CREATE INDEX IF NOT EXISTS idx_forum_threads_flagged ON forum_threads(is_flagged) WHERE is_flagged = TRUE;
 CREATE INDEX IF NOT EXISTS idx_forum_threads_title_trgm ON forum_threads USING GIN (LOWER(title) gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_forum_threads_search_document ON forum_threads USING GIN (search_document);
+CREATE INDEX IF NOT EXISTS idx_forum_threads_category_last_activity ON forum_threads(category_id, last_activity DESC);
+CREATE INDEX IF NOT EXISTS idx_forum_threads_author_created ON forum_threads(author_id, created_at DESC);
 
 ALTER TABLE forum_threads ENABLE ROW LEVEL SECURITY;
 
@@ -456,6 +458,7 @@ CREATE TABLE IF NOT EXISTS post_votes (
 CREATE INDEX IF NOT EXISTS idx_post_votes_post ON post_votes(post_id);
 CREATE INDEX IF NOT EXISTS idx_post_votes_user ON post_votes(user_id);
 CREATE INDEX IF NOT EXISTS idx_post_votes_post_type ON post_votes(post_id, vote_type);
+CREATE INDEX IF NOT EXISTS idx_post_votes_user_post ON post_votes(user_id, post_id);
 
 ALTER TABLE post_votes ENABLE ROW LEVEL SECURITY;
 
@@ -756,6 +759,22 @@ AS $$
   WHERE up.id = auth.uid();
 $$;
 
+-- Get current user's vote for a list of posts
+CREATE OR REPLACE FUNCTION get_user_post_votes(p_post_ids INTEGER[])
+RETURNS TABLE (
+  post_id INTEGER,
+  vote_type INTEGER
+)
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT pv.post_id, pv.vote_type
+  FROM post_votes pv
+  WHERE pv.user_id = auth.uid()
+    AND pv.post_id = ANY(p_post_ids);
+$$;
+
 -- Update own login metadata (last login/IP/location)
 CREATE OR REPLACE FUNCTION update_login_metadata(
   p_last_login TIMESTAMPTZ DEFAULT NULL,
@@ -869,6 +888,7 @@ $$;
 GRANT EXECUTE ON FUNCTION get_public_user_profile(UUID) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION get_my_profile_status() TO authenticated;
 GRANT EXECUTE ON FUNCTION update_login_metadata(TIMESTAMPTZ, INET, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_post_votes(INTEGER[]) TO authenticated;
 GRANT EXECUTE ON FUNCTION is_username_available(TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION set_user_role(UUID, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION set_user_blocked(UUID, BOOLEAN) TO authenticated;

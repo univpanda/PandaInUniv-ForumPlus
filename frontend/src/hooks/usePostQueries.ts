@@ -2,9 +2,11 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { checkContent } from '../utils/contentModeration'
 import { STALE_TIME, PAGE_SIZE } from '../utils/constants'
+import { getCachedThreadView, isCacheEnabled } from '../lib/cacheApi'
 import { extractPaginatedResponse } from '../utils/queryHelpers'
 import { forumKeys } from './forumQueryKeys'
 import { profileKeys } from './useUserProfile'
+import { useAuth } from './useAuth'
 import type { Post, Thread, GetThreadPostsResponse, GetPaginatedPostsResponse } from '../types'
 
 // Posts query (used to fetch all posts for a thread, then filtered/sorted client-side)
@@ -33,6 +35,8 @@ export function usePaginatedPosts(
   sort: 'popular' | 'new' = 'popular',
   enabled: boolean = true
 ) {
+  const { session, isAdmin } = useAuth()
+
   return useQuery({
     queryKey: forumKeys.paginatedPosts(threadId, parentId, page, sort),
     queryFn: async (): Promise<GetPaginatedPostsResponse> => {
@@ -68,19 +72,60 @@ export function useThreadView(
   sort: 'popular' | 'new' = 'popular',
   enabled: boolean = true
 ) {
+  const { session } = useAuth()
+
   return useQuery({
     queryKey: forumKeys.threadView(threadId, page, sort),
     queryFn: async (): Promise<ThreadViewResponse> => {
-      const { data, error } = await supabase.rpc('get_thread_view', {
-        p_thread_id: threadId,
-        p_limit: pageSize,
-        p_offset: (page - 1) * pageSize,
-        p_sort: sort,
-      })
-      if (error) throw error
+      let rows: Array<Post & { is_op: boolean; total_count: number }> = []
+      let usedCache = false
 
-      // Parse response: first row with is_op=true is OP, rest are replies
-      const rows = (data ?? []) as Array<Post & { is_op: boolean; total_count: number }>
+      if (!isAdmin && isCacheEnabled()) {
+        const cached = await getCachedThreadView(
+          threadId,
+          pageSize,
+          (page - 1) * pageSize,
+          sort
+        )
+        if (cached) {
+          rows = cached as Array<Post & { is_op: boolean; total_count: number }>
+          usedCache = true
+        }
+      }
+
+      if (rows.length === 0) {
+        const { data, error } = await supabase.rpc('get_thread_view', {
+          p_thread_id: threadId,
+          p_limit: pageSize,
+          p_offset: (page - 1) * pageSize,
+          p_sort: sort,
+        })
+        if (error) throw error
+        rows = (data ?? []) as Array<Post & { is_op: boolean; total_count: number }>
+      }
+
+      if (session?.access_token && usedCache && rows.length > 0) {
+        try {
+          const postIds = Array.from(new Set(rows.map((row) => row.id)))
+          const { data, error } = await supabase.rpc('get_user_post_votes', {
+            p_post_ids: postIds,
+          })
+          if (!error) {
+            const voteMap = new Map<number, number>(
+              (data as Array<{ post_id: number; vote_type: number }> | null)?.map((row) => [
+                row.post_id,
+                row.vote_type,
+              ]) || []
+            )
+            rows = rows.map((row) => ({
+              ...row,
+              user_vote: voteMap.get(row.id) ?? null,
+            }))
+          }
+        } catch {
+          // If overlay fails, fall back to base data
+        }
+      }
       const opRow = rows.find((r) => r.is_op)
       const replyRows = rows.filter((r) => !r.is_op)
       const totalCount = rows[0]?.total_count ?? 0

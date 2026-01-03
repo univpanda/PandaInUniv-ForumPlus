@@ -30,6 +30,16 @@ export interface PaginatedUsersResponse {
   _cached: boolean
 }
 
+export interface CachedThreadsParams {
+  limit: number
+  offset: number
+  sort: string
+  author?: string | null
+  search?: string | null
+  flagged?: boolean
+  deleted?: boolean
+}
+
 // Get user profile from cache (with fallback to Supabase on miss)
 export async function getCachedUserProfile(
   userId: string,
@@ -167,6 +177,83 @@ export async function getCachedPaginatedUsers(
   } catch (error) {
     console.warn('Cache API fetch failed for paginated users:', error)
     return null
+  }
+}
+
+// Get cached thread list for anonymous users
+export async function getCachedThreads(params: CachedThreadsParams): Promise<unknown[] | null> {
+  if (!CACHE_API_URL) {
+    return null
+  }
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 2000)
+
+  try {
+    const query = new URLSearchParams({
+      limit: String(params.limit),
+      offset: String(params.offset),
+      sort: params.sort,
+    })
+    if (params.author) query.set('author', params.author)
+    if (params.search) query.set('search', params.search)
+    if (params.flagged) query.set('flagged', 'true')
+    if (params.deleted) query.set('deleted', 'true')
+
+    const response = await fetch(`${CACHE_API_URL}/public/threads?${query}`, {
+      method: 'GET',
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      throw new Error(`Cache API error: ${response.status}`)
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.warn('Cache API fetch failed for threads:', error)
+    return null
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+// Get cached thread view for anonymous users
+export async function getCachedThreadView(
+  threadId: number,
+  limit: number,
+  offset: number,
+  sort: string
+): Promise<unknown[] | null> {
+  if (!CACHE_API_URL) {
+    return null
+  }
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 2000)
+
+  try {
+    const query = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+      sort,
+    })
+
+    const response = await fetch(`${CACHE_API_URL}/public/thread/${threadId}?${query}`, {
+      method: 'GET',
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      throw new Error(`Cache API error: ${response.status}`)
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.warn('Cache API fetch failed for thread view:', error)
+    return null
+  } finally {
+    clearTimeout(timeout)
   }
 }
 
