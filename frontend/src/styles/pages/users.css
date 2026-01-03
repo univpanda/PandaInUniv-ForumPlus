@@ -269,6 +269,7 @@
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
   color: var(--color-text-muted);
+  min-width: 2rem;
 }
 
 .engagement-stat svg {
@@ -491,7 +492,11 @@ button.engagement-stat.flagged.clickable:hover {
     order: 6;
     width: 100%;
     flex-direction: row;
-    gap: 1.5rem;
+    gap: 0.625rem;
+  }
+
+  .user-col-engagement .engagement-row {
+    gap: 0.625rem;
   }
 
   .user-col-votes-recv {

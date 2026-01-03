@@ -332,6 +332,8 @@
   gap: 0.25rem;
   color: var(--color-text-muted);
   font-size: 0.8rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-xs);
 }
 
 .chat-stat-upvote {
@@ -345,8 +347,6 @@
 .chat-stat-link {
   background: none;
   border: none;
-  padding: 0.25rem 0.5rem;
-  margin: -0.25rem 0;
   border-radius: var(--radius-xs);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
@@ -523,6 +523,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   resize: none;
+  overflow-y: hidden;
   font-size: 0.9375rem;
   line-height: 1.4;
   font-family: inherit;

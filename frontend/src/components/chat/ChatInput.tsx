@@ -31,6 +31,7 @@ export function ChatInput({
     // Set to scrollHeight, capped at max
     const newHeight = Math.min(textarea.scrollHeight, MAX_HEIGHT)
     textarea.style.height = `${newHeight}px`
+    textarea.style.overflowY = textarea.scrollHeight > MAX_HEIGHT ? 'auto' : 'hidden'
   }, [value])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

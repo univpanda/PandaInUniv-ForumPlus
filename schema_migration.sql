@@ -2188,3 +2188,28 @@ BEGIN
   LIMIT p_limit OFFSET p_offset;
 END;
 $$;
+
+-- =============================================================================
+-- Fix column ambiguity in feedback_messages RLS policies
+-- =============================================================================
+DROP POLICY IF EXISTS "Users can view their conversations" ON feedback_messages;
+DROP POLICY IF EXISTS "Recipients can mark messages as read" ON feedback_messages;
+
+CREATE POLICY "Users can view their conversations" ON feedback_messages
+  FOR SELECT TO authenticated
+  USING (
+    user_id = auth.uid()
+    OR recipient_id = auth.uid()
+    OR EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
+  );
+
+CREATE POLICY "Recipients can mark messages as read" ON feedback_messages
+  FOR UPDATE TO authenticated
+  USING (
+    recipient_id = auth.uid()
+    OR EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
+  )
+  WITH CHECK (
+    recipient_id = auth.uid()
+    OR EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
+  );

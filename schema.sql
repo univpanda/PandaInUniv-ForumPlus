@@ -993,7 +993,7 @@ CREATE POLICY "Users can view their conversations" ON feedback_messages
   USING (
     user_id = auth.uid()
     OR recipient_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin')
+    OR EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
   );
 
 CREATE POLICY "Non-blocked users can send messages" ON feedback_messages
@@ -1007,11 +1007,11 @@ CREATE POLICY "Recipients can mark messages as read" ON feedback_messages
   FOR UPDATE TO authenticated
   USING (
     recipient_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin')
+    OR EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
   )
   WITH CHECK (
     recipient_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin')
+    OR EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
   );
 
 
