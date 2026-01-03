@@ -1509,8 +1509,8 @@ BEGIN
   post_counts AS (
     SELECT author_id,
            COUNT(*) AS post_count,
-           COUNT(*) FILTER (WHERE is_deleted = TRUE) AS deleted_count,
-           COUNT(*) FILTER (WHERE is_flagged = TRUE) AS flagged_count
+           COUNT(*) FILTER (WHERE forum_posts.is_deleted = TRUE) AS deleted_count,
+           COUNT(*) FILTER (WHERE forum_posts.is_flagged = TRUE) AS flagged_count
     FROM forum_posts
     GROUP BY author_id
   ),
