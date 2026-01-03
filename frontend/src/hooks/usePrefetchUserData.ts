@@ -78,13 +78,11 @@ export function usePrefetchUserData() {
       queryClient.prefetchQuery({
         queryKey: profileKeys.user(userId),
         queryFn: async () => {
-          const { data, error } = await supabase
-            .from('user_profiles')
-            .select('id, username, avatar_url, avatar_path, is_private')
-            .eq('id', userId)
-            .single()
+          const { data, error } = await supabase.rpc('get_public_user_profile', {
+            p_user_id: userId,
+          })
           if (error) throw error
-          return data
+          return (data ?? [])[0] ?? null
         },
       })
 

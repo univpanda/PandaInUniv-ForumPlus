@@ -55,14 +55,13 @@ export function useUserProfile(userId: string | null) {
       }
 
       // Fallback to Supabase
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('id, username, avatar_url, avatar_path, is_private')
-        .eq('id', userId)
-        .single()
+      const { data, error } = await supabase.rpc('get_public_user_profile', {
+        p_user_id: userId,
+      })
 
       if (error) throw error
-      return data
+      const profile = (data as UserProfile[] | null)?.[0] ?? null
+      return profile
     },
     enabled: !!userId,
     staleTime: STALE_TIME.LONG,
@@ -72,14 +71,12 @@ export function useUserProfile(userId: string | null) {
 // Check username availability (imperative async function, not a hook)
 // Case-insensitive check to prevent "User" and "user" from being different users
 export async function isUsernameAvailable(username: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .select('id')
-    .ilike('username', username)
-    .maybeSingle()
+  const { data, error } = await supabase.rpc('is_username_available', {
+    p_username: username,
+  })
 
   if (error) throw error
-  return data === null // Available if no user found with that username
+  return Boolean(data)
 }
 
 // Hook to fetch reserved usernames from database (cached for app lifetime)
@@ -174,14 +171,13 @@ export function useCheckUserPrivacy(userId: string | null, enabled: boolean = tr
     queryFn: async (): Promise<boolean> => {
       if (!userId) return false
 
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('is_private')
-        .eq('id', userId)
-        .single()
+      const { data, error } = await supabase.rpc('get_public_user_profile', {
+        p_user_id: userId,
+      })
 
       if (error) return false
-      return data?.is_private ?? false
+      const profile = (data as UserProfile[] | null)?.[0]
+      return profile?.is_private ?? false
     },
     enabled: !!userId && enabled,
     staleTime: STALE_TIME.MEDIUM,

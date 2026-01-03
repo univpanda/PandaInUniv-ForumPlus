@@ -114,10 +114,10 @@ export function useToggleAdmin() {
   return useMutation({
     mutationFn: async ({ userId, currentRole }: { userId: string; currentRole: string }) => {
       const newRole = currentRole === 'admin' ? 'user' : 'admin'
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({ role: newRole })
-        .eq('id', userId)
+      const { error } = await supabase.rpc('set_user_role', {
+        p_user_id: userId,
+        p_role: newRole,
+      })
       if (error) throw error
       return userId
     },
@@ -138,10 +138,10 @@ export function useToggleBlock() {
 
   return useMutation({
     mutationFn: async ({ userId, currentlyBlocked }: { userId: string; currentlyBlocked: boolean }) => {
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({ is_blocked: !currentlyBlocked })
-        .eq('id', userId)
+      const { error } = await supabase.rpc('set_user_blocked', {
+        p_user_id: userId,
+        p_is_blocked: !currentlyBlocked,
+      })
       if (error) throw error
       return userId
     },

@@ -69,18 +69,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS user_profiles_username_lower_idx
 
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 
--- Anyone can view profiles
-CREATE POLICY "Anyone can view profiles" ON user_profiles
-  FOR SELECT USING (true);
-
--- Users can update their own profile
-CREATE POLICY "Users can update own profile" ON user_profiles
-  FOR UPDATE USING (auth.uid() = id);
-
--- Admins can update any profile
-CREATE POLICY "Admins can update any profile" ON user_profiles
-  FOR UPDATE USING (
-    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin')
+-- Users can view own profile; admins can view all
+CREATE POLICY "Users can view own profile" ON user_profiles
+  FOR SELECT USING (
+    auth.uid() = id
+    OR EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
   );
 
 -- Create user profile (called from app after successful auth)
@@ -185,6 +178,9 @@ $$;
 CREATE POLICY "Users can insert own profile" ON user_profiles
   FOR INSERT WITH CHECK (auth.uid() = id);
 
+-- Prevent direct profile updates; use RPCs instead
+REVOKE UPDATE ON user_profiles FROM anon, authenticated;
+
 
 -- =============================================================================
 -- 2. FORUM THREADS
@@ -198,7 +194,8 @@ CREATE TABLE IF NOT EXISTS forum_threads (
   is_flagged BOOLEAN DEFAULT FALSE,
   flag_reason TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  last_activity TIMESTAMPTZ DEFAULT NOW()
+  last_activity TIMESTAMPTZ DEFAULT NOW(),
+  search_document TSVECTOR
 );
 
 CREATE INDEX IF NOT EXISTS idx_forum_threads_author ON forum_threads(author_id);
@@ -206,6 +203,7 @@ CREATE INDEX IF NOT EXISTS idx_forum_threads_created ON forum_threads(created_at
 CREATE INDEX IF NOT EXISTS idx_forum_threads_last_activity ON forum_threads(last_activity DESC);
 CREATE INDEX IF NOT EXISTS idx_forum_threads_flagged ON forum_threads(is_flagged) WHERE is_flagged = TRUE;
 CREATE INDEX IF NOT EXISTS idx_forum_threads_title_trgm ON forum_threads USING GIN (LOWER(title) gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_forum_threads_search_document ON forum_threads USING GIN (search_document);
 
 ALTER TABLE forum_threads ENABLE ROW LEVEL SECURITY;
 
@@ -236,6 +234,7 @@ CREATE TABLE IF NOT EXISTS forum_posts (
   deleted_by UUID REFERENCES user_profiles(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   edited_at TIMESTAMPTZ,
+  search_document TSVECTOR,
   likes INTEGER DEFAULT 0,
   dislikes INTEGER DEFAULT 0,
   reply_count INTEGER DEFAULT 0
@@ -253,11 +252,15 @@ CREATE INDEX IF NOT EXISTS idx_forum_posts_thread_created ON forum_posts(thread_
 CREATE INDEX IF NOT EXISTS idx_forum_posts_thread_parent_created ON forum_posts(thread_id, parent_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_forum_posts_thread_op ON forum_posts(thread_id) WHERE parent_id IS NULL;
 CREATE INDEX IF NOT EXISTS idx_forum_posts_content_trgm ON forum_posts USING GIN (LOWER(content) gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_forum_posts_search_document ON forum_posts USING GIN (search_document);
 
 ALTER TABLE forum_posts ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Anyone can view posts" ON forum_posts
-  FOR SELECT USING (true);
+CREATE POLICY "Anyone can view non-deleted posts" ON forum_posts
+  FOR SELECT USING (
+    COALESCE(is_deleted, FALSE) = FALSE
+    OR EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
+  );
 
 CREATE POLICY "Non-blocked users can create posts" ON forum_posts
   FOR INSERT WITH CHECK (
@@ -265,11 +268,9 @@ CREATE POLICY "Non-blocked users can create posts" ON forum_posts
     AND public.is_not_blocked()
   );
 
-CREATE POLICY "Non-blocked authors can update own posts" ON forum_posts
-  FOR UPDATE USING (
-    auth.uid() = author_id
-    AND public.is_not_blocked()
-  );
+-- Prevent direct post updates; use RPCs instead
+REVOKE UPDATE ON forum_posts FROM anon, authenticated;
+
 
 -- Trigger to update thread last_activity when a post is created
 CREATE OR REPLACE FUNCTION update_thread_last_activity()
@@ -286,6 +287,69 @@ CREATE TRIGGER trigger_update_thread_last_activity
   AFTER INSERT ON forum_posts
   FOR EACH ROW
   EXECUTE FUNCTION update_thread_last_activity();
+
+-- Trigger to maintain post search_document
+CREATE OR REPLACE FUNCTION update_post_search_document()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.search_document := to_tsvector(
+    'simple',
+    COALESCE(NEW.content, '') || ' ' || COALESCE(NEW.additional_comments, '')
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_post_search_document
+  BEFORE INSERT OR UPDATE OF content, additional_comments ON forum_posts
+  FOR EACH ROW
+  EXECUTE FUNCTION update_post_search_document();
+
+-- Refresh thread search_document (title + OP content)
+CREATE OR REPLACE FUNCTION refresh_thread_search_document(p_thread_id INTEGER)
+RETURNS VOID AS $$
+DECLARE
+  v_title TEXT;
+  v_op_content TEXT;
+BEGIN
+  SELECT t.title, op.content
+  INTO v_title, v_op_content
+  FROM forum_threads t
+  LEFT JOIN forum_posts op
+    ON op.thread_id = t.id AND op.parent_id IS NULL
+  WHERE t.id = p_thread_id;
+
+  UPDATE forum_threads
+  SET search_document = to_tsvector(
+    'simple',
+    COALESCE(v_title, '') || ' ' || COALESCE(v_op_content, '')
+  )
+  WHERE id = p_thread_id;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_refresh_thread_search_document
+  AFTER INSERT OR UPDATE OF title ON forum_threads
+  FOR EACH ROW
+  EXECUTE FUNCTION refresh_thread_search_document(NEW.id);
+
+CREATE TRIGGER trigger_refresh_thread_search_document_op_insert
+  AFTER INSERT ON forum_posts
+  FOR EACH ROW
+  WHEN (NEW.parent_id IS NULL)
+  EXECUTE FUNCTION refresh_thread_search_document(NEW.thread_id);
+
+CREATE TRIGGER trigger_refresh_thread_search_document_op_update
+  AFTER UPDATE OF content, additional_comments ON forum_posts
+  FOR EACH ROW
+  WHEN (NEW.parent_id IS NULL)
+  EXECUTE FUNCTION refresh_thread_search_document(NEW.thread_id);
+
+CREATE TRIGGER trigger_refresh_thread_search_document_op_delete
+  AFTER DELETE ON forum_posts
+  FOR EACH ROW
+  WHEN (OLD.parent_id IS NULL)
+  EXECUTE FUNCTION refresh_thread_search_document(OLD.thread_id);
 
 -- Trigger to maintain reply_count on parent posts
 CREATE OR REPLACE FUNCTION update_post_reply_count()
@@ -371,8 +435,10 @@ CREATE INDEX IF NOT EXISTS idx_post_votes_post_type ON post_votes(post_id, vote_
 
 ALTER TABLE post_votes ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Anyone can view votes" ON post_votes
-  FOR SELECT USING (true);
+CREATE POLICY "Admins can view votes" ON post_votes
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
+  );
 
 CREATE POLICY "Non-blocked users can vote" ON post_votes
   FOR INSERT WITH CHECK (
@@ -651,6 +717,98 @@ AS $$
   ]::TEXT[];
 $$;
 
+-- Public profile lookup (no auth required, returns safe fields only)
+CREATE OR REPLACE FUNCTION get_public_user_profile(p_user_id UUID)
+RETURNS TABLE (
+  id UUID,
+  username TEXT,
+  avatar_url TEXT,
+  avatar_path TEXT,
+  is_private BOOLEAN
+)
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT up.id, up.username, up.avatar_url, up.avatar_path, up.is_private
+  FROM user_profiles up
+  WHERE up.id = p_user_id;
+$$;
+
+-- Check username availability (case-insensitive + reserved words)
+CREATE OR REPLACE FUNCTION is_username_available(p_username TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+STABLE
+AS $$
+DECLARE
+  v_lower_username TEXT := LOWER(p_username);
+  v_reserved_usernames TEXT[] := get_reserved_usernames();
+BEGIN
+  IF v_lower_username IS NULL OR v_lower_username = '' THEN
+    RETURN FALSE;
+  END IF;
+
+  IF v_lower_username = ANY(v_reserved_usernames) THEN
+    RETURN FALSE;
+  END IF;
+
+  IF v_lower_username LIKE '%moderator%' OR v_lower_username LIKE '%admin%' THEN
+    RETURN FALSE;
+  END IF;
+
+  IF v_lower_username LIKE '%pandakeeper%' AND v_lower_username != 'pandakeeper' THEN
+    RETURN FALSE;
+  END IF;
+
+  RETURN NOT EXISTS (
+    SELECT 1 FROM user_profiles WHERE LOWER(username) = v_lower_username
+  );
+END;
+$$;
+
+-- Admin-only user role update
+CREATE OR REPLACE FUNCTION set_user_role(p_user_id UUID, p_role TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin') THEN
+    RAISE EXCEPTION 'Admin access required';
+  END IF;
+
+  IF p_role NOT IN ('user', 'admin') THEN
+    RAISE EXCEPTION 'Invalid role';
+  END IF;
+
+  UPDATE user_profiles SET role = p_role WHERE id = p_user_id;
+  RETURN TRUE;
+END;
+$$;
+
+-- Admin-only blocked status update
+CREATE OR REPLACE FUNCTION set_user_blocked(p_user_id UUID, p_is_blocked BOOLEAN)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin') THEN
+    RAISE EXCEPTION 'Admin access required';
+  END IF;
+
+  UPDATE user_profiles SET is_blocked = p_is_blocked WHERE id = p_user_id;
+  RETURN TRUE;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION get_public_user_profile(UUID) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION is_username_available(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION set_user_role(UUID, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION set_user_blocked(UUID, BOOLEAN) TO authenticated;
+
 -- Update username with case-insensitive duplicate check and reserved word validation
 CREATE OR REPLACE FUNCTION update_username(p_new_username TEXT)
 RETURNS TABLE (success BOOLEAN, message TEXT)
@@ -913,6 +1071,18 @@ BEGIN
   END IF;
 
   RETURN QUERY
+  WITH thread_counts AS (
+    SELECT author_id, COUNT(*) AS thread_count
+    FROM forum_threads
+    GROUP BY author_id
+  ),
+  post_counts AS (
+    SELECT author_id,
+           COUNT(*) FILTER (WHERE parent_id IS NOT NULL) AS post_count,
+           COUNT(*) FILTER (WHERE is_flagged = TRUE) AS flagged_count
+    FROM forum_posts
+    GROUP BY author_id
+  )
   SELECT
     up.id,
     up.username,
@@ -923,11 +1093,13 @@ BEGIN
     COALESCE(up.is_deleted, FALSE),
     up.created_at,
     up.last_login,
-    (SELECT COUNT(*) FROM forum_threads ft WHERE ft.author_id = up.id),
-    (SELECT COUNT(*) FROM forum_posts fp WHERE fp.author_id = up.id AND fp.parent_id IS NOT NULL),
-    (SELECT COUNT(*) FROM forum_posts fp WHERE fp.author_id = up.id AND fp.is_flagged = TRUE)
+    COALESCE(tc.thread_count, 0),
+    COALESCE(pc.post_count, 0),
+    COALESCE(pc.flagged_count, 0)
   FROM user_profiles up
   JOIN auth.users au ON au.id = up.id
+  LEFT JOIN thread_counts tc ON tc.author_id = up.id
+  LEFT JOIN post_counts pc ON pc.author_id = up.id
   ORDER BY up.created_at DESC;
 END;
 $$;
@@ -991,6 +1163,34 @@ BEGIN
     OR LOWER(au.email::TEXT) LIKE v_search_pattern);
 
   RETURN QUERY
+  WITH thread_counts AS (
+    SELECT author_id, COUNT(*) AS thread_count
+    FROM forum_threads
+    GROUP BY author_id
+  ),
+  post_counts AS (
+    SELECT author_id,
+           COUNT(*) AS post_count,
+           COUNT(*) FILTER (WHERE is_deleted = TRUE) AS deleted_count,
+           COUNT(*) FILTER (WHERE is_flagged = TRUE) AS flagged_count
+    FROM forum_posts
+    GROUP BY author_id
+  ),
+  vote_received AS (
+    SELECT fp.author_id,
+           COUNT(*) FILTER (WHERE pv.vote_type = 1) AS upvotes_received,
+           COUNT(*) FILTER (WHERE pv.vote_type = -1) AS downvotes_received
+    FROM post_votes pv
+    JOIN forum_posts fp ON pv.post_id = fp.id
+    GROUP BY fp.author_id
+  ),
+  vote_given AS (
+    SELECT user_id,
+           COUNT(*) FILTER (WHERE vote_type = 1) AS upvotes_given,
+           COUNT(*) FILTER (WHERE vote_type = -1) AS downvotes_given
+    FROM post_votes
+    GROUP BY user_id
+  )
   SELECT
     up.id,
     up.username,
@@ -1004,19 +1204,21 @@ BEGIN
     up.last_login,
     up.last_ip,
     up.last_location,
-    (SELECT COUNT(*) FROM forum_threads ft WHERE ft.author_id = up.id),
-    (SELECT COUNT(*) FROM forum_posts fp WHERE fp.author_id = up.id),
-    (SELECT COUNT(*) FROM forum_posts fp WHERE fp.author_id = up.id AND fp.is_deleted = TRUE),
-    (SELECT COUNT(*) FROM forum_posts fp WHERE fp.author_id = up.id AND fp.is_flagged = TRUE),
-    (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = 1 THEN 1 ELSE 0 END), 0)
-     FROM post_votes pv JOIN forum_posts fp ON pv.post_id = fp.id WHERE fp.author_id = up.id),
-    (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = -1 THEN 1 ELSE 0 END), 0)
-     FROM post_votes pv JOIN forum_posts fp ON pv.post_id = fp.id WHERE fp.author_id = up.id),
-    (SELECT COUNT(*) FROM post_votes pv WHERE pv.user_id = up.id AND pv.vote_type = 1),
-    (SELECT COUNT(*) FROM post_votes pv WHERE pv.user_id = up.id AND pv.vote_type = -1),
+    COALESCE(tc.thread_count, 0),
+    COALESCE(pc.post_count, 0),
+    COALESCE(pc.deleted_count, 0),
+    COALESCE(pc.flagged_count, 0),
+    COALESCE(vr.upvotes_received, 0),
+    COALESCE(vr.downvotes_received, 0),
+    COALESCE(vg.upvotes_given, 0),
+    COALESCE(vg.downvotes_given, 0),
     v_total
   FROM user_profiles up
   JOIN auth.users au ON au.id = up.id
+  LEFT JOIN thread_counts tc ON tc.author_id = up.id
+  LEFT JOIN post_counts pc ON pc.author_id = up.id
+  LEFT JOIN vote_received vr ON vr.author_id = up.id
+  LEFT JOIN vote_given vg ON vg.user_id = up.id
   WHERE (v_search_pattern IS NULL
     OR LOWER(up.username) LIKE v_search_pattern
     OR LOWER(au.email::TEXT) LIKE v_search_pattern)
@@ -1120,6 +1322,10 @@ DECLARE
   v_thread_id INTEGER;
   v_post_id INTEGER;
 BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   -- Create thread
   INSERT INTO forum_threads (title, category_id, author_id, is_flagged, flag_reason)
   VALUES (p_title, p_category_id, auth.uid(), p_is_flagged, p_flag_reason)
@@ -1171,6 +1377,11 @@ DECLARE
   v_is_admin BOOLEAN;
   v_total BIGINT;
 BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
+    RETURN QUERY SELECT FALSE, FALSE, 'Permission denied'::TEXT;
+    RETURN;
+  END IF;
+
   SELECT (role = 'admin') INTO v_is_admin FROM user_profiles WHERE user_profiles.id = auth.uid();
   v_is_admin := COALESCE(v_is_admin, FALSE);
 
@@ -1181,7 +1392,7 @@ BEGIN
   JOIN user_profiles u ON u.id = t.author_id
   WHERE (p_category_ids IS NULL OR t.category_id = ANY(p_category_ids))
     AND (p_author_username IS NULL OR LOWER(u.username) = LOWER(p_author_username))
-    AND (p_search_text IS NULL OR text_contains_all_words(t.title || ' ' || op.content, p_search_text))
+    AND (p_search_text IS NULL OR t.search_document @@ websearch_to_tsquery('simple', p_search_text))
     AND (NOT p_flagged_only OR t.is_flagged = TRUE OR op.is_flagged = TRUE)
     AND (NOT p_deleted_only OR op.is_deleted = TRUE)
     AND (v_is_admin OR COALESCE(op.is_deleted, FALSE) = FALSE
@@ -1209,7 +1420,7 @@ BEGIN
     JOIN user_profiles u ON u.id = t.author_id
     WHERE (p_category_ids IS NULL OR t.category_id = ANY(p_category_ids))
       AND (p_author_username IS NULL OR LOWER(u.username) = LOWER(p_author_username))
-      AND (p_search_text IS NULL OR text_contains_all_words(t.title || ' ' || op.content, p_search_text))
+      AND (p_search_text IS NULL OR t.search_document @@ websearch_to_tsquery('simple', p_search_text))
       AND (NOT p_flagged_only OR t.is_flagged = TRUE OR op.is_flagged = TRUE)
       AND (NOT p_deleted_only OR op.is_deleted = TRUE)
       AND (v_is_admin OR COALESCE(op.is_deleted, FALSE) = FALSE
@@ -1311,6 +1522,10 @@ AS $$
 DECLARE
   v_post_id INTEGER;
 BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   INSERT INTO forum_posts (thread_id, parent_id, author_id, content, is_flagged, flag_reason)
   VALUES (p_thread_id, p_parent_id, auth.uid(), p_content, p_is_flagged, p_flag_reason)
   RETURNING id INTO v_post_id;
@@ -1553,6 +1768,11 @@ DECLARE
   v_post forum_posts%ROWTYPE;
   v_is_admin BOOLEAN;
 BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
+    RETURN QUERY SELECT FALSE, 'Permission denied'::TEXT;
+    RETURN;
+  END IF;
+
   SELECT * INTO v_post FROM forum_posts WHERE forum_posts.id = p_post_id;
 
   IF v_post IS NULL THEN
@@ -1600,6 +1820,11 @@ DECLARE
   v_post forum_posts%ROWTYPE;
   v_can_edit_content BOOLEAN;
 BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
+    RETURN QUERY SELECT FALSE, FALSE, 'Permission denied'::TEXT;
+    RETURN;
+  END IF;
+
   SELECT * INTO v_post FROM forum_posts WHERE forum_posts.id = p_post_id;
 
   IF v_post IS NULL THEN
@@ -1647,6 +1872,10 @@ AS $$
 DECLARE
   v_existing_vote INTEGER;
 BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   SELECT vote_type INTO v_existing_vote FROM post_votes WHERE post_id = p_post_id AND user_id = auth.uid();
 
   IF p_vote_type = 0 THEN
@@ -1871,6 +2100,10 @@ DECLARE
   v_thread_id INTEGER;
   v_option_id INTEGER;
 BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   SELECT * INTO v_poll FROM polls WHERE id = p_poll_id;
 
   IF v_poll IS NULL THEN
@@ -2051,6 +2284,10 @@ AS $$
 DECLARE
   v_exists BOOLEAN;
 BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   SELECT EXISTS(SELECT 1 FROM ignored_users WHERE user_id = auth.uid() AND ignored_user_id = p_ignored_user_id) INTO v_exists;
 
   IF v_exists THEN
@@ -2141,6 +2378,10 @@ AS $$
 DECLARE
   v_exists BOOLEAN;
 BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   SELECT EXISTS(SELECT 1 FROM bookmarks WHERE user_id = auth.uid() AND post_id = p_post_id) INTO v_exists;
 
   IF v_exists THEN
@@ -2184,6 +2425,10 @@ DECLARE
   v_op_post_id INTEGER;
   v_exists BOOLEAN;
 BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   SELECT id INTO v_op_post_id
   FROM forum_posts
   WHERE thread_id = p_thread_id AND parent_id IS NULL
@@ -2214,6 +2459,10 @@ AS $$
 DECLARE
   v_exists BOOLEAN;
 BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   SELECT EXISTS(SELECT 1 FROM bookmarks WHERE user_id = auth.uid() AND post_id = p_post_id) INTO v_exists;
 
   IF v_exists THEN
@@ -2263,7 +2512,7 @@ BEGIN
   JOIN forum_threads t ON t.id = p.thread_id
   WHERE b.user_id = p_user_id
     AND COALESCE(p.is_deleted, FALSE) = FALSE
-    AND (p_search_text IS NULL OR text_contains_all_words(p.content || ' ' || t.title, p_search_text));
+    AND (p_search_text IS NULL OR (p.search_document || t.search_document) @@ websearch_to_tsquery('simple', p_search_text));
 
   SELECT json_agg(row_to_json(posts_data)) INTO v_posts
   FROM (
@@ -2299,7 +2548,7 @@ BEGIN
     JOIN user_profiles u ON u.id = p.author_id
     WHERE b.user_id = p_user_id
       AND COALESCE(p.is_deleted, FALSE) = FALSE
-      AND (p_search_text IS NULL OR text_contains_all_words(p.content || ' ' || t.title, p_search_text))
+      AND (p_search_text IS NULL OR (p.search_document || t.search_document) @@ websearch_to_tsquery('simple', p_search_text))
     ORDER BY b.created_at DESC
     LIMIT p_limit OFFSET p_offset
   ) posts_data;
@@ -2362,7 +2611,7 @@ BEGIN
   FROM forum_posts p
   JOIN forum_threads t ON t.id = p.thread_id
   WHERE (v_author_id IS NULL OR p.author_id = v_author_id)
-    AND (p_search_text IS NULL OR text_contains_all_words(p.content || ' ' || t.title, p_search_text))
+    AND (p_search_text IS NULL OR (p.search_document || t.search_document) @@ websearch_to_tsquery('simple', p_search_text))
     AND (NOT p_flagged_only OR p.is_flagged = TRUE)
     AND (NOT p_deleted_only OR COALESCE(p.is_deleted, FALSE) = TRUE)
     AND (v_is_admin OR COALESCE(p.is_deleted, FALSE) = FALSE)
@@ -2395,7 +2644,7 @@ BEGIN
     JOIN forum_threads t ON t.id = p.thread_id
     JOIN user_profiles u ON u.id = p.author_id
     WHERE (v_author_id IS NULL OR p.author_id = v_author_id)
-      AND (p_search_text IS NULL OR text_contains_all_words(p.content || ' ' || t.title, p_search_text))
+      AND (p_search_text IS NULL OR (p.search_document || t.search_document) @@ websearch_to_tsquery('simple', p_search_text))
       AND (NOT p_flagged_only OR p.is_flagged = TRUE)
       AND (NOT p_deleted_only OR COALESCE(p.is_deleted, FALSE) = TRUE)
       AND (v_is_admin OR COALESCE(p.is_deleted, FALSE) = FALSE)

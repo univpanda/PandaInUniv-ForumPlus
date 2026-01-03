@@ -19,18 +19,35 @@ const TTL = {
   RESERVED_USERNAMES: 60 * 60, // 1 hour
 };
 
-// CORS headers
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Content-Type': 'application/json',
-};
+const DEFAULT_CORS_ORIGIN = 'http://localhost:5173';
+const allowedOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+function resolveCorsOrigin(requestOrigin) {
+  if (allowedOrigins.length === 0) {
+    return DEFAULT_CORS_ORIGIN;
+  }
+  if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+    return requestOrigin;
+  }
+  return allowedOrigins[0];
+}
+
+function buildCorsHeaders(requestOrigin) {
+  return {
+    'Access-Control-Allow-Origin': resolveCorsOrigin(requestOrigin),
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Content-Type': 'application/json',
+  };
+}
 
 // Response helper
-const response = (statusCode, body) => ({
+const response = (statusCode, body, requestOrigin) => ({
   statusCode,
-  headers: corsHeaders,
+  headers: buildCorsHeaders(requestOrigin),
   body: JSON.stringify(body),
 });
 
@@ -406,9 +423,10 @@ async function invalidateAllUsersCacheEntries() {
 
 // Main handler
 export const handler = async (event) => {
+  const requestOrigin = event.headers?.origin || event.headers?.Origin;
   // Handle CORS preflight
   if (event.requestContext?.http?.method === 'OPTIONS') {
-    return response(200, {});
+    return response(200, {}, requestOrigin);
   }
 
   const method = event.requestContext?.http?.method || 'GET';
@@ -416,7 +434,7 @@ export const handler = async (event) => {
 
   try {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-      return response(500, { error: 'Server configuration error' });
+      return response(500, { error: 'Server configuration error' }, requestOrigin);
     }
 
     // Parse path
@@ -424,7 +442,7 @@ export const handler = async (event) => {
 
     // Health check
     if (path === '/' || path === '/health') {
-      return response(200, { status: 'ok', timestamp: new Date().toISOString() });
+      return response(200, { status: 'ok', timestamp: new Date().toISOString() }, requestOrigin);
     }
 
     // Verify auth for protected endpoints
@@ -434,13 +452,13 @@ export const handler = async (event) => {
       token = await verifyToken(authHeader);
     } catch (error) {
       console.error('Auth verification failed:', error);
-      return response(503, { error: 'Auth service unavailable' });
+      return response(503, { error: 'Auth service unavailable' }, requestOrigin);
     }
 
     // GET /user/:userId
     if (method === 'GET' && pathParts[0] === 'user' && pathParts[1]) {
       if (!token) {
-        return response(401, { error: 'Unauthorized' });
+        return response(401, { error: 'Unauthorized' }, requestOrigin);
       }
       const userId = pathParts[1];
 
@@ -448,17 +466,17 @@ export const handler = async (event) => {
       if (token.sub !== userId) {
         const requesterProfile = await getUserProfile(token.sub);
         if (requesterProfile?.role !== 'admin') {
-          return response(403, { error: 'Forbidden' });
+          return response(403, { error: 'Forbidden' }, requestOrigin);
         }
       }
 
       const profile = await getUserProfile(userId);
 
       if (!profile) {
-        return response(404, { error: 'User not found' });
+        return response(404, { error: 'User not found' }, requestOrigin);
       }
 
-      return response(200, profile);
+      return response(200, profile, requestOrigin);
     }
 
     // GET /public/user/:userId (no auth)
@@ -468,16 +486,16 @@ export const handler = async (event) => {
       const profile = await getPublicUserProfile(userId);
 
       if (!profile) {
-        return response(404, { error: 'User not found' });
+        return response(404, { error: 'User not found' }, requestOrigin);
       }
 
-      return response(200, profile);
+      return response(200, profile, requestOrigin);
     }
 
     // GET /users (admin only) - supports pagination via query params
     if (method === 'GET' && pathParts[0] === 'users') {
       if (!token) {
-        return response(401, { error: 'Unauthorized' });
+        return response(401, { error: 'Unauthorized' }, requestOrigin);
       }
 
       // Check for pagination query params
@@ -498,67 +516,67 @@ export const handler = async (event) => {
 
         // Verify admin role
         if (adminProfile?.role !== 'admin') {
-          return response(403, { error: 'Admin access required' });
+          return response(403, { error: 'Admin access required' }, requestOrigin);
         }
 
         // If cache hit, return immediately (saves ~200ms)
         if (cachedUsers) {
-          return response(200, cachedUsers);
+          return response(200, cachedUsers, requestOrigin);
         }
 
         // Cache miss - fetch from Supabase
         const userToken = authHeader?.slice(7); // Remove 'Bearer ' prefix
         const result = await fetchPaginatedUsersFromSupabase(limit, offset, search, userToken);
-        return response(200, result);
+        return response(200, result, requestOrigin);
       }
 
       // Non-paginated request (legacy) - sequential fetch
       const adminProfile = await getUserProfile(token.sub);
       if (adminProfile?.role !== 'admin') {
-        return response(403, { error: 'Admin access required' });
+        return response(403, { error: 'Admin access required' }, requestOrigin);
       }
 
       const result = await getAllUsers();
-      return response(200, result);
+      return response(200, result, requestOrigin);
     }
 
     // DELETE /cache/user/:userId
     if (method === 'DELETE' && pathParts[0] === 'cache' && pathParts[1] === 'user' && pathParts[2]) {
       if (!token) {
-        return response(401, { error: 'Unauthorized' });
+        return response(401, { error: 'Unauthorized' }, requestOrigin);
       }
 
       const targetUserId = pathParts[2];
       if (token.sub !== targetUserId) {
         const requesterProfile = await getUserProfile(token.sub);
         if (requesterProfile?.role !== 'admin') {
-          return response(403, { error: 'Admin access required' });
+          return response(403, { error: 'Admin access required' }, requestOrigin);
         }
       }
 
       const result = await invalidateUserCache(targetUserId);
-      return response(200, result);
+      return response(200, result, requestOrigin);
     }
 
     // DELETE /cache/users
     if (method === 'DELETE' && pathParts[0] === 'cache' && pathParts[1] === 'users') {
       if (!token) {
-        return response(401, { error: 'Unauthorized' });
+        return response(401, { error: 'Unauthorized' }, requestOrigin);
       }
 
       const requesterProfile = await getUserProfile(token.sub);
       if (requesterProfile?.role !== 'admin') {
-        return response(403, { error: 'Admin access required' });
+        return response(403, { error: 'Admin access required' }, requestOrigin);
       }
 
       const result = await invalidateUsersCache();
-      return response(200, result);
+      return response(200, result, requestOrigin);
     }
 
-    return response(404, { error: 'Not found' });
+    return response(404, { error: 'Not found' }, requestOrigin);
 
   } catch (error) {
     console.error('Handler error:', error);
-    return response(500, { error: 'Internal server error' });
+    return response(500, { error: 'Internal server error' }, requestOrigin);
   }
 };
