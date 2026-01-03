@@ -34,11 +34,8 @@ export async function checkAndSignOutIfBlocked(): Promise<boolean> {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return false
 
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('is_blocked')
-      .eq('id', user.id)
-      .single()
+    const { data } = await supabase.rpc('get_my_profile_status')
+    const profile = (data as Array<{ is_blocked: boolean }> | null)?.[0]
 
     if (profile?.is_blocked) {
       await supabase.auth.signOut()

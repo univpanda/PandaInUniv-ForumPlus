@@ -74,15 +74,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ): Promise<{ role: string; isBlocked: boolean } | null> => {
       const userId = newSession.user.id
 
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('role, is_blocked')
-        .eq('id', userId)
-        .single()
+      const { data, error } = await supabase.rpc('get_my_profile_status')
 
       if (!isActive()) return null
 
-      if (error) {
+      const status = (data as Array<{ role: string; is_blocked: boolean }> | null)?.[0]
+
+      if (error || !status) {
         // Profile doesn't exist (new user) - create it
         const email = newSession.user.email
         if (email) {
@@ -105,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { role: 'user', isBlocked: false }
       }
 
-      return { role: data?.role ?? 'user', isBlocked: data?.is_blocked ?? false }
+      return { role: status.role ?? 'user', isBlocked: status.is_blocked ?? false }
     },
     []
   )
@@ -240,14 +238,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Always update login info, even if IP/location failed
     try {
-      await supabase
-        .from('user_profiles')
-        .update({
-          last_login: new Date().toISOString(),
-          ...(ip && { last_ip: ip }),
-          ...(location && { last_location: location }),
-        })
-        .eq('id', userId)
+      await supabase.rpc('update_login_metadata', {
+        p_last_login: new Date().toISOString(),
+        p_last_ip: ip,
+        p_last_location: location,
+      })
 
       // Invalidate cache after profile update
       if (authToken) {

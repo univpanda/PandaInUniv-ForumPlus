@@ -320,6 +320,8 @@ CREATE TRIGGER trigger_update_post_vote_counts_delete
 -- =============================================================================
 
 DROP FUNCTION IF EXISTS get_public_user_profile(UUID);
+DROP FUNCTION IF EXISTS get_my_profile_status();
+DROP FUNCTION IF EXISTS update_login_metadata(TIMESTAMPTZ, INET, TEXT);
 DROP FUNCTION IF EXISTS is_username_available(TEXT);
 DROP FUNCTION IF EXISTS set_user_role(UUID, TEXT);
 DROP FUNCTION IF EXISTS set_user_blocked(UUID, BOOLEAN);
@@ -356,6 +358,44 @@ AS $$
   SELECT up.id, up.username, up.avatar_url, up.avatar_path, up.is_private
   FROM user_profiles up
   WHERE up.id = p_user_id;
+$$;
+
+-- Get own profile status (role + blocked)
+CREATE OR REPLACE FUNCTION get_my_profile_status()
+RETURNS TABLE (
+  role TEXT,
+  is_blocked BOOLEAN
+)
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT up.role, COALESCE(up.is_blocked, FALSE)
+  FROM user_profiles up
+  WHERE up.id = auth.uid();
+$$;
+
+-- Update own login metadata (last login/IP/location)
+CREATE OR REPLACE FUNCTION update_login_metadata(
+  p_last_login TIMESTAMPTZ DEFAULT NULL,
+  p_last_ip INET DEFAULT NULL,
+  p_last_location TEXT DEFAULT NULL
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  UPDATE user_profiles
+  SET last_login = COALESCE(p_last_login, NOW()),
+      last_ip = COALESCE(p_last_ip, last_ip),
+      last_location = COALESCE(p_last_location, last_location)
+  WHERE id = auth.uid();
+END;
 $$;
 
 -- Check username availability (case-insensitive + reserved words)
@@ -428,6 +468,8 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION get_public_user_profile(UUID) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION get_my_profile_status() TO authenticated;
+GRANT EXECUTE ON FUNCTION update_login_metadata(TIMESTAMPTZ, INET, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION is_username_available(TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION set_user_role(UUID, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION set_user_blocked(UUID, BOOLEAN) TO authenticated;

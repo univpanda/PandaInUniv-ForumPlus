@@ -741,6 +741,44 @@ AS $$
   ]::TEXT[];
 $$;
 
+-- Get own profile status (role + blocked)
+CREATE OR REPLACE FUNCTION get_my_profile_status()
+RETURNS TABLE (
+  role TEXT,
+  is_blocked BOOLEAN
+)
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT up.role, COALESCE(up.is_blocked, FALSE)
+  FROM user_profiles up
+  WHERE up.id = auth.uid();
+$$;
+
+-- Update own login metadata (last login/IP/location)
+CREATE OR REPLACE FUNCTION update_login_metadata(
+  p_last_login TIMESTAMPTZ DEFAULT NULL,
+  p_last_ip INET DEFAULT NULL,
+  p_last_location TEXT DEFAULT NULL
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  UPDATE user_profiles
+  SET last_login = COALESCE(p_last_login, NOW()),
+      last_ip = COALESCE(p_last_ip, last_ip),
+      last_location = COALESCE(p_last_location, last_location)
+  WHERE id = auth.uid();
+END;
+$$;
+
 -- Public profile lookup (no auth required, returns safe fields only)
 CREATE OR REPLACE FUNCTION get_public_user_profile(p_user_id UUID)
 RETURNS TABLE (
@@ -829,6 +867,8 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION get_public_user_profile(UUID) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION get_my_profile_status() TO authenticated;
+GRANT EXECUTE ON FUNCTION update_login_metadata(TIMESTAMPTZ, INET, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION is_username_available(TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION set_user_role(UUID, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION set_user_blocked(UUID, BOOLEAN) TO authenticated;
