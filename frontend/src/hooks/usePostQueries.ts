@@ -102,15 +102,19 @@ export function useThreadView(
         rows = (data ?? []) as Array<Post & { is_op: boolean; total_count: number }>
       }
 
-      if (session?.access_token && usedCache && rows.length > 0) {
+      if (session?.access_token && rows.length > 0) {
         try {
           const postIds = Array.from(new Set(rows.map((row) => row.id)))
-          const [votesRes, bookmarksRes] = await Promise.all([
-            supabase.rpc('get_user_post_votes', { p_post_ids: postIds }),
+          const overlayCalls = [
             supabase.rpc('get_user_post_bookmarks', { p_post_ids: postIds }),
-          ])
+          ]
+          if (usedCache) {
+            overlayCalls.push(supabase.rpc('get_user_post_votes', { p_post_ids: postIds }))
+          }
 
-          if (!votesRes.error) {
+          const [bookmarksRes, votesRes] = await Promise.all(overlayCalls)
+
+          if (votesRes && !votesRes.error) {
             const voteMap = new Map<number, number>(
               (votesRes.data as Array<{ post_id: number; vote_type: number }> | null)?.map((row) => [
                 row.post_id,

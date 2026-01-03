@@ -318,7 +318,7 @@ BEGIN
   INTO v_title, v_op_content
   FROM forum_threads t
   LEFT JOIN forum_posts op
-    ON op.thread_id = t.id AND op.parent_id IS NULL
+    ON op.thread_id = t.id AND op.parent_id IS NULL AND COALESCE(op.is_deleted, FALSE) = FALSE
   WHERE t.id = p_thread_id;
 
   UPDATE forum_threads

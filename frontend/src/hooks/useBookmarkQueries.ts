@@ -60,7 +60,7 @@ export function useToggleBookmark(userId: string | undefined) {
 /**
  * Query to fetch user's bookmarked post IDs (excluding deleted posts)
  */
-export function usePostBookmarks(userId: string | undefined) {
+export function usePostBookmarks(userId: string | undefined, enabled: boolean = true) {
   return useQuery({
     queryKey: forumKeys.postBookmarks(userId ?? ''),
     queryFn: async () => {
@@ -71,7 +71,7 @@ export function usePostBookmarks(userId: string | undefined) {
       if (error) throw error
       return new Set((data as number[]) ?? [])
     },
-    enabled: !!userId,
+    enabled: !!userId && enabled,
     staleTime: STALE_TIME.LONG,
   })
 }

@@ -391,6 +391,7 @@ async function getPaginatedUsers(limit, offset, search, userToken) {
 // DELETE /cache/user/:userId - Invalidate user cache
 async function invalidateUserCache(userId) {
   await deleteFromCache(`user:${userId}`, 'profile');
+  await deleteFromCache(`user:${userId}`, 'public-profile');
   // Also invalidate admin users list since user data changed
   await invalidateAllUsersCacheEntries();
   return { success: true, invalidated: userId };
@@ -696,6 +697,11 @@ export const handler = async (event) => {
         return response(401, { error: 'Unauthorized' }, requestOrigin);
       }
 
+      const requesterProfile = await getUserProfile(token.sub);
+      if (requesterProfile?.role !== 'admin') {
+        return response(403, { error: 'Admin access required' }, requestOrigin);
+      }
+
       await invalidatePublicThreadsCache();
       return response(200, { success: true }, requestOrigin);
     }
@@ -704,6 +710,11 @@ export const handler = async (event) => {
     if (method === 'DELETE' && pathParts[0] === 'cache' && pathParts[1] === 'thread' && pathParts[2]) {
       if (!token) {
         return response(401, { error: 'Unauthorized' }, requestOrigin);
+      }
+
+      const requesterProfile = await getUserProfile(token.sub);
+      if (requesterProfile?.role !== 'admin') {
+        return response(403, { error: 'Admin access required' }, requestOrigin);
       }
 
       const threadId = parseInt(pathParts[2], 10);

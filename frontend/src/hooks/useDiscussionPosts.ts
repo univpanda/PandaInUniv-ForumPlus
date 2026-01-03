@@ -80,7 +80,7 @@ export function useDiscussionPosts({
   const bookmarks = bookmarksQuery.data ?? emptySet
 
   // Post bookmarks query
-  const postBookmarksQuery = usePostBookmarks(userId)
+  const postBookmarksQuery = usePostBookmarks(userId, view !== 'thread')
   const postBookmarks = postBookmarksQuery.data ?? emptySet
 
   // Thread list data (paginated threads - not used in bookmarks view or posts search mode)
