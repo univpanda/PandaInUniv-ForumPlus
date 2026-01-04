@@ -262,30 +262,6 @@ async function deleteFromCache(pk, sk) {
 }
 
 // Fetch from Supabase
-async function fetchFromSupabase(table, query, options = {}, allowServiceKey = false) {
-  if (!allowServiceKey) {
-    throw new Error('Direct table fetch requires explicit service-role opt-in');
-  }
-  const url = `${SUPABASE_URL}/rest/v1/${table}?${query}`;
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      'apikey': SUPABASE_SERVICE_KEY,
-      'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation',
-      ...options.headers,
-    },
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Supabase error: ${res.status} - ${text}`);
-  }
-
-  return res.json();
-}
-
 // Call Supabase RPC
 async function callSupabaseRpc(functionName, params = {}, userToken = null) {
   const url = `${SUPABASE_URL}/rest/v1/rpc/${functionName}`;
@@ -311,7 +287,7 @@ async function callSupabaseRpc(functionName, params = {}, userToken = null) {
 }
 
 // GET /user/:userId - Get user profile (role, is_blocked)
-async function getUserProfile(userId) {
+async function getUserProfile(userId, userToken) {
   const pk = `user:${userId}`;
   const sk = 'profile';
 
@@ -322,12 +298,9 @@ async function getUserProfile(userId) {
   }
 
   // Fetch from Supabase
-  const data = await fetchFromSupabase(
-    'user_profiles',
-    `id=eq.${userId}&select=id,role,is_blocked,username,avatar_url,is_private`,
-    {},
-    true
-  );
+  const data = await callSupabaseRpc('get_user_profile_cache', {
+    p_user_id: userId,
+  }, userToken);
 
   if (!data || data.length === 0) {
     return null;
@@ -551,14 +524,15 @@ export const handler = async (event) => {
       const userId = pathParts[1];
 
       // Allow self lookup; require admin for other users
+      const userToken = authHeader?.slice(7);
       if (token.sub !== userId) {
-        const requesterProfile = await getUserProfile(token.sub);
+        const requesterProfile = await getUserProfile(token.sub, userToken);
         if (requesterProfile?.role !== 'admin') {
           return response(403, { error: 'Forbidden' }, requestOrigin);
         }
       }
 
-      const profile = await getUserProfile(userId);
+      const profile = await getUserProfile(userId, userToken);
 
       if (!profile) {
         return response(404, { error: 'User not found' }, requestOrigin);
@@ -668,7 +642,7 @@ export const handler = async (event) => {
       if (limit !== null && offset !== null) {
         // OPTIMIZATION: Fetch admin profile and check users cache in parallel
         const [adminProfile, cachedUsers] = await Promise.all([
-          getUserProfile(token.sub),
+          getUserProfile(token.sub, authHeader?.slice(7)),
           checkPaginatedUsersCache(limit, offset, search),
         ]);
 
@@ -689,7 +663,7 @@ export const handler = async (event) => {
       }
 
       // Non-paginated request (legacy) - sequential fetch
-      const adminProfile = await getUserProfile(token.sub);
+      const adminProfile = await getUserProfile(token.sub, authHeader?.slice(7));
       if (adminProfile?.role !== 'admin') {
         return response(403, { error: 'Admin access required' }, requestOrigin);
       }
@@ -706,7 +680,7 @@ export const handler = async (event) => {
 
       const targetUserId = pathParts[2];
       if (token.sub !== targetUserId) {
-        const requesterProfile = await getUserProfile(token.sub);
+        const requesterProfile = await getUserProfile(token.sub, authHeader?.slice(7));
         if (requesterProfile?.role !== 'admin') {
           return response(403, { error: 'Admin access required' }, requestOrigin);
         }
@@ -722,7 +696,7 @@ export const handler = async (event) => {
         return response(401, { error: 'Unauthorized' }, requestOrigin);
       }
 
-      const requesterProfile = await getUserProfile(token.sub);
+      const requesterProfile = await getUserProfile(token.sub, authHeader?.slice(7));
       if (requesterProfile?.role !== 'admin') {
         return response(403, { error: 'Admin access required' }, requestOrigin);
       }

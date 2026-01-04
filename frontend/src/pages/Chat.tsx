@@ -6,7 +6,7 @@ import { AlertBanner } from '../components/ui'
 import { ChatConversationList, ChatConversation } from '../components/chat'
 
 interface ChatProps {
-  initialPartner?: { id: string; username: string; avatar: string | null; avatarPath?: string | null } | null
+  initialPartner?: { id: string; username: string | null; avatar: string | null; avatarPath?: string | null } | null
   onInitialPartnerConsumed?: () => void
   resetToList?: number
 }

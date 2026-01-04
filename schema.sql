@@ -1387,6 +1387,45 @@ AS $$
   WHERE up.id = p_user_id;
 $$;
 
+-- Internal profile lookup for cache (auth required, admin or self)
+CREATE OR REPLACE FUNCTION get_user_profile_cache(p_user_id UUID)
+RETURNS TABLE (
+  id UUID,
+  role TEXT,
+  is_blocked BOOLEAN,
+  username TEXT,
+  avatar_url TEXT,
+  avatar_path TEXT,
+  is_private BOOLEAN
+)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_is_admin BOOLEAN;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  v_is_admin := public.check_is_admin();
+  IF NOT v_is_admin AND auth.uid() <> p_user_id THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    up.id,
+    up.role,
+    up.is_blocked,
+    up.username,
+    up.avatar_url,
+    up.avatar_path,
+    up.is_private
+  FROM user_profiles up
+  WHERE up.id = p_user_id;
+END;
+$$;
+
 -- Get public user stats (with privacy check)
 CREATE OR REPLACE FUNCTION get_public_user_stats(p_user_id UUID)
 RETURNS TABLE (
@@ -3467,6 +3506,7 @@ GRANT EXECUTE ON FUNCTION get_paginated_forum_threads(INTEGER[], INTEGER, INTEGE
 GRANT EXECUTE ON FUNCTION get_thread_view(INTEGER, INTEGER, INTEGER, TEXT) TO anon;
 GRANT EXECUTE ON FUNCTION get_post_by_id(INTEGER) TO anon;
 GRANT EXECUTE ON FUNCTION get_poll_data(INTEGER) TO anon;
+GRANT EXECUTE ON FUNCTION get_user_profile_cache(UUID) TO authenticated;
 
 
 -- =============================================================================

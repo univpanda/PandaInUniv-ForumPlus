@@ -11,7 +11,7 @@ import type { ChatView, ChatMessage } from '../types'
 
 interface SelectedPartner {
   id: string
-  username: string
+  username: string | null
   avatar: string | null
 }
 

@@ -3,7 +3,7 @@ import { MessagesSquare } from 'lucide-react'
 
 interface UserNameHoverProps {
   userId: string
-  username: string
+  username: string | null
   avatar: string | null
   avatarPath?: string | null
   currentUserId: string | null
@@ -26,6 +26,7 @@ export const UserNameHover = memo(function UserNameHover({
   currentUserId,
   className = '',
 }: UserNameHoverProps) {
+  const displayName = username ?? 'Private Panda'
   const [showPopup, setShowPopup] = useState(false)
   const containerRef = useRef<HTMLSpanElement>(null)
   const timeoutRef = useRef<number | null>(null)
@@ -57,7 +58,7 @@ export const UserNameHover = memo(function UserNameHover({
 
     // Dispatch custom event to trigger chat
     const event = new CustomEvent('startChatWithUser', {
-      detail: { userId, username, avatar, avatarPath } as StartChatEvent,
+      detail: { userId, username: displayName, avatar, avatarPath } as StartChatEvent,
     })
     window.dispatchEvent(event)
     setShowPopup(false)
@@ -79,7 +80,7 @@ export const UserNameHover = memo(function UserNameHover({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <span className={`username-text ${className}`}>{username}</span>
+      <span className={`username-text ${className}`}>{displayName}</span>
       {showPopup && (
         <div
           className="username-popup"

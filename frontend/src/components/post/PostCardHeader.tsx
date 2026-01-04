@@ -32,18 +32,19 @@ export const PostCardHeader = memo(function PostCardHeader({
   onUserDeletedClick,
 }: PostCardHeaderProps) {
   const canEdit = canEditContent(post.created_at)
+  const authorName = post.author_name || 'Private Panda'
 
   return (
     <div className="post-header">
       <div className="post-author">
         <img
-          src={getAvatarUrl(post.author_avatar, post.author_name, post.author_avatar_path)}
+          src={getAvatarUrl(post.author_avatar, authorName, post.author_avatar_path)}
           alt=""
           className="avatar-small"
         />
         <UserNameHover
           userId={post.author_id}
-          username={post.author_name}
+          username={post.author_name ?? 'Private Panda'}
           avatar={post.author_avatar}
           avatarPath={post.author_avatar_path}
           currentUserId={user?.id || null}

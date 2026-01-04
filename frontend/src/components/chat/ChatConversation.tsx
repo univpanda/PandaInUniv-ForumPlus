@@ -10,7 +10,7 @@ import type { ChatMessage } from '../../types'
 interface ChatConversationProps {
   partner: {
     id: string
-    username: string
+    username: string | null
     avatar: string | null
     avatarPath?: string | null
   }
@@ -46,11 +46,12 @@ export function ChatConversation({
   const { data: partnerStats } = usePublicUserStats(partner.id)
   const { data: isIgnored } = useIsUserIgnored(currentUserId, partner.id)
   const toggleIgnore = useToggleIgnore(currentUserId)
+  const partnerName = partner.username || 'Private Panda'
 
   const handleToggleIgnore = () => {
     toggleIgnore.mutate(partner.id, {
       onSuccess: (isNowIgnored) => {
-        onIgnoreToggled?.(partner.username, isNowIgnored)
+        onIgnoreToggled?.(partnerName, isNowIgnored)
       },
     })
   }
@@ -62,9 +63,9 @@ export function ChatConversation({
         <div className="chat-partner-info">
           <button className="chat-partner-back" onClick={onBack} title="Back to whispers">
             <div className="chat-partner-avatar">
-              <img src={getAvatarUrl(partner.avatar, partner.username, partner.avatarPath)} alt="" />
+              <img src={getAvatarUrl(partner.avatar, partnerName, partner.avatarPath)} alt="" />
             </div>
-            <span className="chat-partner-name">{partner.username}</span>
+            <span className="chat-partner-name">{partnerName}</span>
           </button>
           <button
             className={`chat-ignore-btn ${isIgnored ? 'ignored' : ''}`}
@@ -86,10 +87,10 @@ export function ChatConversation({
               className="chat-stat chat-stat-link"
               onClick={() => {
                 window.dispatchEvent(new CustomEvent('searchDiscussion', {
-                  detail: { searchQuery: `@${partner.username} @op` }
+                  detail: { searchQuery: `@${partnerName} @op` }
                 }))
               }}
-              title={`View ${partner.username}'s threads`}
+              title={`View ${partnerName}'s threads`}
             >
               <FileText size={14} />
               {partnerStats.threadCount}
@@ -98,10 +99,10 @@ export function ChatConversation({
               className="chat-stat chat-stat-link"
               onClick={() => {
                 window.dispatchEvent(new CustomEvent('searchDiscussion', {
-                  detail: { searchQuery: `@${partner.username} @replies` }
+                  detail: { searchQuery: `@${partnerName} @replies` }
                 }))
               }}
-              title={`View ${partner.username}'s replies`}
+              title={`View ${partnerName}'s replies`}
             >
               <MessageCircle size={14} />
               {partnerStats.postCount}
@@ -125,7 +126,7 @@ export function ChatConversation({
         currentUserId={currentUserId}
         partnerAvatar={partner.avatar}
         partnerAvatarPath={partner.avatarPath}
-        partnerUsername={partner.username}
+        partnerUsername={partnerName}
         hasMore={hasMoreMessages}
         onLoadMore={onLoadMoreMessages}
         isLoadingMore={isLoadingMoreMessages}
@@ -137,7 +138,7 @@ export function ChatConversation({
         onChange={onMessageChange}
         onSend={onSend}
         sending={sending}
-        placeholder={`Message ${partner.username}...`}
+        placeholder={`Message ${partnerName}...`}
         autoFocus
       />
     </div>

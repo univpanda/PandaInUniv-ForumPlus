@@ -10,7 +10,7 @@ interface ChatMessageListProps {
   currentUserId: string
   partnerAvatar: string | null
   partnerAvatarPath?: string | null
-  partnerUsername: string
+  partnerUsername: string | null
   /** Whether there are more messages to load */
   hasMore?: boolean
   /** Function to load more messages */
@@ -30,7 +30,8 @@ export const ChatMessageList = memo(function ChatMessageList({
   onLoadMore,
   isLoadingMore = false,
 }: ChatMessageListProps) {
-  const avatarUrl = getAvatarUrl(partnerAvatar, partnerUsername, partnerAvatarPath)
+  const displayName = partnerUsername || 'Private Panda'
+  const avatarUrl = getAvatarUrl(partnerAvatar, displayName, partnerAvatarPath)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const prevScrollHeightRef = useRef<number>(0)
 

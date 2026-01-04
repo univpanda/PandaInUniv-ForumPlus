@@ -30,7 +30,7 @@ export function useChatPageState({ resetToList }: UseChatPageStateOptions = {}) 
   const [view, setView] = useState<ChatView>('conversations')
   const [selectedPartner, setSelectedPartner] = useState<{
     id: string
-    username: string
+    username: string | null
     avatar: string | null
     avatarPath?: string | null
   } | null>(null)
@@ -90,7 +90,7 @@ export function useChatPageState({ resetToList }: UseChatPageStateOptions = {}) 
 
   // Used by Discussion username hover to start a new chat
   const startNewChat = useCallback(
-    (partnerId: string, partnerUsername: string, partnerAvatar: string | null, partnerAvatarPath?: string | null) => {
+    (partnerId: string, partnerUsername: string | null, partnerAvatar: string | null, partnerAvatarPath?: string | null) => {
       setSelectedPartner({
         id: partnerId,
         username: partnerUsername,
