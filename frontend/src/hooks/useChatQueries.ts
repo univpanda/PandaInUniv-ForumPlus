@@ -1,7 +1,7 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { STALE_TIME, POLL_INTERVAL, PAGE_SIZE } from '../utils/constants'
-import { getPollingInterval } from '../utils/polling'
+import { getPollingIntervalSafe } from '../utils/polling'
 import type {
   ChatMessage,
   UserConversation,
@@ -40,11 +40,11 @@ export function useConversations(userId: string | null, options?: { enabled?: bo
     },
     enabled: !!userId && options?.enabled !== false,
     staleTime: STALE_TIME.MEDIUM,
-    refetchInterval: (query) => {
+    refetchInterval: (dataOrQuery, maybeQuery) => {
       if (typeof document !== 'undefined' && document.hidden) {
         return false
       }
-      return getPollingInterval(POLL_INTERVAL.NOTIFICATIONS, query.state.fetchFailureCount)
+      return getPollingIntervalSafe(POLL_INTERVAL.NOTIFICATIONS, dataOrQuery, maybeQuery)
     },
     refetchIntervalInBackground: false,
   })
@@ -121,11 +121,11 @@ export function useUnreadMessageCount(userId: string | null, options?: { enabled
     },
     enabled: !!userId && options?.enabled !== false,
     staleTime: STALE_TIME.SHORT,
-    refetchInterval: (query) => {
+    refetchInterval: (dataOrQuery, maybeQuery) => {
       if (typeof document !== 'undefined' && document.hidden) {
         return false
       }
-      return getPollingInterval(POLL_INTERVAL.NOTIFICATIONS, query.state.fetchFailureCount)
+      return getPollingIntervalSafe(POLL_INTERVAL.NOTIFICATIONS, dataOrQuery, maybeQuery)
     },
     refetchIntervalInBackground: false,
   })

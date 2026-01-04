@@ -1,6 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { checkThreadContent } from '../utils/contentModeration'
 import { STALE_TIME, PAGE_SIZE } from '../utils/constants'
 import { getCachedThreads, invalidateThreadsCache, isCacheEnabled } from '../lib/cacheApi'
 import { extractPaginatedResponse } from '../utils/queryHelpers'
@@ -85,15 +84,10 @@ export function useCreateThread() {
 
   return useOptimisticMutation<never, CreateThreadVariables, CreateThreadResponse>({
     mutationFn: async ({ title, content }): Promise<CreateThreadResponse> => {
-      // Check content for inappropriate words
-      const flagCheck = checkThreadContent(title, content)
-
       const { data, error } = await supabase.rpc('create_thread', {
         p_title: title,
         p_category_id: null,
         p_content: content,
-        p_is_flagged: flagCheck.isFlagged,
-        p_flag_reason: flagCheck.isFlagged ? flagCheck.reasons.join(', ') : null,
       })
       if (error) throw error
       return data as CreateThreadResponse

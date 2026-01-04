@@ -2,7 +2,6 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { forumKeys } from './forumQueryKeys'
 import { profileKeys } from './useUserProfile'
-import { checkThreadContent } from '../utils/contentModeration'
 import { STALE_TIME } from '../utils/constants'
 import type { Poll, PollSettings } from '../types'
 
@@ -121,17 +120,12 @@ export function useCreatePollThread() {
       pollOptions,
       pollSettings,
     }: CreatePollThreadVariables): Promise<number> => {
-      // Check content for inappropriate words
-      const flagCheck = checkThreadContent(title, content)
-
       const { data, error } = await supabase.rpc('create_poll_thread', {
         p_title: title,
         p_content: content,
         p_poll_options: pollOptions,
         p_allow_multiple: pollSettings.allowMultiple,
         p_duration_hours: pollSettings.durationHours,
-        p_is_flagged: flagCheck.isFlagged,
-        p_flag_reason: flagCheck.isFlagged ? flagCheck.reasons.join(', ') : null,
       })
       if (error) throw error
       return data as number

@@ -262,7 +262,10 @@ async function deleteFromCache(pk, sk) {
 }
 
 // Fetch from Supabase
-async function fetchFromSupabase(table, query, options = {}) {
+async function fetchFromSupabase(table, query, options = {}, allowServiceKey = false) {
+  if (!allowServiceKey) {
+    throw new Error('Direct table fetch requires explicit service-role opt-in');
+  }
   const url = `${SUPABASE_URL}/rest/v1/${table}?${query}`;
   const res = await fetch(url, {
     ...options,
@@ -321,7 +324,9 @@ async function getUserProfile(userId) {
   // Fetch from Supabase
   const data = await fetchFromSupabase(
     'user_profiles',
-    `id=eq.${userId}&select=id,role,is_blocked,username,avatar_url,is_private`
+    `id=eq.${userId}&select=id,role,is_blocked,username,avatar_url,is_private`,
+    {},
+    true
   );
 
   if (!data || data.length === 0) {
@@ -346,10 +351,9 @@ async function getPublicUserProfile(userId) {
     return { ...cached, _cached: true };
   }
 
-  const data = await fetchFromSupabase(
-    'user_profiles',
-    `id=eq.${userId}&select=id,username,avatar_url,avatar_path,is_private`
-  );
+  const data = await callSupabaseRpc('get_public_user_profile', {
+    p_user_id: userId,
+  });
 
   if (!data || data.length === 0) {
     return null;
@@ -586,8 +590,8 @@ export const handler = async (event) => {
       const sort = queryParams.sort || 'recent';
       const author = queryParams.author || null;
       const search = queryParams.search || null;
-      const flagged = parseBoolean(queryParams.flagged);
-      const deleted = parseBoolean(queryParams.deleted);
+      const flagged = false;
+      const deleted = false;
 
       const pk = 'public';
       const sk = `threads:${sort}:${limit}:${offset}:${author || ''}:${search || ''}:${flagged}:${deleted}`;
@@ -606,6 +610,7 @@ export const handler = async (event) => {
         p_search_text: search,
         p_flagged_only: flagged,
         p_deleted_only: deleted,
+        p_public_only: true,
       });
 
       await putToCache(pk, sk, data, TTL.THREAD_LIST);

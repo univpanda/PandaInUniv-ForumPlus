@@ -51,6 +51,151 @@ AS $$
   SELECT COALESCE((SELECT role = 'admin' FROM public.user_profiles WHERE id = p_user_id), FALSE);
 $$;
 
+-- Helper function to flag content for moderation (server-side)
+CREATE OR REPLACE FUNCTION public.get_flag_reasons(p_content TEXT)
+RETURNS TEXT[]
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+STABLE
+AS $$
+DECLARE
+  v_patterns TEXT[];
+  v_reasons TEXT[];
+  v_context_words TEXT[];
+  v_has_context BOOLEAN := FALSE;
+  v_pattern TEXT;
+  v_reason TEXT;
+  v_match TEXT;
+  v_result TEXT[] := ARRAY[]::TEXT[];
+  i INTEGER;
+BEGIN
+  IF p_content IS NULL OR length(p_content) = 0 THEN
+    RETURN v_result;
+  END IF;
+
+  v_patterns := ARRAY[
+    '(?i)\\y(f+u+c+k+|f+[*@#$%]ck|fuk|fck)\\y',
+    '(?i)\\y(s+h+i+t+|sh[*@#$%]t|sht)\\y',
+    '(?i)\\y(a+s+s+h+o+l+e+|a+s+s+)\\y',
+    '(?i)\\y(b+i+t+c+h+|b[*@#$%]tch)\\y',
+    '(?i)\\y(d+a+m+n+)\\y',
+    '(?i)\\y(c+u+n+t+)\\y',
+    '(?i)\\y(d+i+c+k+|d[*@#$%]ck)\\y',
+    '(?i)\\y(p+u+s+s+y+)\\y',
+    '(?i)\\y(c+o+c+k+)\\y',
+    '(?i)\\y(w+h+o+r+e+)\\y',
+    '(?i)\\y(s+l+u+t+)\\y',
+    '(?i)\\y(n+[i1]+g+[g4]+[e3a]+r*|n[*@#$%]gg[*@#$%]r)\\y',
+    '(?i)\\y(f+[a4]+g+[o0]+t*|f[*@#$%]gg[*@#$%]t)\\y',
+    '(?i)\\y(r+[e3]+t+[a4]+r+d+)\\y',
+    '(?i)\\y(kill\\s+(you|yourself|him|her|them))\\y',
+    '(?i)\\y(i(''ll|will)\\s+murder)\\y',
+    '(?i)\\y(death\\s+threat)\\y',
+    '(?i)\\y(buy\\s+now|click\\s+here|free\\s+money)\\y',
+    '(?i)(https?://[^\\s]+){3,}'
+  ];
+
+  v_reasons := ARRAY[
+    'Inappropriate language',
+    'Inappropriate language',
+    'Inappropriate language',
+    'Inappropriate language',
+    'Inappropriate language',
+    'Inappropriate language',
+    'Inappropriate language',
+    'Inappropriate language',
+    'Inappropriate language',
+    'Inappropriate language',
+    'Inappropriate language',
+    'Inappropriate language',
+    'Inappropriate language',
+    'Inappropriate language',
+    'Potential threat/violence',
+    'Potential threat/violence',
+    'Potential threat/violence',
+    'Potential spam',
+    'Potential spam'
+  ];
+
+  v_context_words := ARRAY[
+    'assessment',
+    'class',
+    'assume',
+    'bass',
+    'pass',
+    'mass',
+    'assistance',
+    'associate',
+    'assassin',
+    'cockpit',
+    'cocktail',
+    'peacock',
+    'hancock',
+    'scunthorpe',
+    'dickens',
+    'dickerson'
+  ];
+
+  v_has_context := EXISTS (
+    SELECT 1 FROM unnest(v_context_words) AS w
+    WHERE p_content ILIKE '%' || w || '%'
+  );
+
+  FOR i IN 1..array_length(v_patterns, 1) LOOP
+    v_pattern := v_patterns[i];
+    v_reason := v_reasons[i];
+    v_match := substring(p_content from v_pattern);
+
+    IF v_match IS NULL THEN
+      CONTINUE;
+    END IF;
+
+    IF v_has_context THEN
+      IF EXISTS (
+        SELECT 1 FROM unnest(v_context_words) AS w
+        WHERE position(lower(w) in lower(v_match)) > 0
+           OR position(lower(v_match) in lower(w)) > 0
+      ) THEN
+        CONTINUE;
+      END IF;
+    END IF;
+
+    IF NOT (v_reason = ANY(v_result)) THEN
+      v_result := array_append(v_result, v_reason);
+    END IF;
+  END LOOP;
+
+  IF p_content ~ '[A-Z\\s!]{50,}' THEN
+    IF NOT ('Excessive caps' = ANY(v_result)) THEN
+      v_result := array_append(v_result, 'Excessive caps');
+    END IF;
+  END IF;
+
+  RETURN v_result;
+END;
+$$;
+
+-- Flag reasons for threads (title + content)
+CREATE OR REPLACE FUNCTION public.get_thread_flag_reasons(p_title TEXT, p_content TEXT)
+RETURNS TEXT[]
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+STABLE
+AS $$
+DECLARE
+  v_title_reasons TEXT[] := public.get_flag_reasons(p_title);
+  v_content_reasons TEXT[] := public.get_flag_reasons(p_content);
+  v_combined TEXT[];
+BEGIN
+  v_combined := array(
+    SELECT DISTINCT unnest(
+      COALESCE(v_title_reasons, ARRAY[]::TEXT[])
+      || COALESCE(v_content_reasons, ARRAY[]::TEXT[])
+    )
+  );
+
+  RETURN COALESCE(v_combined, ARRAY[]::TEXT[]);
+END;
+$$;
+
 
 -- =============================================================================
 -- 1. USER PROFILES
@@ -150,7 +295,16 @@ DECLARE
   v_final_username TEXT;
   v_pandakeeper_id UUID;
   v_welcome_message TEXT;
+  v_attempts INTEGER := 0;
 BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  IF auth.uid() <> p_user_id THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   -- Check if profile already exists
   IF EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = p_user_id) THEN
     SELECT up.username INTO v_final_username FROM user_profiles up WHERE up.id = p_user_id;
@@ -161,9 +315,19 @@ BEGIN
   -- Use provided username or generate fallback
   v_final_username := COALESCE(p_username, 'Panda' || lpad(floor(random() * 10000)::text, 4, '0'));
 
-  -- Check for username collision, append UUID fragment if needed
-  IF EXISTS (SELECT 1 FROM user_profiles WHERE LOWER(username) = LOWER(v_final_username)) THEN
-    v_final_username := v_final_username || substr(p_user_id::text, 1, 4);
+  -- Validate provided username or find a valid fallback
+  IF p_username IS NOT NULL THEN
+    IF NOT public.is_username_available(v_final_username) THEN
+      RAISE EXCEPTION 'Username not available';
+    END IF;
+  ELSE
+    WHILE NOT public.is_username_available(v_final_username) LOOP
+      v_attempts := v_attempts + 1;
+      IF v_attempts > 10 THEN
+        RAISE EXCEPTION 'Failed to generate a unique username';
+      END IF;
+      v_final_username := 'Panda' || lpad(floor(random() * 10000)::text, 4, '0');
+    END LOOP;
   END IF;
 
   -- Insert the new user profile
@@ -200,6 +364,9 @@ If you have questions or suggestions, just whisper back. Happy foraging!';
   RETURN QUERY SELECT TRUE, v_final_username, 'Profile created'::TEXT;
 END;
 $$;
+
+REVOKE EXECUTE ON FUNCTION create_user_profile(UUID, TEXT, TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION create_user_profile(UUID, TEXT, TEXT, TEXT) TO authenticated;
 
 -- RLS policy to allow authenticated users to insert their own profile
 CREATE POLICY "Users can insert own profile" ON user_profiles
@@ -305,7 +472,7 @@ ALTER TABLE forum_posts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Anyone can view non-deleted posts" ON forum_posts
   FOR SELECT USING (
     COALESCE(is_deleted, FALSE) = FALSE
-    OR EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
+    OR public.check_is_admin()
   );
 
 CREATE POLICY "Non-blocked users can create posts" ON forum_posts
@@ -508,7 +675,7 @@ ALTER TABLE post_votes ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Admins can view votes" ON post_votes
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
+    public.check_is_admin()
   );
 
 CREATE POLICY "Non-blocked users can vote" ON post_votes
@@ -1192,7 +1359,30 @@ RETURNS TABLE (
 LANGUAGE sql SECURITY DEFINER SET search_path = public
 STABLE
 AS $$
-  SELECT up.id, up.username, up.avatar_url, up.avatar_path, up.is_private
+  SELECT
+    up.id,
+    CASE
+      WHEN COALESCE(up.is_private, FALSE)
+        AND auth.uid() IS DISTINCT FROM up.id
+        AND NOT public.check_is_admin()
+      THEN NULL
+      ELSE up.username
+    END AS username,
+    CASE
+      WHEN COALESCE(up.is_private, FALSE)
+        AND auth.uid() IS DISTINCT FROM up.id
+        AND NOT public.check_is_admin()
+      THEN NULL
+      ELSE up.avatar_url
+    END AS avatar_url,
+    CASE
+      WHEN COALESCE(up.is_private, FALSE)
+        AND auth.uid() IS DISTINCT FROM up.id
+        AND NOT public.check_is_admin()
+      THEN NULL
+      ELSE up.avatar_path
+    END AS avatar_path,
+    COALESCE(up.is_private, FALSE) AS is_private
   FROM user_profiles up
   WHERE up.id = p_user_id;
 $$;
@@ -1479,19 +1669,40 @@ AS $$
 DECLARE
   v_thread_id INTEGER;
   v_post_id INTEGER;
+  v_flag_reasons TEXT[];
 BEGIN
   IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
     RAISE EXCEPTION 'Permission denied';
   END IF;
 
+  v_flag_reasons := public.get_thread_flag_reasons(p_title, p_content);
+
   -- Create thread
   INSERT INTO forum_threads (title, category_id, author_id, is_flagged, flag_reason)
-  VALUES (p_title, p_category_id, auth.uid(), p_is_flagged, p_flag_reason)
+  VALUES (
+    p_title,
+    p_category_id,
+    auth.uid(),
+    array_length(v_flag_reasons, 1) > 0,
+    CASE
+      WHEN array_length(v_flag_reasons, 1) > 0 THEN array_to_string(v_flag_reasons, ', ')
+      ELSE NULL
+    END
+  )
   RETURNING id INTO v_thread_id;
 
   -- Create first post (OP)
   INSERT INTO forum_posts (thread_id, author_id, content, is_flagged, flag_reason)
-  VALUES (v_thread_id, auth.uid(), p_content, p_is_flagged, p_flag_reason)
+  VALUES (
+    v_thread_id,
+    auth.uid(),
+    p_content,
+    array_length(v_flag_reasons, 1) > 0,
+    CASE
+      WHEN array_length(v_flag_reasons, 1) > 0 THEN array_to_string(v_flag_reasons, ', ')
+      ELSE NULL
+    END
+  )
   RETURNING id INTO v_post_id;
 
   -- Auto-upvote own post
@@ -1511,7 +1722,8 @@ CREATE OR REPLACE FUNCTION get_paginated_forum_threads(
   p_author_username TEXT DEFAULT NULL,
   p_search_text TEXT DEFAULT NULL,
   p_flagged_only BOOLEAN DEFAULT FALSE,
-  p_deleted_only BOOLEAN DEFAULT FALSE
+  p_deleted_only BOOLEAN DEFAULT FALSE,
+  p_public_only BOOLEAN DEFAULT FALSE
 )
 RETURNS TABLE (
   id INTEGER,
@@ -1534,12 +1746,18 @@ AS $$
 DECLARE
   v_is_admin BOOLEAN;
   v_total BIGINT;
+  v_flagged_only BOOLEAN := p_flagged_only;
+  v_deleted_only BOOLEAN := p_deleted_only;
 BEGIN
   IF auth.uid() IS NOT NULL AND NOT public.is_not_blocked() THEN
     RAISE EXCEPTION 'Permission denied';
   END IF;
 
   v_is_admin := public.check_is_admin();
+  IF p_public_only OR NOT v_is_admin THEN
+    v_flagged_only := FALSE;
+    v_deleted_only := FALSE;
+  END IF;
 
   -- Count total matching threads
   SELECT COUNT(*) INTO v_total
@@ -1549,8 +1767,8 @@ BEGIN
   WHERE (p_category_ids IS NULL OR t.category_id = ANY(p_category_ids))
     AND (p_author_username IS NULL OR LOWER(u.username) = LOWER(p_author_username))
     AND (p_search_text IS NULL OR t.search_document @@ websearch_to_tsquery('simple', p_search_text))
-    AND (NOT p_flagged_only OR t.is_flagged = TRUE OR op.is_flagged = TRUE)
-    AND (NOT p_deleted_only OR op.is_deleted = TRUE)
+    AND (NOT v_flagged_only OR t.is_flagged = TRUE OR op.is_flagged = TRUE)
+    AND (NOT v_deleted_only OR op.is_deleted = TRUE)
     AND (v_is_admin OR COALESCE(op.is_deleted, FALSE) = FALSE
          OR EXISTS (SELECT 1 FROM forum_posts r WHERE r.thread_id = t.id AND r.parent_id IS NOT NULL AND COALESCE(r.is_deleted, FALSE) = FALSE));
 
@@ -1578,8 +1796,8 @@ BEGIN
     WHERE (p_category_ids IS NULL OR t.category_id = ANY(p_category_ids))
       AND (p_author_username IS NULL OR LOWER(u.username) = LOWER(p_author_username))
       AND (p_search_text IS NULL OR t.search_document @@ websearch_to_tsquery('simple', p_search_text))
-      AND (NOT p_flagged_only OR t.is_flagged = TRUE OR op.is_flagged = TRUE)
-      AND (NOT p_deleted_only OR op.is_deleted = TRUE)
+      AND (NOT v_flagged_only OR t.is_flagged = TRUE OR op.is_flagged = TRUE)
+      AND (NOT v_deleted_only OR op.is_deleted = TRUE)
       AND (v_is_admin OR COALESCE(op.is_deleted, FALSE) = FALSE
            OR EXISTS (SELECT 1 FROM forum_posts r WHERE r.thread_id = t.id AND r.parent_id IS NOT NULL AND COALESCE(r.is_deleted, FALSE) = FALSE))
   ) sub
@@ -1670,13 +1888,26 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_post_id INTEGER;
+  v_flag_reasons TEXT[];
 BEGIN
   IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
     RAISE EXCEPTION 'Permission denied';
   END IF;
 
+  v_flag_reasons := public.get_flag_reasons(p_content);
+
   INSERT INTO forum_posts (thread_id, parent_id, author_id, content, is_flagged, flag_reason)
-  VALUES (p_thread_id, p_parent_id, auth.uid(), p_content, p_is_flagged, p_flag_reason)
+  VALUES (
+    p_thread_id,
+    p_parent_id,
+    auth.uid(),
+    p_content,
+    array_length(v_flag_reasons, 1) > 0,
+    CASE
+      WHEN array_length(v_flag_reasons, 1) > 0 THEN array_to_string(v_flag_reasons, ', ')
+      ELSE NULL
+    END
+  )
   RETURNING id INTO v_post_id;
 
   -- Auto-upvote own post
@@ -1849,7 +2080,7 @@ BEGIN
     p.edited_at,
     COALESCE(p.likes, 0) AS likes,
     COALESCE(p.dislikes, 0) AS dislikes,
-    (SELECT pv.vote_type FROM post_votes pv WHERE pv.post_id = p.id AND pv.user_id = auth.uid()) AS user_vote,
+    pv.vote_type AS user_vote,
     COALESCE(p.reply_count, 0) AS reply_count,
     p.is_flagged,
     p.flag_reason,
@@ -1860,6 +2091,7 @@ BEGIN
     v_total AS total_count
   FROM forum_posts p
   JOIN user_profiles u ON u.id = p.author_id
+  LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = auth.uid()
   WHERE p.id = v_op_id;
 
   -- Then, return paginated replies to the OP (marked with is_op = FALSE)
@@ -1879,7 +2111,7 @@ BEGIN
       p.edited_at,
     COALESCE(p.likes, 0) AS likes,
     COALESCE(p.dislikes, 0) AS dislikes,
-      (SELECT pv.vote_type FROM post_votes pv WHERE pv.post_id = p.id AND pv.user_id = auth.uid()) AS user_vote,
+      pv.vote_type AS user_vote,
       COALESCE(p.reply_count, 0) AS reply_count,
       p.is_flagged,
       p.flag_reason,
@@ -1890,6 +2122,7 @@ BEGIN
       v_total AS total_count
     FROM forum_posts p
     JOIN user_profiles u ON u.id = p.author_id
+    LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = auth.uid()
     WHERE p.thread_id = p_thread_id
       AND p.parent_id = v_op_id
       AND (v_is_admin OR COALESCE(p.is_deleted, FALSE) = FALSE)
@@ -2017,20 +2250,22 @@ BEGIN
     RAISE EXCEPTION 'Permission denied';
   END IF;
 
-  SELECT vote_type INTO v_existing_vote FROM post_votes WHERE post_id = p_post_id AND user_id = auth.uid();
+  SELECT vote_type INTO v_existing_vote
+  FROM post_votes
+  WHERE post_id = p_post_id AND user_id = auth.uid()
+  FOR UPDATE;
 
   IF p_vote_type = 0 THEN
     -- Remove vote
     DELETE FROM post_votes WHERE post_id = p_post_id AND user_id = auth.uid();
-  ELSIF v_existing_vote IS NULL THEN
-    -- New vote
-    INSERT INTO post_votes (post_id, user_id, vote_type) VALUES (p_post_id, auth.uid(), p_vote_type);
   ELSIF v_existing_vote = p_vote_type THEN
     -- Same vote, remove it
     DELETE FROM post_votes WHERE post_id = p_post_id AND user_id = auth.uid();
   ELSE
-    -- Change vote
-    UPDATE post_votes SET vote_type = p_vote_type WHERE post_id = p_post_id AND user_id = auth.uid();
+    -- Insert or update vote
+    INSERT INTO post_votes (post_id, user_id, vote_type)
+    VALUES (p_post_id, auth.uid(), p_vote_type)
+    ON CONFLICT (post_id, user_id) DO UPDATE SET vote_type = EXCLUDED.vote_type;
   END IF;
 
   RETURN QUERY
@@ -3219,6 +3454,19 @@ BEGIN
   RETURN v_count;
 END;
 $$;
+
+-- =============================================================================
+-- RPC EXECUTE PERMISSIONS (explicit allowlist)
+-- =============================================================================
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
+
+GRANT EXECUTE ON FUNCTION get_public_user_profile(UUID) TO anon;
+GRANT EXECUTE ON FUNCTION get_public_user_stats(UUID) TO anon;
+GRANT EXECUTE ON FUNCTION get_paginated_forum_threads(INTEGER[], INTEGER, INTEGER, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN, BOOLEAN) TO anon;
+GRANT EXECUTE ON FUNCTION get_thread_view(INTEGER, INTEGER, INTEGER, TEXT) TO anon;
+GRANT EXECUTE ON FUNCTION get_post_by_id(INTEGER) TO anon;
+GRANT EXECUTE ON FUNCTION get_poll_data(INTEGER) TO anon;
 
 
 -- =============================================================================

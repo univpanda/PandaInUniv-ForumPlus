@@ -64,7 +64,7 @@ export const AuthButton = memo(function AuthButton() {
     )
   }
 
-  const displayName = profile?.username || null
+  const displayName = profile?.username ?? (profile?.is_private ? 'Private Panda' : null)
   const avatarUrl = getAvatarUrl(
     profile?.avatar_url || null,
     displayName || user.email || 'User',

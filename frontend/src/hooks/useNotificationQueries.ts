@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { STALE_TIME, POLL_INTERVAL, PAGE_SIZE } from '../utils/constants'
-import { getPollingInterval } from '../utils/polling'
+import { getPollingIntervalSafe } from '../utils/polling'
 import type { Notification } from '../types'
 
 // Query key factory for notifications
@@ -25,11 +25,11 @@ export function useNotificationCount(userId: string | null) {
     },
     enabled: !!userId,
     staleTime: STALE_TIME.SHORT,
-    refetchInterval: (query) => {
+    refetchInterval: (dataOrQuery, maybeQuery) => {
       if (typeof document !== 'undefined' && document.hidden) {
         return false
       }
-      return getPollingInterval(POLL_INTERVAL.NOTIFICATIONS, query.state.fetchFailureCount)
+      return getPollingIntervalSafe(POLL_INTERVAL.NOTIFICATIONS, dataOrQuery, maybeQuery)
     },
     refetchIntervalInBackground: false,
   })

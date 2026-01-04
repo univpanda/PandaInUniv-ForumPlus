@@ -1,6 +1,5 @@
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { checkContent } from '../utils/contentModeration'
 import { STALE_TIME, PAGE_SIZE } from '../utils/constants'
 import { getCachedThreadView, invalidateThreadCache, invalidateThreadsCache, isCacheEnabled } from '../lib/cacheApi'
 import { extractPaginatedResponse } from '../utils/queryHelpers'
@@ -283,15 +282,10 @@ export function useAddReply() {
 
   return useMutation<number, Error, AddReplyVariables, { previousData: Map<string, unknown> }>({
     mutationFn: async ({ threadId, content, parentId }): Promise<number> => {
-      // Check content for inappropriate words
-      const flagCheck = checkContent(content)
-
       const { data, error } = await supabase.rpc('add_reply', {
         p_thread_id: threadId,
         p_content: content,
         p_parent_id: parentId,
-        p_is_flagged: flagCheck.isFlagged,
-        p_flag_reason: flagCheck.isFlagged ? flagCheck.reasons.join(', ') : null,
       })
       if (error) throw error
       return data as number // Returns the new post ID

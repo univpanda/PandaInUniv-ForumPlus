@@ -10,3 +10,19 @@ export function getPollingInterval(baseMs: number, failureCount: number): number
 
   return Math.max(1000, Math.round(jittered))
 }
+
+export function getPollingIntervalSafe(
+  baseMs: number,
+  queryOrData?: unknown,
+  maybeQuery?: { state?: { fetchFailureCount?: number } }
+): number {
+  const query =
+    maybeQuery && typeof maybeQuery === 'object'
+      ? maybeQuery
+      : queryOrData && typeof queryOrData === 'object' && 'state' in (queryOrData as object)
+        ? (queryOrData as { state?: { fetchFailureCount?: number } })
+        : null
+  const failureCount = query?.state?.fetchFailureCount ?? 0
+
+  return getPollingInterval(baseMs, failureCount)
+}
