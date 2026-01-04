@@ -64,6 +64,10 @@
   --spacing-xl: 1.5rem;
   --spacing-2xl: 2rem;
 
+  /* Layout */
+  --sidebar-width: 220px;
+  --mobile-header-height: 64px;
+
   /* Transitions */
   --transition-fast: all 0.15s;
   --transition-normal: all 0.2s;

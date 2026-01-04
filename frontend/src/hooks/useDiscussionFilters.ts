@@ -9,7 +9,7 @@ export type SearchMode = 'threads' | 'posts'
 
 export function useDiscussionFilters() {
   // Sort state
-  const [sortBy, setSortBy] = useState<SortBy>('recent')
+  const [sortBy, setSortBy] = useState<SortBy>('popular')
   const [replySortBy, setReplySortBy] = useState<ReplySortBy>('popular')
 
   // Search state

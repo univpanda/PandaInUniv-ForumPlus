@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { LogIn, EyeOff } from 'lucide-react'
 import { useDiscussionPage } from '../hooks/useDiscussionPage'
 import { DiscussionProvider } from '../contexts/DiscussionContext'
@@ -19,9 +19,11 @@ import {
   PostsSearchView,
   BookmarkedPostsView,
 } from '../components/discussion'
+import { useClickOutside } from '../hooks/useClickOutside'
 
 interface DiscussionProps {
   resetToList?: number
+  isActive?: boolean
   initialSearch?: {
     searchQuery: string
   } | null
@@ -36,6 +38,7 @@ interface DiscussionProps {
 
 export function Discussion({
   resetToList,
+  isActive = true,
   initialSearch,
   onInitialSearchConsumed,
   initialNavigation,
@@ -75,6 +78,12 @@ export function Discussion({
       onInitialSearchConsumed?.()
     }
   }, [initialSearch, onInitialSearchConsumed, goToList, setSearchQuery])
+
+  useEffect(() => {
+    if (resetToList) {
+      setSearchQuery('')
+    }
+  }, [resetToList, setSearchQuery])
 
   // Handle direct navigation to a specific post (from notifications)
   useEffect(() => {
@@ -218,6 +227,37 @@ export function Discussion({
     ]
   )
 
+  const newThreadComposerRef = useRef<HTMLDivElement | null>(null)
+
+  useClickOutside(
+    newThreadComposerRef,
+    () => {
+      if (threadForm.showNewThread) {
+        threadForm.setShowNewThread(false)
+      }
+    },
+    threadForm.showNewThread
+  )
+
+  useEffect(() => {
+    if (!isActive && threadForm.showNewThread) {
+      threadForm.setShowNewThread(false)
+    }
+  }, [isActive, threadForm.showNewThread, threadForm.setShowNewThread])
+
+  useEffect(() => {
+    if (!threadForm.showNewThread) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        threadForm.setShowNewThread(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [threadForm.showNewThread, threadForm.setShowNewThread])
+
   return (
     <div className="discussion-container no-sidebar">
       {/* Modals */}
@@ -252,35 +292,47 @@ export function Discussion({
           view={nav.view}
           threadTitle={nav.selectedThread?.title}
           onGoToThreadFromTitle={nav.goToThreadFromTitle}
+          onGoToList={nav.goToList}
           sortBy={sort.sortBy}
           onSortChange={sort.handleSortChange}
           searchQuery={search.searchQuery}
           onSearchQueryChange={search.setSearchQuery}
           isAdmin={auth.isAdmin}
           user={auth.user}
-          showNewThread={threadForm.showNewThread}
-          onToggleNewThread={() => threadForm.setShowNewThread(!threadForm.showNewThread)}
           pageSizeInput={data.pageSizeControl.pageSizeInput}
           onPageSizeInputChange={data.pageSizeControl.setPageSizeInput}
           onPageSizeBlur={data.pageSizeControl.handlePageSizeBlur}
         />
 
-        {/* New Thread Form */}
-        {threadForm.showNewThread && (
-          <NewThreadForm
-            title={threadForm.newThreadTitle}
-            content={threadForm.newThreadContent}
-            submitting={status.submitting}
-            onTitleChange={threadForm.setNewThreadTitle}
-            onContentChange={threadForm.setNewThreadContent}
-            onSubmit={threadForm.createThread}
-            isPollEnabled={threadForm.isPollEnabled}
-            onPollToggle={threadForm.setIsPollEnabled}
-            pollOptions={threadForm.pollOptions}
-            onPollOptionsChange={threadForm.setPollOptions}
-            pollSettings={threadForm.pollSettings}
-            onPollSettingsChange={threadForm.setPollSettings}
-          />
+        {/* New Thread Composer */}
+        {auth.user && nav.view === 'list' && (
+          <div className="new-thread-composer" ref={newThreadComposerRef}>
+            {!threadForm.showNewThread && (
+              <button
+                type="button"
+                className="new-thread-collapsed"
+                onClick={() => threadForm.setShowNewThread(true)}
+              >
+                Take a bite...
+              </button>
+            )}
+            {threadForm.showNewThread && (
+              <NewThreadForm
+                title={threadForm.newThreadTitle}
+                content={threadForm.newThreadContent}
+                submitting={status.submitting}
+                onTitleChange={threadForm.setNewThreadTitle}
+                onContentChange={threadForm.setNewThreadContent}
+                onSubmit={threadForm.createThread}
+                isPollEnabled={threadForm.isPollEnabled}
+                onPollToggle={threadForm.setIsPollEnabled}
+                pollOptions={threadForm.pollOptions}
+                onPollOptionsChange={threadForm.setPollOptions}
+                pollSettings={threadForm.pollSettings}
+                onPollSettingsChange={threadForm.setPollSettings}
+              />
+            )}
+          </div>
         )}
 
         {/* Loading - only show spinner for initial load (no data yet) */}

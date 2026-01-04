@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Search, X, Info } from 'lucide-react'
 import { SEARCH_HELP_TEXT } from '../../utils/search'
 
@@ -24,9 +24,13 @@ export function SearchInput({
   helpText = SEARCH_HELP_TEXT,
 }: SearchInputProps) {
   const [showTooltip, setShowTooltip] = useState(false)
+  const inputRef = useRef<HTMLInputElement | null>(null)
 
   return (
-    <div className={`search-box ${className}`}>
+    <div
+      className={`search-box ${className}`}
+      onClick={() => inputRef.current?.focus()}
+    >
       <Search size={iconSize} aria-hidden="true" />
       <input
         type="text"
@@ -34,9 +38,17 @@ export function SearchInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label={ariaLabel || placeholder}
+        ref={inputRef}
       />
       {value && (
-        <button className="clear-search" onClick={() => onChange('')} aria-label="Clear search">
+        <button
+          className="clear-search"
+          onClick={() => {
+            onChange('')
+            inputRef.current?.blur()
+          }}
+          aria-label="Clear search"
+        >
           <X size={14} aria-hidden="true" />
         </button>
       )}

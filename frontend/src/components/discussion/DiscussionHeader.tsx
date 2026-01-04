@@ -1,5 +1,6 @@
-import { memo, useMemo } from 'react'
-import { X } from 'lucide-react'
+import { memo, useMemo, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { ChevronDown } from 'lucide-react'
 import { SearchInput } from '../ui'
 import { getSearchHelpText } from '../../utils/search'
 import type { SortBy } from '../../hooks/useDiscussionFilters'
@@ -9,6 +10,7 @@ interface DiscussionHeaderProps {
   view: 'list' | 'thread' | 'replies'
   threadTitle?: string
   onGoToThreadFromTitle?: () => void
+  onGoToList?: () => void
 
   // Sort
   sortBy: SortBy
@@ -23,8 +25,6 @@ interface DiscussionHeaderProps {
 
   // User actions
   user: { id: string } | null
-  showNewThread: boolean
-  onToggleNewThread: () => void
 
   // Page size control
   pageSizeInput: string
@@ -36,14 +36,13 @@ export const DiscussionHeader = memo(function DiscussionHeader({
   view,
   threadTitle,
   onGoToThreadFromTitle,
+  onGoToList,
   sortBy,
   onSortChange,
   searchQuery,
   onSearchQueryChange,
   isAdmin,
   user,
-  showNewThread,
-  onToggleNewThread,
   pageSizeInput,
   onPageSizeInputChange,
   onPageSizeBlur,
@@ -54,76 +53,97 @@ export const DiscussionHeader = memo(function DiscussionHeader({
     [user, isAdmin]
   )
 
-  return (
-    <div className="discussion-header">
-      {view !== 'list' && threadTitle && (
-        <h2 className="thread-title-clickable" onClick={onGoToThreadFromTitle}>
-          {threadTitle}
-        </h2>
-      )}
+  const ensureListView = () => {
+    if (view !== 'list') {
+      onGoToList?.()
+    }
+  }
 
-      {view === 'list' && (
-        <div className="sort-options">
-          <button
-            className={`sort-btn ${sortBy === 'popular' ? 'active' : ''}`}
-            onClick={() => onSortChange('popular')}
+  const [utilityRoot, setUtilityRoot] = useState<HTMLElement | null>(null)
+
+  useEffect(() => {
+    setUtilityRoot(document.getElementById('header-utilities'))
+  }, [])
+
+  const utilities = (
+    <div className={`discussion-utilities ${searchQuery ? 'search-expanded' : ''}`}>
+      <div className="discussion-utility discussion-utility-sort">
+        <div className="sort-options sort-select-container">
+          <select
+            className="sort-select"
+            value={sortBy}
+            onChange={(e) => {
+              ensureListView()
+              onSortChange(e.target.value as SortBy)
+            }}
+            aria-label="Sort threads"
           >
-            Popular
-          </button>
-          <button
-            className={`sort-btn ${sortBy === 'recent' ? 'active' : ''}`}
-            onClick={() => onSortChange('recent')}
-          >
-            Recent
-          </button>
-          <button
-            className={`sort-btn ${sortBy === 'new' ? 'active' : ''}`}
-            onClick={() => onSortChange('new')}
-          >
-            New
-          </button>
+            <option value="popular">Popular</option>
+            <option value="recent">Recent</option>
+            <option value="new">New</option>
+          </select>
+          <ChevronDown className="sort-select-icon" size={16} aria-hidden="true" />
         </div>
-      )}
-
-      {view === 'list' && (
-        <div className="header-actions">
-          <SearchInput
-            value={searchQuery}
-            onChange={onSearchQueryChange}
-            placeholder="Forage..."
-            iconSize={16}
-            showHelp
-            helpText={searchHelpText}
+      </div>
+      <div className="discussion-utility discussion-utility-search">
+        <SearchInput
+          value={searchQuery}
+          onChange={(value) => {
+            ensureListView()
+            onSearchQueryChange(value)
+          }}
+          placeholder="Forage for discussions..."
+          className={`header-search ${searchQuery ? 'has-value' : ''}`}
+          iconSize={16}
+          showHelp
+          helpText={searchHelpText}
+        />
+      </div>
+      <div className="discussion-utility discussion-utility-actions">
+        {isAdmin && (
+          <input
+            type="number"
+            min="1"
+            max="500"
+            className="page-size-input"
+            value={pageSizeInput}
+            onChange={(e) => {
+              ensureListView()
+              onPageSizeInputChange(e.target.value)
+            }}
+            onBlur={onPageSizeBlur}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                onPageSizeBlur()
+                e.currentTarget.blur()
+              }
+            }}
+            title="Items per page"
           />
-          {isAdmin && (
-            <input
-              type="number"
-              min="1"
-              max="500"
-              className="page-size-input"
-              value={pageSizeInput}
-              onChange={(e) => onPageSizeInputChange(e.target.value)}
-              onBlur={onPageSizeBlur}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  onPageSizeBlur()
-                  e.currentTarget.blur()
-                }
-              }}
-              title="Items per page"
-            />
-          )}
-          {user && (
-            <button
-              className={`new-thread-btn ${showNewThread ? 'cancel' : ''}`}
-              onClick={onToggleNewThread}
-            >
-              {showNewThread && <X size={18} />}
-              <span className="btn-text">{showNewThread ? 'Nah' : 'Chomp'}</span>
-            </button>
+        )}
+      </div>
+    </div>
+  )
+
+  const utilityPortal = utilityRoot && utilities
+    ? createPortal(utilities, utilityRoot)
+    : null
+
+  const showInlineUtilities = !utilityRoot
+
+  return (
+    <>
+      {utilityPortal}
+      {(view !== 'list' || showInlineUtilities) && (
+        <div className="discussion-header">
+          {showInlineUtilities && utilities}
+          {view !== 'list' && threadTitle && (
+            <h2 className="thread-title-clickable" onClick={onGoToThreadFromTitle}>
+              {threadTitle}
+            </h2>
           )}
         </div>
       )}
-    </div>
+    </>
   )
 })

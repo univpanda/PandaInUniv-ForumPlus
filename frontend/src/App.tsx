@@ -20,6 +20,7 @@ import { usePrefetchUserData } from './hooks/usePrefetchUserData'
 import type { StartChatEvent } from './components/UserNameHover'
 import type { SearchDiscussionEvent } from './components/AuthButton'
 import type { Notification } from './types'
+import { TreePine, Users, MessagesSquare, User, Bell } from 'lucide-react'
 import './styles/index.css'
 
 // Configure React Query to use page visibility for focus detection
@@ -235,21 +236,60 @@ function AppContent() {
     setShowTerms(false)
   }, [])
 
+  const tabsNav = (className: string) => (
+    <nav className={`side-tabs ${className} ${showTerms ? 'hidden' : ''}`}>
+      <button
+        className={`side-tab ${activeTab === 'discussion' ? 'active' : ''}`}
+        onClick={handleDiscussionClick}
+      >
+        <TreePine size={18} />
+        <span className="side-tab-label">Grove</span>
+      </button>
+      {user && (
+        <button
+          className={`side-tab ${activeTab === 'notifications' ? 'active' : ''}`}
+          onClick={handleNotificationsClick}
+        >
+          <Bell size={18} />
+          <span className="side-tab-label">Alerts</span>
+          {notificationCount > 0 && <span className="side-tab-badge">{notificationCount}</span>}
+        </button>
+      )}
+      {user && (
+        <button
+          className={`side-tab ${activeTab === 'chat' ? 'active' : ''}`}
+          onClick={handleChatClick}
+        >
+          <MessagesSquare size={18} />
+          <span className="side-tab-label">Den</span>
+          {chatUnread > 0 && <span className="side-tab-badge">{chatUnread}</span>}
+        </button>
+      )}
+      {isAdmin && (
+        <button
+          className={`side-tab ${activeTab === 'users' ? 'active' : ''}`}
+          onClick={() => setActiveTab('users')}
+          onMouseEnter={handleUsersHover}
+        >
+          <Users size={18} />
+          <span className="side-tab-label">Pandas</span>
+        </button>
+      )}
+      {user && (
+        <button
+          className={`side-tab ${activeTab === 'profile' ? 'active' : ''}`}
+          onClick={() => setActiveTab('profile')}
+        >
+          <User size={18} />
+          <span className="side-tab-label">Profile</span>
+        </button>
+      )}
+    </nav>
+  )
+
   return (
     <div className="app">
-      <Header
-        activeTab={effectiveTab}
-        onTabChange={setActiveTab}
-        user={user}
-        isAdmin={isAdmin}
-        chatUnread={chatUnread || 0}
-        notificationCount={notificationCount || 0}
-        showTerms={showTerms}
-        onDiscussionClick={handleDiscussionClick}
-        onChatClick={handleChatClick}
-        onNotificationsClick={handleNotificationsClick}
-        onUsersHover={handleUsersHover}
-      />
+      <Header />
 
       {/* Auth error banner */}
       {authError && (
@@ -261,64 +301,72 @@ function AppContent() {
         />
       )}
 
-      {/* Only mount tabs when they've been visited - prioritizes active tab's network requests */}
-      {shouldMountTab('discussion') && (
-        <div className={`tab-content ${effectiveTab !== 'discussion' || showTerms ? 'hidden' : ''}`}>
-          <ErrorBoundary fallbackMessage="Failed to load grove. Please try again.">
-            <Discussion
-              resetToList={discussionResetKey > 0 ? discussionResetKey : undefined}
-              initialSearch={initialDiscussionSearch}
-              onInitialSearchConsumed={clearInitialDiscussionSearch}
-              initialNavigation={initialDiscussionNavigation}
-              onInitialNavigationConsumed={clearInitialDiscussionNavigation}
-            />
-          </ErrorBoundary>
-        </div>
-      )}
+      <div className="app-body">
+        {tabsNav('side-tabs-desktop')}
 
-      {user && shouldMountTab('chat') && (
-        <div className={`tab-content ${effectiveTab !== 'chat' || showTerms ? 'hidden' : ''}`}>
-          <ErrorBoundary fallbackMessage="Failed to load chat. Please try again.">
-            <Chat
-              initialPartner={initialChatPartner}
-              onInitialPartnerConsumed={clearInitialChatPartner}
-              resetToList={chatResetKey > 0 ? chatResetKey : undefined}
-            />
-          </ErrorBoundary>
-        </div>
-      )}
+        <div className="app-content">
+          {/* Only mount tabs when they've been visited - prioritizes active tab's network requests */}
+          {shouldMountTab('discussion') && (
+            <div className={`tab-content ${effectiveTab !== 'discussion' || showTerms ? 'hidden' : ''}`}>
+              <ErrorBoundary fallbackMessage="Failed to load grove. Please try again.">
+                <Discussion
+                  resetToList={discussionResetKey > 0 ? discussionResetKey : undefined}
+                  isActive={effectiveTab === 'discussion' && !showTerms}
+                  initialSearch={initialDiscussionSearch}
+                  onInitialSearchConsumed={clearInitialDiscussionSearch}
+                  initialNavigation={initialDiscussionNavigation}
+                  onInitialNavigationConsumed={clearInitialDiscussionNavigation}
+                />
+              </ErrorBoundary>
+            </div>
+          )}
 
-      {isAdmin && shouldMountTab('users') && (
-        <div className={`tab-content ${effectiveTab !== 'users' || showTerms ? 'hidden' : ''}`}>
-          <ErrorBoundary fallbackMessage="Failed to load user management. Please try again.">
-            <UserManagement
-              isActive={effectiveTab === 'users' && !showTerms}
-            />
-          </ErrorBoundary>
-        </div>
-      )}
+          {user && shouldMountTab('chat') && (
+            <div className={`tab-content ${effectiveTab !== 'chat' || showTerms ? 'hidden' : ''}`}>
+              <ErrorBoundary fallbackMessage="Failed to load chat. Please try again.">
+                <Chat
+                  initialPartner={initialChatPartner}
+                  onInitialPartnerConsumed={clearInitialChatPartner}
+                  resetToList={chatResetKey > 0 ? chatResetKey : undefined}
+                />
+              </ErrorBoundary>
+            </div>
+          )}
 
-      {user && shouldMountTab('profile') && (
-        <div className={`tab-content ${effectiveTab !== 'profile' || showTerms ? 'hidden' : ''}`}>
-          <ErrorBoundary fallbackMessage="Failed to load profile. Please try again.">
-            <Profile />
-          </ErrorBoundary>
-        </div>
-      )}
+          {isAdmin && shouldMountTab('users') && (
+            <div className={`tab-content ${effectiveTab !== 'users' || showTerms ? 'hidden' : ''}`}>
+              <ErrorBoundary fallbackMessage="Failed to load user management. Please try again.">
+                <UserManagement
+                  isActive={effectiveTab === 'users' && !showTerms}
+                />
+              </ErrorBoundary>
+            </div>
+          )}
 
-      {user && shouldMountTab('notifications') && (
-        <div className={`tab-content ${effectiveTab !== 'notifications' || showTerms ? 'hidden' : ''}`}>
-          <ErrorBoundary fallbackMessage="Failed to load notifications. Please try again.">
-            <Notifications onNavigateToPost={handleNavigateToPost} />
-          </ErrorBoundary>
-        </div>
-      )}
+          {user && shouldMountTab('profile') && (
+            <div className={`tab-content ${effectiveTab !== 'profile' || showTerms ? 'hidden' : ''}`}>
+              <ErrorBoundary fallbackMessage="Failed to load profile. Please try again.">
+                <Profile />
+              </ErrorBoundary>
+            </div>
+          )}
 
-      {showTerms && (
-        <div className="tab-content">
-          <Terms onBack={() => setShowTerms(false)} />
+          {user && shouldMountTab('notifications') && (
+            <div className={`tab-content ${effectiveTab !== 'notifications' || showTerms ? 'hidden' : ''}`}>
+              <ErrorBoundary fallbackMessage="Failed to load notifications. Please try again.">
+                <Notifications onNavigateToPost={handleNavigateToPost} />
+              </ErrorBoundary>
+            </div>
+          )}
+
+          {showTerms && (
+            <div className="tab-content">
+              <Terms onBack={() => setShowTerms(false)} />
+            </div>
+          )}
+
         </div>
-      )}
+      </div>
 
       <Footer showTerms={showTerms} onShowTerms={() => setShowTerms(true)} />
     </div>
