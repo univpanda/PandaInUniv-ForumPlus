@@ -45,6 +45,7 @@ export const PostCardHeader = memo(function PostCardHeader({
           userId={post.author_id}
           username={post.author_name}
           avatar={post.author_avatar}
+          avatarPath={post.author_avatar_path}
           currentUserId={user?.id || null}
           className="author-name"
         />

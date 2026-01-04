@@ -88,6 +88,7 @@ function AppContent() {
     id: string
     username: string
     avatar: string | null
+    avatarPath?: string | null
   } | null>(null)
   const [initialDiscussionSearch, setInitialDiscussionSearch] = useState<{
     searchQuery: string
@@ -126,8 +127,8 @@ function AppContent() {
   // Listen for chat start events from username hover
   const handleStartChatEvent = useCallback((e: Event) => {
     const customEvent = e as CustomEvent<StartChatEvent>
-    const { userId, username, avatar } = customEvent.detail
-    setInitialChatPartner({ id: userId, username, avatar })
+    const { userId, username, avatar, avatarPath } = customEvent.detail
+    setInitialChatPartner({ id: userId, username, avatar, avatarPath })
     setActiveTab('chat')
     setShowTerms(false)
   }, [])

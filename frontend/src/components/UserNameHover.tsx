@@ -5,6 +5,7 @@ interface UserNameHoverProps {
   userId: string
   username: string
   avatar: string | null
+  avatarPath?: string | null
   currentUserId: string | null
   className?: string
 }
@@ -14,12 +15,14 @@ export interface StartChatEvent {
   userId: string
   username: string
   avatar: string | null
+  avatarPath?: string | null
 }
 
 export const UserNameHover = memo(function UserNameHover({
   userId,
   username,
   avatar,
+  avatarPath,
   currentUserId,
   className = '',
 }: UserNameHoverProps) {
@@ -54,7 +57,7 @@ export const UserNameHover = memo(function UserNameHover({
 
     // Dispatch custom event to trigger chat
     const event = new CustomEvent('startChatWithUser', {
-      detail: { userId, username, avatar } as StartChatEvent,
+      detail: { userId, username, avatar, avatarPath } as StartChatEvent,
     })
     window.dispatchEvent(event)
     setShowPopup(false)

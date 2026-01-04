@@ -76,7 +76,6 @@ export function useThreadView(
     queryKey: forumKeys.threadView(threadId, page, sort),
     queryFn: async (): Promise<ThreadViewResponse> => {
       let rows: Array<Post & { is_op: boolean; total_count: number }> = []
-      let usedCache = false
 
       if (!isAdmin && isCacheEnabled()) {
         const cached = await getCachedThreadView(
@@ -87,7 +86,6 @@ export function useThreadView(
         )
         if (cached) {
           rows = cached as Array<Post & { is_op: boolean; total_count: number }>
-          usedCache = true
         }
       }
 

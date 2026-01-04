@@ -1,6 +1,7 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { STALE_TIME, POLL_INTERVAL, PAGE_SIZE } from '../utils/constants'
+import { getPollingInterval } from '../utils/polling'
 import type {
   ChatMessage,
   UserConversation,
@@ -25,9 +26,9 @@ export const chatKeys = {
  * Hook to fetch user's conversations list
  */
 export function useConversations(userId: string | null, options?: { enabled?: boolean }) {
-  return useQuery({
+  return useQuery<UserConversation[], Error>({
     queryKey: chatKeys.conversations(userId || ''),
-    queryFn: async () => {
+    queryFn: async (): Promise<UserConversation[]> => {
       if (!userId) return []
 
       const { data, error } = await supabase.rpc('get_user_conversations', {
@@ -39,7 +40,12 @@ export function useConversations(userId: string | null, options?: { enabled?: bo
     },
     enabled: !!userId && options?.enabled !== false,
     staleTime: STALE_TIME.MEDIUM,
-    refetchInterval: POLL_INTERVAL.NOTIFICATIONS,
+    refetchInterval: (query) => {
+      if (typeof document !== 'undefined' && document.hidden) {
+        return false
+      }
+      return getPollingInterval(POLL_INTERVAL.NOTIFICATIONS, query.state.fetchFailureCount)
+    },
     refetchIntervalInBackground: false,
   })
 }
@@ -69,7 +75,7 @@ export function useConversationMessages(
   options?: { enabled?: boolean }
 ) {
   return useInfiniteQuery({
-    queryKey: chatKeys.messagesInfinite(userId || '', partnerId || '') as const,
+    queryKey: chatKeys.messagesInfinite(userId || '', partnerId || ''),
     queryFn: async ({ pageParam }) => {
       if (!userId || !partnerId) return { messages: [], nextCursor: null, hasMore: false }
 
@@ -115,7 +121,12 @@ export function useUnreadMessageCount(userId: string | null, options?: { enabled
     },
     enabled: !!userId && options?.enabled !== false,
     staleTime: STALE_TIME.SHORT,
-    refetchInterval: POLL_INTERVAL.NOTIFICATIONS,
+    refetchInterval: (query) => {
+      if (typeof document !== 'undefined' && document.hidden) {
+        return false
+      }
+      return getPollingInterval(POLL_INTERVAL.NOTIFICATIONS, query.state.fetchFailureCount)
+    },
     refetchIntervalInBackground: false,
   })
 }

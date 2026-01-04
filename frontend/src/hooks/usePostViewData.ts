@@ -5,7 +5,8 @@ import { PAGE_SIZE } from '../utils/constants'
 import { isPostStub, isFullPost } from '../types'
 import type { View, SelectedThread, SelectedPost } from './useDiscussionNavigation'
 import type { ReplySortBy } from './useDiscussionFilters'
-import type { Post, AuthorPost, GetPaginatedPostsResponse, ThreadViewResponse } from '../types'
+import type { Post, AuthorPost, GetPaginatedPostsResponse } from '../types'
+import type { ThreadViewResponse } from './usePostQueries'
 
 interface UsePostViewDataProps {
   view: View
@@ -215,7 +216,7 @@ export function usePostViewData({
           const threadView = data as ThreadViewResponse
           const opMatch = threadView.originalPost?.id === targetId ? threadView.originalPost : undefined
           if (opMatch) return opMatch
-          return threadView.replies.find((p) => p.id === targetId)
+          return threadView.replies.find((p: Post) => p.id === targetId)
         }
       }
       return undefined

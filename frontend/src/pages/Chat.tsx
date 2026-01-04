@@ -6,7 +6,7 @@ import { AlertBanner } from '../components/ui'
 import { ChatConversationList, ChatConversation } from '../components/chat'
 
 interface ChatProps {
-  initialPartner?: { id: string; username: string; avatar: string | null } | null
+  initialPartner?: { id: string; username: string; avatar: string | null; avatarPath?: string | null } | null
   onInitialPartnerConsumed?: () => void
   resetToList?: number
 }
@@ -83,7 +83,7 @@ export function Chat({ initialPartner, onInitialPartnerConsumed, resetToList }: 
   // Handle initial partner from Discussion username hover
   useEffect(() => {
     if (initialPartner && user) {
-      startNewChat(initialPartner.id, initialPartner.username, initialPartner.avatar)
+      startNewChat(initialPartner.id, initialPartner.username, initialPartner.avatar, initialPartner.avatarPath)
       onInitialPartnerConsumed?.()
     }
   }, [initialPartner, user, startNewChat, onInitialPartnerConsumed])
