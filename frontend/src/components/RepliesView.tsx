@@ -19,7 +19,8 @@ export function RepliesView() {
     submitting,
     subRepliesPagination,
   } = useDiscussionView()
-  const { onReplyContentChange, onAddReply, onReplySortChange, onGoToThread } = useDiscussionViewActions()
+  const { onReplyContentChange, onAddReply, onReplySortChange, onGoToThread } =
+    useDiscussionViewActions()
 
   if (!thread || !originalPost || !selectedPost) return null
 
@@ -65,18 +66,6 @@ export function RepliesView() {
         onSortChange={onReplySortChange}
         show={sortedSubReplies.length > 1}
       />
-
-      {/* Top Pagination */}
-      {subRepliesPagination && subRepliesPagination.totalPages > 1 && (
-        <Pagination
-          currentPage={subRepliesPagination.page}
-          totalPages={subRepliesPagination.totalPages}
-          onPageChange={subRepliesPagination.setPage}
-          totalItems={subRepliesPagination.totalCount}
-          itemsPerPage={subRepliesPagination.pageSize}
-          itemName="replies"
-        />
-      )}
 
       {sortedSubReplies.length === 0 ? (
         <p className="no-replies">No replies yet</p>

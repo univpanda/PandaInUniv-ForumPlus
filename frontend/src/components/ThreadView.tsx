@@ -32,10 +32,7 @@ export function ThreadView() {
   } = useDiscussionViewActions()
 
   // Memoized handlers to prevent breaking PostCard's memo()
-  const handlePostClick = useCallback(
-    (post: Post) => onOpenReplies(post),
-    [onOpenReplies]
-  )
+  const handlePostClick = useCallback((post: Post) => onOpenReplies(post), [onOpenReplies])
 
   const handleReplyClick = useCallback(
     (post: Post, e: React.MouseEvent) => onToggleReplyToPost(post, e),
@@ -81,18 +78,6 @@ export function ThreadView() {
         show={replies.length > 1}
       />
 
-      {/* Top Pagination */}
-      {repliesPagination && repliesPagination.totalPages > 1 && (
-        <Pagination
-          currentPage={repliesPagination.page}
-          totalPages={repliesPagination.totalPages}
-          onPageChange={repliesPagination.setPage}
-          totalItems={repliesPagination.totalCount}
-          itemsPerPage={repliesPagination.pageSize}
-          itemName="replies"
-        />
-      )}
-
       {replies.length === 0 ? (
         <p className="no-replies">No replies yet</p>
       ) : (
@@ -131,17 +116,6 @@ export function ThreadView() {
           totalItems={repliesPagination.totalCount}
           itemsPerPage={repliesPagination.pageSize}
           itemName="replies"
-        />
-      )}
-
-      {/* Bottom Reply Input */}
-      {user && replies.length > 0 && (
-        <ReplyInput
-          value={replyContent}
-          onChange={onReplyContentChange}
-          onSubmit={() => onAddReply(thread.id, originalPost?.id ?? null)}
-          placeholder="Write a reply..."
-          submitting={submitting}
         />
       )}
     </div>

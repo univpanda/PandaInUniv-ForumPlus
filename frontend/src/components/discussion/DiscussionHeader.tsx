@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react'
-import { X } from 'lucide-react'
+import { X, Plus } from 'lucide-react'
 import { SearchInput } from '../ui'
 import { getSearchHelpText } from '../../utils/search'
 import type { SortBy } from '../../hooks/useDiscussionFilters'
@@ -7,8 +7,6 @@ import type { SortBy } from '../../hooks/useDiscussionFilters'
 interface DiscussionHeaderProps {
   // Navigation
   view: 'list' | 'thread' | 'replies'
-  threadTitle?: string
-  onGoToThreadFromTitle?: () => void
 
   // Sort
   sortBy: SortBy
@@ -34,8 +32,6 @@ interface DiscussionHeaderProps {
 
 export const DiscussionHeader = memo(function DiscussionHeader({
   view,
-  threadTitle,
-  onGoToThreadFromTitle,
   sortBy,
   onSortChange,
   searchQuery,
@@ -49,19 +45,10 @@ export const DiscussionHeader = memo(function DiscussionHeader({
   onPageSizeBlur,
 }: DiscussionHeaderProps) {
   // Get appropriate help text based on user status
-  const searchHelpText = useMemo(
-    () => getSearchHelpText(!!user, isAdmin),
-    [user, isAdmin]
-  )
+  const searchHelpText = useMemo(() => getSearchHelpText(!!user, isAdmin), [user, isAdmin])
 
   return (
     <div className="discussion-header">
-      {view !== 'list' && threadTitle && (
-        <h2 className="thread-title-clickable" onClick={onGoToThreadFromTitle}>
-          {threadTitle}
-        </h2>
-      )}
-
       {view === 'list' && (
         <div className="sort-options">
           <button
@@ -118,7 +105,7 @@ export const DiscussionHeader = memo(function DiscussionHeader({
               className={`new-thread-btn ${showNewThread ? 'cancel' : ''}`}
               onClick={onToggleNewThread}
             >
-              {showNewThread && <X size={18} />}
+              {showNewThread ? <X size={18} /> : <Plus size={18} />}
               <span className="btn-text">{showNewThread ? 'Nah' : 'Chomp'}</span>
             </button>
           )}

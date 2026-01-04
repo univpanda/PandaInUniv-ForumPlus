@@ -27,16 +27,20 @@ export function useDiscussionPage({ resetToList }: UseDiscussionPageProps) {
   // Only allow @username filtering for logged-in users
   // @deleted and @flagged only work for admins
   const { authorUsername, searchText, isDeleted, isFlagged, postType } = useMemo(() => {
-    if (!filters.deferredSearchQuery.trim()) {
-      return { authorUsername: null, searchText: null, isDeleted: false, isFlagged: false, postType: 'all' as const }
+    if (!filters.debouncedSearchQuery.trim()) {
+      return {
+        authorUsername: null,
+        searchText: null,
+        isDeleted: false,
+        isFlagged: false,
+        postType: 'all' as const,
+      }
     }
 
     if (!user) {
       // Non-logged-in users can't use @username filters; drop leading @token.
       const raw = filters.deferredSearchQuery.trim()
-      const sanitized = raw.startsWith('@')
-        ? raw.replace(/^@\S+\s*/, '').trim()
-        : raw
+      const sanitized = raw.startsWith('@') ? raw.replace(/^@\S+\s*/, '').trim() : raw
       return {
         authorUsername: null,
         searchText: sanitized || null,
@@ -55,7 +59,13 @@ export function useDiscussionPage({ resetToList }: UseDiscussionPageProps) {
       isFlagged: isAdmin && filters.parsedSearch.isFlagged,
       postType: filters.parsedSearch.postType,
     }
-  }, [user, isAdmin, filters.deferredSearchQuery, filters.parsedSearch])
+  }, [
+    user,
+    isAdmin,
+    filters.debouncedSearchQuery,
+    filters.deferredSearchQuery,
+    filters.parsedSearch,
+  ])
 
   // Privacy check is now done server-side in get_posts_by_author
   // The backend returns is_private=true if searching a private user
@@ -164,7 +174,7 @@ export function useDiscussionPage({ resetToList }: UseDiscussionPageProps) {
   const search = {
     searchQuery: filters.searchQuery,
     setSearchQuery: filters.setSearchQuery,
-    deferredSearchQuery: filters.deferredSearchQuery,
+    debouncedSearchQuery: filters.debouncedSearchQuery,
     searchMode: filters.searchMode,
     setSearchMode: filters.setSearchMode,
   }

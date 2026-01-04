@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import { ArrowLeft, Loader2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useDeleteOwnAccount } from '../hooks/useAccountActions'
 
-interface TermsProps {
-  onBack: () => void
-}
-
-export function Terms({ onBack }: TermsProps) {
+export function Terms() {
   const { user, signOut } = useAuth()
+  const navigate = useNavigate()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const deleteAccountMutation = useDeleteOwnAccount()
 
@@ -17,7 +15,7 @@ export function Terms({ onBack }: TermsProps) {
       onSuccess: async () => {
         await signOut()
         setShowDeleteConfirm(false)
-        onBack()
+        navigate('/')
       },
       onError: (error) => {
         alert(`Failed to delete account: ${error.message}`)
@@ -30,7 +28,7 @@ export function Terms({ onBack }: TermsProps) {
 
   return (
     <div className="terms-page">
-      <button className="back-button" onClick={onBack}>
+      <button className="back-button" onClick={() => navigate(-1)}>
         <ArrowLeft size={18} />
         Back
       </button>

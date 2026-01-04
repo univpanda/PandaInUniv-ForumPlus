@@ -250,8 +250,6 @@ export function Discussion({
         {/* Header */}
         <DiscussionHeader
           view={nav.view}
-          threadTitle={nav.selectedThread?.title}
-          onGoToThreadFromTitle={nav.goToThreadFromTitle}
           sortBy={sort.sortBy}
           onSortChange={sort.handleSortChange}
           searchQuery={search.searchQuery}

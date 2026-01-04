@@ -22,18 +22,6 @@ export function ThreadListView({
 }: ThreadListViewProps) {
   return (
     <>
-      {/* Top Pagination */}
-      {threadsPagination.totalPages > 1 && (
-        <Pagination
-          currentPage={threadsPagination.page}
-          totalPages={threadsPagination.totalPages}
-          onPageChange={threadsPagination.setPage}
-          totalItems={threadsPagination.totalCount}
-          itemsPerPage={threadsPagination.pageSize}
-          itemName="threads"
-        />
-      )}
-
       <ThreadList
         threads={threads}
         bookmarks={bookmarks}

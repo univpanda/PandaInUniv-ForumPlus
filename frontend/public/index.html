@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#1a6985" />
+    <meta
+      name="description"
+      content="PandainUniv - Track PhD placement data and compare university outcomes"
+    />
+
+    <!-- Add social media meta tags for better sharing -->
+    <meta property="og:title" content="PandainUniv - PhD Placement Tracker" />
+    <meta
+      property="og:description"
+      content="Compare and analyze PhD placement outcomes across universities"
+    />
+    <meta property="og:type" content="website" />
+
+    <!-- Add Apple-specific meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+
+    <!-- Preload critical fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;900&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Poppins:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Google Analytics - Only loaded when tracking ID is set -->
+    <script>
+      if (
+        "%REACT_APP_GOOGLE_ANALYTICS_ID%" &&
+        "%REACT_APP_GOOGLE_ANALYTICS_ID%" !== ""
+      ) {
+        // Load Google Analytics script
+        var script = document.createElement("script");
+        script.async = true;
+        script.src =
+          "https://www.googletagmanager.com/gtag/js?id=%REACT_APP_GOOGLE_ANALYTICS_ID%";
+        document.head.appendChild(script);
+
+        // Initialize Google Analytics
+        window.dataLayer = window.dataLayer || [];
+        function gtag() {
+          dataLayer.push(arguments);
+        }
+        gtag("js", new Date());
+        gtag("config", "%REACT_APP_GOOGLE_ANALYTICS_ID%");
+      }
+    </script>
+    <!-- Add cache control headers -->
+    <meta http-equiv="Cache-Control" content="max-age=86400" />
+
+    <title>PandainUniv - PhD Placement</title>
+  </head>
+  <body>
+    <!-- End Google Tag Manager (noscript) -->
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>

@@ -14,10 +14,9 @@ export interface ParsedSearchQuery {
 
 /**
  * Extract search terms from text, handling quoted phrases
- * "hello world" foo bar -> ["hello world", "foo", "bar"]
- * Handles unclosed quotes gracefully: "cute panda -> ["cute panda"]
+ * "hello world" foo bar -> [{term: "hello world", quoted: true}, {term: "foo", quoted: false}, {term: "bar", quoted: false}]
  */
-function extractSearchTerms(text: string): string[] {
+function extractSearchTerms(text: string): { term: string; quoted: boolean }[] {
   // Count quotes - if odd number, add closing quote at end
   const quoteCount = (text.match(/"/g) || []).length
   let processedText = text
@@ -25,21 +24,37 @@ function extractSearchTerms(text: string): string[] {
     processedText = text + '"'
   }
 
-  const terms: string[] = []
+  const terms: { term: string; quoted: boolean }[] = []
   // Match: "quoted phrase" OR regular word
   const regex = /"([^"]*)"|(\S+)/g
   let match
 
   while ((match = regex.exec(processedText)) !== null) {
     // match[1] = quoted phrase content, match[2] = unquoted word
-    const term = match[1] !== undefined ? match[1] : match[2]
-
-    if (term && term.trim()) {
-      terms.push(term.toLowerCase().trim())
+    if (match[1] !== undefined) {
+      if (match[1].trim()) {
+        terms.push({ term: match[1].toLowerCase().trim(), quoted: true })
+      }
+    } else if (match[2]) {
+      if (match[2].trim()) {
+        terms.push({ term: match[2].toLowerCase().trim(), quoted: false })
+      }
     }
   }
 
   return terms
+}
+
+/**
+ * Format search text for backend FTS
+ * Unquoted terms get :* suffix for partial matching
+ * Terms are joined by & for AND behavior
+ */
+function formatSearchText(terms: { term: string; quoted: boolean }[]): string | null {
+  if (terms.length === 0) return null
+  return terms
+    .map((t) => (t.quoted ? `"${t.term}"` : `${t.term}:*`))
+    .join(' & ')
 }
 
 // Base result with all flags false
@@ -130,8 +145,9 @@ export function parseSearchQuery(query: string): ParsedSearchQuery {
 
     // If we consumed at least one known filter, return the result
     if (isBookmarked || isDeleted || isFlagged || postType !== 'all') {
-      const terms = remaining ? extractSearchTerms(remaining) : []
-      const searchText = terms.length > 0 ? terms.join(' ') : null
+      const termObjects = remaining ? extractSearchTerms(remaining) : []
+      const terms = termObjects.map(t => t.term)
+      const searchText = formatSearchText(termObjects)
 
       return {
         ...emptyResult,
@@ -192,8 +208,9 @@ export function parseSearchQuery(query: string): ParsedSearchQuery {
         }
       }
 
-      const terms = textAfterFlags ? extractSearchTerms(textAfterFlags) : []
-      const searchText = terms.length > 0 ? terms.join(' ') : null
+      const termObjects = textAfterFlags ? extractSearchTerms(textAfterFlags) : []
+      const terms = termObjects.map(t => t.term)
+      const searchText = formatSearchText(termObjects)
 
       return {
         ...emptyResult,
@@ -208,8 +225,10 @@ export function parseSearchQuery(query: string): ParsedSearchQuery {
   }
 
   // Regular text search - extract terms (words and quoted phrases)
-  const terms = extractSearchTerms(trimmed)
-  const searchText = terms.length > 0 ? terms.join(' ') : null
+  const termObjects = extractSearchTerms(trimmed)
+  const terms = termObjects.map(t => t.term)
+  const searchText = formatSearchText(termObjects)
+  
   return {
     ...emptyResult,
     searchTerms: terms,

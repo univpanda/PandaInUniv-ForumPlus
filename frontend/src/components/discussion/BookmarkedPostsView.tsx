@@ -30,18 +30,6 @@ export function BookmarkedPostsView({
 }: BookmarkedPostsViewProps) {
   return (
     <div className="author-posts-list">
-      {/* Top Pagination */}
-      {pagination.totalPages > 1 && (
-        <Pagination
-          currentPage={pagination.page}
-          totalPages={pagination.totalPages}
-          onPageChange={pagination.setPage}
-          totalItems={pagination.totalCount}
-          itemsPerPage={pagination.pageSize}
-          itemName="bookmarked posts"
-        />
-      )}
-
       {!posts || posts.length === 0 ? (
         <EmptyState
           icon={Bookmark}

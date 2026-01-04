@@ -167,6 +167,11 @@ export const PostCard = memo(function PostCard({
       style={handleClick ? { cursor: 'pointer' } : undefined}
       data-post-id={post.id}
     >
+      {/* Thread Title (for original posts) */}
+      {isOriginal && threadTitle && (
+        <h2 className="post-card-title">{threadTitle}</h2>
+      )}
+
       {/* Post Header */}
       <PostCardHeader
         post={post}

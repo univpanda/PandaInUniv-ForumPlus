@@ -1,5 +1,18 @@
 /* Responsive */
+/* Mobile responsive styles */
+@media (max-width: 1024px) {
+  /* Sidebar collapses to icon-only view */
+  .main-content {
+    margin-left: 80px;
+  }
+}
+
 @media (max-width: 768px) {
+  /* Hide sidebar on mobile, use bottom nav instead */
+  .main-content {
+    margin-left: 0;
+  }
+
   .header-content {
     flex-direction: column;
     gap: 1rem;
@@ -69,4 +82,3 @@
     padding: 0.625rem;
   }
 }
-

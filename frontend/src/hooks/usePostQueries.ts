@@ -99,6 +99,7 @@ export function useThreadView(
           p_sort: sort,
         })
         if (error) throw error
+        console.log('get_thread_view result:', { threadId, count: data?.length, firstRow: data?.[0] })
         rows = (data ?? []) as Array<Post & { is_op: boolean; total_count: number }>
       }
 
@@ -133,8 +134,8 @@ export function useThreadView(
           // If overlay fails, fall back to base data
         }
       }
-      const opRow = rows.find((r) => r.is_op)
-      const replyRows = rows.filter((r) => !r.is_op)
+      const opRow = rows.find((r) => r.is_op || r.parent_id === null)
+      const replyRows = rows.filter((r) => r.id !== opRow?.id)
       const totalCount = rows[0]?.total_count ?? 0
 
       // Convert to Post type (remove is_op and total_count fields)

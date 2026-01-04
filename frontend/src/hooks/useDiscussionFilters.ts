@@ -1,4 +1,4 @@
-import { useState, useCallback, useDeferredValue, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import type { ThreadSortBy } from './useForumQueries'
 import { parseSearchQuery } from '../utils/search'
 
@@ -14,11 +14,20 @@ export function useDiscussionFilters() {
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
-  const deferredSearchQuery = useDeferredValue(searchQuery)
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery)
   const [searchMode, setSearchMode] = useState<SearchMode>('threads')
 
+  // Debounce search query to prevent excessive API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+    }, 250)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
   // Parse search query to detect @bookmarked
-  const parsedSearch = useMemo(() => parseSearchQuery(deferredSearchQuery), [deferredSearchQuery])
+  const parsedSearch = useMemo(() => parseSearchQuery(debouncedSearchQuery), [debouncedSearchQuery])
 
   // Derived state - bookmarks view is now triggered by @bookmarked in search
   const isBookmarksView = parsedSearch.isBookmarked
@@ -47,7 +56,7 @@ export function useDiscussionFilters() {
     // Search state
     searchQuery,
     setSearchQuery,
-    deferredSearchQuery,
+    debouncedSearchQuery,
     searchMode,
     setSearchMode,
 

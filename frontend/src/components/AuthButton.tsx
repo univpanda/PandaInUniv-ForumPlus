@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, memo } from 'react'
 import { LogIn, LogOut, User, ChevronDown, Loader2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useUserProfile } from '../hooks/useUserProfile'
 import { useClickOutside } from '../hooks/useClickOutside'
@@ -14,6 +15,7 @@ export interface SearchDiscussionEvent {
 export const AuthButton = memo(function AuthButton() {
   const { user, loading, signInWithGoogle, signOut } = useAuth()
   const { data: profile } = useUserProfile(user?.id ?? null)
+  const navigate = useNavigate()
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [signingIn, setSigningIn] = useState(false)
@@ -43,6 +45,11 @@ export const AuthButton = memo(function AuthButton() {
     await signOut()
     cleanOAuthHash()
   }, [signOut])
+
+  const handleProfileClick = useCallback(() => {
+    setDropdownOpen(false)
+    navigate('/profile')
+  }, [navigate])
 
   if (loading) {
     return (
@@ -94,6 +101,10 @@ export const AuthButton = memo(function AuthButton() {
 
       {dropdownOpen && (
         <div className="auth-menu">
+          <button className="auth-menu-item" onClick={handleProfileClick}>
+            <User size={16} />
+            <span>Profile</span>
+          </button>
           <button className="auth-menu-item" onClick={handleSignOut}>
             <LogOut size={16} />
             <span>Sign out</span>

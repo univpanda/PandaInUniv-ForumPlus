@@ -110,7 +110,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Unified function to handle user session - prevents duplicate calls
   const handleUserSession = useCallback(
-    async (newSession: Session | null, isActive: () => boolean, isInitialLoad: boolean = false): Promise<boolean> => {
+    async (
+      newSession: Session | null,
+      isActive: () => boolean,
+      isInitialLoad: boolean = false
+    ): Promise<boolean> => {
       if (!newSession?.user) {
         if (isActive()) {
           clearLocalAuthCache()
@@ -344,9 +348,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user, session, loading, isAdmin, authError, signInWithGoogle, signOut, clearAuthError]
   )
 
-  return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
 }
