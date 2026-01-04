@@ -10,6 +10,7 @@ interface ChatInputProps {
   onSend: () => void
   sending: boolean
   placeholder?: string
+  autoFocus?: boolean
 }
 
 export function ChatInput({
@@ -18,8 +19,15 @@ export function ChatInput({
   onSend,
   sending,
   placeholder = 'Type your message...',
+  autoFocus = false,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (autoFocus) {
+      textareaRef.current?.focus()
+    }
+  }, [autoFocus])
 
   // Auto-resize textarea based on content
   useEffect(() => {
@@ -46,14 +54,18 @@ export function ChatInput({
   }
 
   return (
-    <div className="chat-input-container">
+    <div
+      className="chat-input-container"
+      onClick={() => {
+        textareaRef.current?.focus()
+      }}
+    >
       <textarea
         ref={textareaRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        disabled={sending}
         style={{ minHeight: MIN_HEIGHT, maxHeight: MAX_HEIGHT }}
       />
       <button

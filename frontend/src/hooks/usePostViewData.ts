@@ -191,7 +191,7 @@ export function usePostViewData({
     if (cachedOp) {
       return { originalPost: cachedOp, replies: [] }
     }
-    const rootPosts = cachedRootPosts ?? threadRootPostsQuery.data ?? []
+    const rootPosts = cachedRootPosts ?? threadRootPostsQuery.data?.posts ?? []
     const original = rootPosts.find((p) => p.parent_id === null)
     return { originalPost: original, replies: [] }
   }, [view, threadViewQuery.data, cachedOp, cachedRootPosts, threadRootPostsQuery.data])

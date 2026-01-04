@@ -34,8 +34,8 @@ LANGUAGE sql SECURITY DEFINER SET search_path = public
 STABLE
 AS $$
   SELECT NOT EXISTS (
-    SELECT 1 FROM public.user_profiles
-    WHERE id = auth.uid() AND is_blocked = true
+    SELECT 1 FROM public.user_profiles up
+    WHERE up.id = auth.uid() AND up.is_blocked = true
   );
 $$;
 
@@ -93,10 +93,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS user_profiles_username_lower_idx
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 
 -- Users can view own profile; admins can view all
+-- NOTE: Uses check_is_admin() function instead of EXISTS subquery to avoid infinite recursion
+-- (the policy cannot reference user_profiles itself)
 CREATE POLICY "Users can view own profile" ON user_profiles
   FOR SELECT USING (
-    auth.uid() = id
-    OR EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
+    auth.uid() = user_profiles.id OR public.check_is_admin()
   );
 
 -- Create user profile (called from app after successful auth)
@@ -997,27 +998,27 @@ ALTER TABLE feedback_messages ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view their conversations" ON feedback_messages
   FOR SELECT TO authenticated
   USING (
-    user_id = auth.uid()
-    OR recipient_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
+    feedback_messages.user_id = auth.uid()
+    OR feedback_messages.recipient_id = auth.uid()
+    OR public.check_is_admin()
   );
 
 CREATE POLICY "Non-blocked users can send messages" ON feedback_messages
   FOR INSERT TO authenticated
   WITH CHECK (
-    user_id = auth.uid()
+    feedback_messages.user_id = auth.uid()
     AND public.is_not_blocked()
   );
 
 CREATE POLICY "Recipients can mark messages as read" ON feedback_messages
   FOR UPDATE TO authenticated
   USING (
-    recipient_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
+    feedback_messages.recipient_id = auth.uid()
+    OR public.check_is_admin()
   )
   WITH CHECK (
-    recipient_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
+    feedback_messages.recipient_id = auth.uid()
+    OR public.check_is_admin()
   );
 
 
@@ -1196,32 +1197,29 @@ AS $$
   WHERE up.id = p_user_id;
 $$;
 
--- Check username availability (case-insensitive + reserved words)
-CREATE OR REPLACE FUNCTION is_username_available(p_username TEXT)
-RETURNS BOOLEAN
+-- Get public user stats (with privacy check)
+CREATE OR REPLACE FUNCTION get_public_user_stats(p_user_id UUID)
+RETURNS TABLE (
+  is_private BOOLEAN,
+  thread_count BIGINT,
+  post_count BIGINT,
+  upvotes_received BIGINT,
+  downvotes_received BIGINT
+)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
-STABLE
 AS $$
 DECLARE
-  v_lower_username TEXT := LOWER(p_username);
-  v_reserved_usernames TEXT[] := get_reserved_usernames();
+  v_is_private BOOLEAN;
+  v_is_admin BOOLEAN;
+  v_current_user_id UUID;
 BEGIN
-  IF v_lower_username IS NULL OR v_lower_username = '' THEN
-    RETURN FALSE;
-  END IF;
+  v_current_user_id := auth.uid();
 
-  IF v_lower_username = ANY(v_reserved_usernames) THEN
-    RETURN FALSE;
-  END IF;
+  -- Check if target user is private
+  SELECT COALESCE(up.is_private, FALSE) INTO v_is_private
+  FROM user_profiles up WHERE up.id = p_user_id;
 
-  IF v_lower_username LIKE '%moderator%' OR v_lower_username LIKE '%admin%' THEN
-    RETURN FALSE;
-  END IF;
-
-  IF v_lower_username LIKE '%pandakeeper%' AND v_lower_username != 'pandakeeper' THEN
-    RETURN FALSE;
-  END IF;
-
+  -- Check if current user is admin
   v_is_admin := public.check_is_admin(v_current_user_id);
 
   -- If private and not self and not admin, return empty stats with is_private = true
@@ -1248,6 +1246,83 @@ BEGIN
      FROM post_votes pv JOIN forum_posts fp ON pv.post_id = fp.id WHERE fp.author_id = p_user_id);
 END;
 $$;
+
+-- Check username availability (case-insensitive + reserved words)
+CREATE OR REPLACE FUNCTION is_username_available(p_username TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+STABLE
+AS $$
+DECLARE
+  v_lower_username TEXT := LOWER(p_username);
+  v_reserved_usernames TEXT[] := get_reserved_usernames();
+BEGIN
+  IF v_lower_username IS NULL OR v_lower_username = '' THEN
+    RETURN FALSE;
+  END IF;
+
+  IF v_lower_username = ANY(v_reserved_usernames) THEN
+    RETURN FALSE;
+  END IF;
+
+  IF v_lower_username LIKE '%moderator%' OR v_lower_username LIKE '%admin%' THEN
+    RETURN FALSE;
+  END IF;
+
+  IF v_lower_username LIKE '%pandakeeper%' AND v_lower_username != 'pandakeeper' THEN
+    RETURN FALSE;
+  END IF;
+
+  RETURN NOT EXISTS (
+    SELECT 1 FROM user_profiles WHERE LOWER(username) = v_lower_username
+  );
+END;
+$$;
+
+-- Admin-only user role update
+CREATE OR REPLACE FUNCTION set_user_role(p_user_id UUID, p_role TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+  IF NOT public.check_is_admin() THEN
+    RAISE EXCEPTION 'Admin access required';
+  END IF;
+
+  IF p_role NOT IN ('user', 'admin') THEN
+    RAISE EXCEPTION 'Invalid role';
+  END IF;
+
+  UPDATE user_profiles SET role = p_role WHERE id = p_user_id;
+  RETURN TRUE;
+END;
+$$;
+
+-- Admin-only blocked status update
+CREATE OR REPLACE FUNCTION set_user_blocked(p_user_id UUID, p_is_blocked BOOLEAN)
+RETURNS BOOLEAN
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+  IF NOT public.check_is_admin() THEN
+    RAISE EXCEPTION 'Admin access required';
+  END IF;
+
+  UPDATE user_profiles SET is_blocked = p_is_blocked WHERE id = p_user_id;
+  RETURN TRUE;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION get_public_user_profile(UUID) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION get_public_user_stats(UUID) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION get_my_profile_status() TO authenticated;
+GRANT EXECUTE ON FUNCTION update_login_metadata(TIMESTAMPTZ, INET, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_post_votes(INTEGER[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_post_bookmarks(INTEGER[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_post_overlays(INTEGER[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION is_username_available(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION set_user_role(UUID, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION set_user_blocked(UUID, BOOLEAN) TO authenticated;
 
 -- Admin: Get all users with stats (legacy - kept for compatibility)
 CREATE OR REPLACE FUNCTION get_users_with_stats()
@@ -1450,6 +1525,7 @@ RETURNS TABLE (
   reply_count BIGINT,
   total_likes BIGINT,
   total_dislikes BIGINT,
+  has_poll BOOLEAN,
   is_op_deleted BOOLEAN,
   total_count BIGINT
 )
@@ -1493,6 +1569,7 @@ BEGIN
       COALESCE(op.reply_count, 0)::BIGINT AS reply_count,
       COALESCE(op.likes, 0)::BIGINT AS total_likes,
       COALESCE(op.dislikes, 0)::BIGINT AS total_dislikes,
+      EXISTS (SELECT 1 FROM polls pl WHERE pl.thread_id = t.id) AS has_poll,
       COALESCE(op.is_deleted, FALSE) AS is_op_deleted,
       v_total AS total_count
     FROM forum_threads t
@@ -2197,6 +2274,10 @@ BEGIN
   RETURN get_poll_data(v_thread_id);
 END;
 $$;
+
+GRANT EXECUTE ON FUNCTION create_poll_thread(TEXT, TEXT, TEXT[], BOOLEAN, INTEGER, BOOLEAN, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_poll_data(INTEGER) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION vote_poll(INTEGER, INTEGER[]) TO authenticated;
 
 
 -- =============================================================================

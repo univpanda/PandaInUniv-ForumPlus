@@ -58,13 +58,16 @@ export function useChatPageState({ resetToList }: UseChatPageStateOptions = {}) 
     view,
   })
 
+  const { setSearchQuery } = conversationsData
+  const { clearMessage } = messagesData
+
   // Reset search and message form when view changes via resetToList
   useEffect(() => {
     if (resetToList) {
-      conversationsData.setSearchQuery('')
-      messagesData.clearMessage()
+      setSearchQuery('')
+      clearMessage()
     }
-  }, [resetToList, conversationsData, messagesData])
+  }, [resetToList, setSearchQuery, clearMessage])
 
   // ============ Computed Values ============
   const loading =

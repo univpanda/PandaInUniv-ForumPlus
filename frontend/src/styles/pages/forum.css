@@ -975,6 +975,9 @@
 }
 
 /* Markdown content styling */
+.post-content.markdown-content {
+  font-synthesis: style;
+}
 .post-content.markdown-content p {
   margin: 0 0 0.5rem 0;
 }
@@ -987,7 +990,8 @@
   font-weight: 600;
 }
 
-.post-content.markdown-content em {
+.post-content.markdown-content em,
+.post-content.markdown-content i {
   font-style: italic;
 }
 
@@ -1188,6 +1192,7 @@
   border-radius: var(--radius-md);
   font-size: 0.95rem;
   font-family: inherit;
+  font-synthesis: style;
   line-height: 1.5;
   outline: none;
   transition: border-color 0.2s ease;
@@ -1215,7 +1220,8 @@
   font-weight: 600;
 }
 
-.reply-editor em {
+.reply-editor em,
+.reply-editor i {
   font-style: italic;
 }
 
@@ -2035,4 +2041,3 @@
     flex-wrap: wrap;
   }
 }
-

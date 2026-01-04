@@ -138,6 +138,7 @@ export function ChatConversation({
         onSend={onSend}
         sending={sending}
         placeholder={`Message ${partner.username}...`}
+        autoFocus
       />
     </div>
   )

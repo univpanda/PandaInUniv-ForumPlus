@@ -384,6 +384,7 @@ CREATE TRIGGER trigger_update_post_vote_counts_delete
 -- =============================================================================
 
 DROP FUNCTION IF EXISTS get_public_user_profile(UUID);
+DROP FUNCTION IF EXISTS get_public_user_stats(UUID);
 DROP FUNCTION IF EXISTS get_my_profile_status();
 DROP FUNCTION IF EXISTS update_login_metadata(TIMESTAMPTZ, INET, TEXT);
 DROP FUNCTION IF EXISTS get_user_post_votes(INTEGER[]);
@@ -396,6 +397,62 @@ DROP FUNCTION IF EXISTS create_thread(TEXT, INTEGER, TEXT, BOOLEAN, TEXT);
 DROP FUNCTION IF EXISTS add_reply(INTEGER, TEXT, INTEGER, BOOLEAN, TEXT);
 DROP FUNCTION IF EXISTS delete_post(INTEGER);
 DROP FUNCTION IF EXISTS edit_post(INTEGER, TEXT, TEXT);
+
+-- Edit post
+CREATE OR REPLACE FUNCTION edit_post(
+  p_post_id INTEGER,
+  p_content TEXT DEFAULT NULL,
+  p_additional_comments TEXT DEFAULT NULL
+)
+RETURNS TABLE (success BOOLEAN, can_edit_content BOOLEAN, message TEXT)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_post forum_posts%ROWTYPE;
+  v_can_edit_content BOOLEAN;
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
+    RETURN QUERY SELECT FALSE, FALSE, 'Permission denied'::TEXT;
+    RETURN;
+  END IF;
+
+  SELECT * INTO v_post FROM forum_posts WHERE forum_posts.id = p_post_id;
+
+  IF v_post IS NULL THEN
+    RETURN QUERY SELECT FALSE, FALSE, 'Post not found'::TEXT;
+    RETURN;
+  END IF;
+
+  IF v_post.author_id != auth.uid() THEN
+    RETURN QUERY SELECT FALSE, FALSE, 'Permission denied'::TEXT;
+    RETURN;
+  END IF;
+
+  -- Can edit content within 15 minutes
+  v_can_edit_content := (NOW() - v_post.created_at) < INTERVAL '15 minutes';
+
+  IF p_content IS NOT NULL THEN
+    IF NOT v_can_edit_content THEN
+      RETURN QUERY SELECT FALSE, FALSE, 'Content edit window expired (15 minutes)'::TEXT;
+      RETURN;
+    END IF;
+    UPDATE forum_posts SET content = p_content, edited_at = NOW() WHERE forum_posts.id = p_post_id;
+  END IF;
+
+  IF p_additional_comments IS NOT NULL THEN
+    -- Append new comment with timestamp to existing comments
+    UPDATE forum_posts SET additional_comments =
+      CASE
+        WHEN additional_comments IS NULL OR additional_comments = ''
+        THEN '[' || to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') || ']' || p_additional_comments
+        ELSE additional_comments || E'\n' || '[' || to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') || ']' || p_additional_comments
+      END
+    WHERE forum_posts.id = p_post_id;
+  END IF;
+
+  RETURN QUERY SELECT TRUE, v_can_edit_content, 'Post updated'::TEXT;
+END;
+$$;
 DROP FUNCTION IF EXISTS vote_post(INTEGER, INTEGER);
 DROP FUNCTION IF EXISTS toggle_post_flagged(INTEGER);
 DROP FUNCTION IF EXISTS vote_poll(INTEGER, INTEGER[]);
@@ -408,6 +465,8 @@ DROP FUNCTION IF EXISTS get_bookmarked_posts(UUID, INTEGER, INTEGER, TEXT);
 DROP FUNCTION IF EXISTS get_user_bookmark_post_ids(UUID);
 DROP FUNCTION IF EXISTS get_bookmarked_thread_ids(UUID);
 DROP FUNCTION IF EXISTS get_posts_by_author(TEXT, TEXT, INTEGER, INTEGER, BOOLEAN, BOOLEAN, TEXT);
+DROP FUNCTION IF EXISTS get_poll_data(INTEGER);
+DROP FUNCTION IF EXISTS create_poll_thread(TEXT, TEXT, TEXT[], BOOLEAN, INTEGER, BOOLEAN, TEXT);
 DROP FUNCTION IF EXISTS get_users_with_stats();
 DROP FUNCTION IF EXISTS get_users_paginated(INTEGER, INTEGER, TEXT);
 DROP FUNCTION IF EXISTS get_user_conversations(UUID);
@@ -436,6 +495,56 @@ AS $$
   SELECT up.id, up.username, up.avatar_url, up.avatar_path, up.is_private
   FROM user_profiles up
   WHERE up.id = p_user_id;
+$$;
+
+-- Get public user stats (with privacy check)
+CREATE OR REPLACE FUNCTION get_public_user_stats(p_user_id UUID)
+RETURNS TABLE (
+  is_private BOOLEAN,
+  thread_count BIGINT,
+  post_count BIGINT,
+  upvotes_received BIGINT,
+  downvotes_received BIGINT
+)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_is_private BOOLEAN;
+  v_is_admin BOOLEAN;
+  v_current_user_id UUID;
+BEGIN
+  v_current_user_id := auth.uid();
+
+  -- Check if target user is private
+  SELECT COALESCE(up.is_private, FALSE) INTO v_is_private
+  FROM user_profiles up WHERE up.id = p_user_id;
+
+  -- Check if current user is admin
+  v_is_admin := public.check_is_admin(v_current_user_id);
+
+  -- If private and not self and not admin, return empty stats with is_private = true
+  IF v_is_private AND p_user_id != v_current_user_id AND NOT v_is_admin THEN
+    RETURN QUERY SELECT TRUE::BOOLEAN, 0::BIGINT, 0::BIGINT, 0::BIGINT, 0::BIGINT;
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    COALESCE(v_is_private, FALSE),
+    -- Count threads where OP is not deleted
+    (SELECT COUNT(*) FROM forum_threads t
+     JOIN forum_posts op ON op.thread_id = t.id AND op.parent_id IS NULL
+     WHERE t.author_id = p_user_id AND COALESCE(op.is_deleted, false) = false),
+    -- Count replies only (posts with parent_id, not thread OPs)
+    (SELECT COUNT(*) FROM forum_posts
+     WHERE author_id = p_user_id
+     AND parent_id IS NOT NULL
+     AND COALESCE(is_deleted, false) = false),
+    (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = 1 THEN 1 ELSE 0 END), 0)
+     FROM post_votes pv JOIN forum_posts fp ON pv.post_id = fp.id WHERE fp.author_id = p_user_id),
+    (SELECT COALESCE(SUM(CASE WHEN pv.vote_type = -1 THEN 1 ELSE 0 END), 0)
+     FROM post_votes pv JOIN forum_posts fp ON pv.post_id = fp.id WHERE fp.author_id = p_user_id);
+END;
 $$;
 
 -- Get own profile status (role + blocked)
@@ -1133,6 +1242,202 @@ BEGIN
 END;
 $$;
 
+-- Admin-only user role update
+CREATE OR REPLACE FUNCTION set_user_role(p_user_id UUID, p_role TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+  IF NOT public.check_is_admin() THEN
+    RAISE EXCEPTION 'Admin access required';
+  END IF;
+
+  IF p_role NOT IN ('user', 'admin') THEN
+    RAISE EXCEPTION 'Invalid role';
+  END IF;
+
+  UPDATE user_profiles SET role = p_role WHERE id = p_user_id;
+  RETURN TRUE;
+END;
+$$;
+
+-- Admin-only blocked status update
+CREATE OR REPLACE FUNCTION set_user_blocked(p_user_id UUID, p_is_blocked BOOLEAN)
+RETURNS BOOLEAN
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+  IF NOT public.check_is_admin() THEN
+    RAISE EXCEPTION 'Admin access required';
+  END IF;
+
+  UPDATE user_profiles SET is_blocked = p_is_blocked WHERE id = p_user_id;
+  RETURN TRUE;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION get_public_user_profile(UUID) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION get_public_user_stats(UUID) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION get_my_profile_status() TO authenticated;
+GRANT EXECUTE ON FUNCTION update_login_metadata(TIMESTAMPTZ, INET, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_post_votes(INTEGER[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_post_bookmarks(INTEGER[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_post_overlays(INTEGER[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION is_username_available(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION set_user_role(UUID, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION set_user_blocked(UUID, BOOLEAN) TO authenticated;
+
+-- Create thread with first post
+CREATE OR REPLACE FUNCTION create_thread(
+  p_title TEXT,
+  p_category_id INTEGER,
+  p_content TEXT,
+  p_is_flagged BOOLEAN DEFAULT FALSE,
+  p_flag_reason TEXT DEFAULT NULL
+)
+RETURNS INTEGER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_thread_id INTEGER;
+  v_post_id INTEGER;
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
+  -- Create thread
+  INSERT INTO forum_threads (title, category_id, author_id, is_flagged, flag_reason)
+  VALUES (p_title, p_category_id, auth.uid(), p_is_flagged, p_flag_reason)
+  RETURNING id INTO v_thread_id;
+
+  -- Create first post (OP)
+  INSERT INTO forum_posts (thread_id, author_id, content, is_flagged, flag_reason)
+  VALUES (v_thread_id, auth.uid(), p_content, p_is_flagged, p_flag_reason)
+  RETURNING id INTO v_post_id;
+
+  -- Auto-upvote own post
+  INSERT INTO post_votes (post_id, user_id, vote_type)
+  VALUES (v_post_id, auth.uid(), 1);
+
+  RETURN v_thread_id;
+END;
+$$;
+
+-- Add reply to thread
+CREATE OR REPLACE FUNCTION add_reply(
+  p_thread_id INTEGER,
+  p_content TEXT,
+  p_parent_id INTEGER DEFAULT NULL,
+  p_is_flagged BOOLEAN DEFAULT FALSE,
+  p_flag_reason TEXT DEFAULT NULL
+)
+RETURNS INTEGER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_post_id INTEGER;
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
+  INSERT INTO forum_posts (thread_id, parent_id, author_id, content, is_flagged, flag_reason)
+  VALUES (p_thread_id, p_parent_id, auth.uid(), p_content, p_is_flagged, p_flag_reason)
+  RETURNING id INTO v_post_id;
+
+  -- Auto-upvote own post
+  INSERT INTO post_votes (post_id, user_id, vote_type)
+  VALUES (v_post_id, auth.uid(), 1);
+
+  RETURN v_post_id;
+END;
+$$;
+
+-- Delete/undelete post
+CREATE OR REPLACE FUNCTION delete_post(p_post_id INTEGER)
+RETURNS TABLE (success BOOLEAN, message TEXT)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_post forum_posts%ROWTYPE;
+  v_is_admin BOOLEAN;
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
+    RETURN QUERY SELECT FALSE, 'Permission denied'::TEXT;
+    RETURN;
+  END IF;
+
+  SELECT * INTO v_post FROM forum_posts WHERE forum_posts.id = p_post_id;
+
+  IF v_post IS NULL THEN
+    RETURN QUERY SELECT FALSE, 'Post not found'::TEXT;
+    RETURN;
+  END IF;
+
+  v_is_admin := public.check_is_admin();
+
+  -- Check permission: author or admin
+  IF v_post.author_id != auth.uid() AND NOT v_is_admin THEN
+    RETURN QUERY SELECT FALSE, 'Permission denied'::TEXT;
+    RETURN;
+  END IF;
+
+  -- Toggle deletion
+  IF COALESCE(v_post.is_deleted, FALSE) THEN
+    -- Undelete (admin only)
+    IF NOT v_is_admin THEN
+      RETURN QUERY SELECT FALSE, 'Only admins can restore deleted posts'::TEXT;
+      RETURN;
+    END IF;
+    UPDATE forum_posts SET is_deleted = FALSE, deleted_by = NULL WHERE forum_posts.id = p_post_id;
+    RETURN QUERY SELECT TRUE, 'Post restored'::TEXT;
+  ELSE
+    -- Delete
+    UPDATE forum_posts SET is_deleted = TRUE, deleted_by = auth.uid() WHERE forum_posts.id = p_post_id;
+    RETURN QUERY SELECT TRUE, 'Post deleted'::TEXT;
+  END IF;
+END;
+$$;
+
+-- Vote on post
+CREATE OR REPLACE FUNCTION vote_post(p_post_id INTEGER, p_vote_type INTEGER)
+RETURNS TABLE (likes BIGINT, dislikes BIGINT, user_vote INTEGER)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_existing_vote INTEGER;
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_not_blocked() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
+  SELECT vote_type INTO v_existing_vote FROM post_votes WHERE post_id = p_post_id AND user_id = auth.uid();
+
+  IF p_vote_type = 0 THEN
+    -- Remove vote
+    DELETE FROM post_votes WHERE post_id = p_post_id AND user_id = auth.uid();
+  ELSIF v_existing_vote IS NULL THEN
+    -- New vote
+    INSERT INTO post_votes (post_id, user_id, vote_type) VALUES (p_post_id, auth.uid(), p_vote_type);
+  ELSIF v_existing_vote = p_vote_type THEN
+    -- Same vote, remove it
+    DELETE FROM post_votes WHERE post_id = p_post_id AND user_id = auth.uid();
+  ELSE
+    -- Change vote
+    UPDATE post_votes SET vote_type = p_vote_type WHERE post_id = p_post_id AND user_id = auth.uid();
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    COALESCE(p.likes, 0),
+    COALESCE(p.dislikes, 0),
+    (SELECT pv.vote_type FROM post_votes pv WHERE pv.post_id = p_post_id AND pv.user_id = auth.uid())
+  FROM forum_posts p
+  WHERE p.id = p_post_id;
+END;
+$$;
+
 -- Toggle post flagged status (admin only)
 CREATE OR REPLACE FUNCTION toggle_post_flagged(p_post_id INTEGER)
 RETURNS TABLE (success BOOLEAN, is_flagged BOOLEAN, message TEXT)
@@ -1206,6 +1511,100 @@ BEGIN
   RETURN get_poll_data(v_thread_id);
 END;
 $$;
+
+-- Create thread with poll
+CREATE OR REPLACE FUNCTION create_poll_thread(
+  p_title TEXT,
+  p_content TEXT,
+  p_poll_options TEXT[],
+  p_allow_multiple BOOLEAN DEFAULT FALSE,
+  p_duration_hours INTEGER DEFAULT 0,
+  p_is_flagged BOOLEAN DEFAULT FALSE,
+  p_flag_reason TEXT DEFAULT NULL
+)
+RETURNS INTEGER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_thread_id INTEGER;
+  v_poll_id INTEGER;
+  v_option TEXT;
+  v_order INTEGER := 0;
+  v_ends_at TIMESTAMPTZ := NULL;
+BEGIN
+  -- Calculate ends_at if duration specified
+  IF p_duration_hours > 0 THEN
+    v_ends_at := NOW() + (p_duration_hours || ' hours')::INTERVAL;
+  END IF;
+
+  -- Create thread
+  v_thread_id := create_thread(p_title, NULL, p_content, p_is_flagged, p_flag_reason);
+
+  -- Create poll
+  INSERT INTO polls (thread_id, allow_multiple, allow_vote_change, show_results_before_vote, ends_at)
+  VALUES (v_thread_id, p_allow_multiple, TRUE, FALSE, v_ends_at)
+  RETURNING id INTO v_poll_id;
+
+  -- Create options
+  FOREACH v_option IN ARRAY p_poll_options LOOP
+    INSERT INTO poll_options (poll_id, option_text, display_order)
+    VALUES (v_poll_id, v_option, v_order);
+    v_order := v_order + 1;
+  END LOOP;
+
+  RETURN v_thread_id;
+END;
+$$;
+
+-- Get poll data
+CREATE OR REPLACE FUNCTION get_poll_data(p_thread_id INTEGER)
+RETURNS JSON
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_poll polls%ROWTYPE;
+  v_user_votes INTEGER[];
+  v_has_voted BOOLEAN;
+  v_result JSON;
+BEGIN
+  SELECT * INTO v_poll FROM polls WHERE thread_id = p_thread_id;
+
+  IF v_poll IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  -- Get user's votes
+  SELECT ARRAY_AGG(option_id) INTO v_user_votes
+  FROM poll_votes WHERE poll_id = v_poll.id AND user_id = auth.uid();
+
+  v_has_voted := v_user_votes IS NOT NULL AND array_length(v_user_votes, 1) > 0;
+
+  SELECT json_build_object(
+    'id', v_poll.id,
+    'allow_multiple', v_poll.allow_multiple,
+    'allow_vote_change', v_poll.allow_vote_change,
+    'show_results_before_vote', v_poll.show_results_before_vote,
+    'ends_at', v_poll.ends_at,
+    'has_voted', v_has_voted,
+    'user_votes', COALESCE(v_user_votes, ARRAY[]::INTEGER[]),
+    'total_votes', (SELECT COUNT(DISTINCT user_id) FROM poll_votes WHERE poll_id = v_poll.id),
+    'options', (
+      SELECT json_agg(json_build_object(
+        'id', po.id,
+        'text', po.option_text,
+        'vote_count', (SELECT COUNT(*) FROM poll_votes pv WHERE pv.option_id = po.id)
+      ) ORDER BY po.display_order)
+      FROM poll_options po WHERE po.poll_id = v_poll.id
+    )
+  ) INTO v_result;
+
+  RETURN v_result;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION create_poll_thread(TEXT, TEXT, TEXT[], BOOLEAN, INTEGER, BOOLEAN, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_poll_data(INTEGER) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION vote_poll(INTEGER, INTEGER[]) TO authenticated;
 
 -- Toggle ignore user (blocked users denied)
 CREATE OR REPLACE FUNCTION toggle_ignore_user(p_ignored_user_id UUID)
@@ -1369,6 +1768,7 @@ RETURNS TABLE (
   reply_count BIGINT,
   total_likes BIGINT,
   total_dislikes BIGINT,
+  has_poll BOOLEAN,
   is_op_deleted BOOLEAN,
   total_count BIGINT
 )
@@ -1410,6 +1810,7 @@ BEGIN
       COALESCE(op.reply_count, 0)::BIGINT AS reply_count,
       COALESCE(op.likes, 0)::BIGINT AS total_likes,
       COALESCE(op.dislikes, 0)::BIGINT AS total_dislikes,
+      EXISTS (SELECT 1 FROM polls pl WHERE pl.thread_id = t.id) AS has_poll,
       COALESCE(op.is_deleted, FALSE) AS is_op_deleted,
       v_total AS total_count
     FROM forum_threads t
@@ -1904,32 +2305,8 @@ END;
 $$;
 
 -- =============================================================================
--- Fix column ambiguity in feedback_messages RLS policies
--- =============================================================================
-DROP POLICY IF EXISTS "Users can view their conversations" ON feedback_messages;
-DROP POLICY IF EXISTS "Recipients can mark messages as read" ON feedback_messages;
-
-CREATE POLICY "Users can view their conversations" ON feedback_messages
-  FOR SELECT TO authenticated
-  USING (
-    user_id = auth.uid()
-    OR recipient_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
-  );
-
-CREATE POLICY "Recipients can mark messages as read" ON feedback_messages
-  FOR UPDATE TO authenticated
-  USING (
-    recipient_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
-  )
-  WITH CHECK (
-    recipient_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM user_profiles up WHERE up.id = auth.uid() AND up.role = 'admin')
-  );
-
--- =============================================================================
 -- Helper function for admin checks (consistent across RPCs)
+-- Must be defined BEFORE policies that use it
 -- =============================================================================
 CREATE OR REPLACE FUNCTION public.check_is_admin(p_user_id UUID DEFAULT auth.uid())
 RETURNS BOOLEAN
@@ -1938,6 +2315,65 @@ STABLE
 AS $$
   SELECT COALESCE((SELECT role = 'admin' FROM public.user_profiles WHERE id = p_user_id), FALSE);
 $$;
+
+-- =============================================================================
+-- Fix is_not_blocked to use SECURITY DEFINER to avoid RLS recursion
+-- =============================================================================
+CREATE OR REPLACE FUNCTION public.is_not_blocked()
+RETURNS BOOLEAN
+LANGUAGE sql SECURITY DEFINER SET search_path = public
+STABLE
+AS $$
+  SELECT NOT EXISTS (
+    SELECT 1 FROM public.user_profiles up
+    WHERE up.id = auth.uid() AND up.is_blocked = true
+  );
+$$;
+
+-- =============================================================================
+-- Fix user_profiles SELECT policy to avoid RLS recursion
+-- The old policy used EXISTS(SELECT FROM user_profiles) which caused infinite
+-- recursion. Use check_is_admin() which is SECURITY DEFINER and bypasses RLS.
+-- =============================================================================
+DROP POLICY IF EXISTS "Users can view own profile" ON user_profiles;
+CREATE POLICY "Users can view own profile" ON user_profiles
+  FOR SELECT USING (
+    auth.uid() = user_profiles.id OR public.check_is_admin()
+  );
+
+-- =============================================================================
+-- Fix feedback_messages RLS policies to use check_is_admin() instead of
+-- EXISTS subqueries that cause RLS recursion through user_profiles
+-- =============================================================================
+DROP POLICY IF EXISTS "Users can view their conversations" ON feedback_messages;
+DROP POLICY IF EXISTS "Non-blocked users can send messages" ON feedback_messages;
+DROP POLICY IF EXISTS "Recipients can mark messages as read" ON feedback_messages;
+
+CREATE POLICY "Users can view their conversations" ON feedback_messages
+  FOR SELECT TO authenticated
+  USING (
+    feedback_messages.user_id = auth.uid()
+    OR feedback_messages.recipient_id = auth.uid()
+    OR public.check_is_admin()
+  );
+
+CREATE POLICY "Non-blocked users can send messages" ON feedback_messages
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    feedback_messages.user_id = auth.uid()
+    AND public.is_not_blocked()
+  );
+
+CREATE POLICY "Recipients can mark messages as read" ON feedback_messages
+  FOR UPDATE TO authenticated
+  USING (
+    feedback_messages.recipient_id = auth.uid()
+    OR public.check_is_admin()
+  )
+  WITH CHECK (
+    feedback_messages.recipient_id = auth.uid()
+    OR public.check_is_admin()
+  );
 
 -- =============================================================================
 -- Add get_post_by_id RPC for resolving stub posts

@@ -399,6 +399,8 @@
   gap: 0.5rem;
   padding: 1rem 0;
   min-height: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .chat-load-more {
@@ -515,6 +517,8 @@
   padding-top: 1rem;
   border-top: 1px solid var(--color-border);
   margin-top: auto;
+  position: relative;
+  z-index: 2;
 }
 
 .chat-input-container textarea {

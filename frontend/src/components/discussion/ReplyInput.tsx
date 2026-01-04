@@ -123,8 +123,11 @@ export const ReplyInput = memo(function ReplyInput({
       // Force re-render to update button states (bold/italic/link active state)
       setForceUpdate(n => n + 1)
     },
-    // Note: Removed onTransaction - it fires too frequently and is redundant
-    // with onUpdate + onSelectionUpdate which cover all UI-relevant changes
+    onTransaction: ({ transaction }) => {
+      if (transaction.docChanged || transaction.selectionSet || transaction.storedMarks) {
+        setForceUpdate(n => n + 1)
+      }
+    },
   })
 
   // Sync external value changes (e.g., clearing after submit)
@@ -202,7 +205,9 @@ export const ReplyInput = memo(function ReplyInput({
             <button
               type="button"
               onMouseDown={(e) => {
-                e.preventDefault() // Prevent losing focus
+                e.preventDefault() // Prevent losing focus/selection
+              }}
+              onClick={() => {
                 editor.chain().focus().toggleBold().run()
               }}
               className={`format-btn ${editor.isActive('bold') ? 'active' : ''}`}
@@ -214,6 +219,8 @@ export const ReplyInput = memo(function ReplyInput({
               type="button"
               onMouseDown={(e) => {
                 e.preventDefault()
+              }}
+              onClick={() => {
                 editor.chain().focus().toggleItalic().run()
               }}
               className={`format-btn ${editor.isActive('italic') ? 'active' : ''}`}
@@ -226,6 +233,8 @@ export const ReplyInput = memo(function ReplyInput({
                 type="button"
                 onMouseDown={(e) => {
                   e.preventDefault()
+                }}
+                onClick={() => {
                   setShowEmojiPicker(!showEmojiPicker)
                 }}
                 className={`format-btn ${showEmojiPicker ? 'active' : ''}`}
@@ -252,6 +261,8 @@ export const ReplyInput = memo(function ReplyInput({
               type="button"
               onMouseDown={(e) => {
                 e.preventDefault()
+              }}
+              onClick={() => {
                 setLink()
               }}
               className={`format-btn ${editor.isActive('link') ? 'active' : ''}`}
@@ -263,6 +274,8 @@ export const ReplyInput = memo(function ReplyInput({
               type="button"
               onMouseDown={(e) => {
                 e.preventDefault()
+              }}
+              onClick={() => {
                 editor.chain().focus().toggleBulletList().run()
               }}
               className={`format-btn ${editor.isActive('bulletList') ? 'active' : ''}`}
@@ -274,6 +287,8 @@ export const ReplyInput = memo(function ReplyInput({
               type="button"
               onMouseDown={(e) => {
                 e.preventDefault()
+              }}
+              onClick={() => {
                 insertLatex()
               }}
               className="format-btn"

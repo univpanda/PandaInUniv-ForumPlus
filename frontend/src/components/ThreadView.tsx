@@ -57,7 +57,7 @@ export function ThreadView() {
           threadTitle={thread.title}
         >
           {/* Poll embedded within the original post card */}
-          {'has_poll' in thread && thread.has_poll && (
+          {thread.has_poll !== false && (
             <PollDisplay threadId={thread.id} userId={user?.id ?? null} />
           )}
         </PostCard>
