@@ -29,7 +29,6 @@ export {
 } from './format'
 
 // Content moderation
-export { checkContent, checkThreadContent } from './contentModeration'
 
 // URL utilities
 export { cleanOAuthHash } from './url'
