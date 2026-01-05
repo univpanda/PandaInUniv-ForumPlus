@@ -3,6 +3,16 @@
 // Notification types
 export type { Notification } from './notification'
 
+// Placement types
+export type {
+  Placement,
+  PlacementFilters,
+  PlacementSearchParams,
+  ReverseSearchParams,
+  PlacementSearchResult,
+  PlacementSubTab,
+} from './placement'
+
 // Forum types
 export type { Thread, Post, FlaggedPost, AuthorPost, BookmarkedPost, Poll, PollOption, PollSettings, ThreadStub, PostStub } from './forum'
 export { flaggedPostToPost, authorPostToPost, isThreadStub, isPostStub, isFullPost } from './forum'

@@ -49,7 +49,8 @@ export function usePaginatedThreads(
         }
       }
 
-      const { data, error } = await supabase.rpc('get_paginated_forum_threads', {
+      // Add timeout to prevent infinite loading for anonymous users
+      const rpcPromise = supabase.rpc('get_paginated_forum_threads', {
         p_category_ids: null,
         p_limit: pageSize,
         p_offset: (page - 1) * pageSize,
@@ -59,7 +60,18 @@ export function usePaginatedThreads(
         p_flagged_only: isFlagged,
         p_deleted_only: isDeleted,
       })
-      if (error) throw error
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timeout: threads query took too long')), 15000)
+      )
+
+      const { data, error } = await Promise.race([rpcPromise, timeoutPromise])
+
+      if (error) {
+        console.error('Threads RPC error:', error.message, error.code)
+        throw error
+      }
+
       const { items: threads, totalCount } = extractPaginatedResponse<Thread>(data)
 
       return { threads, totalCount }

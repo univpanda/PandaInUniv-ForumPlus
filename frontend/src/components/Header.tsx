@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { AuthButton } from './AuthButton'
 
-export type Tab = 'discussion' | 'chat' | 'users' | 'profile' | 'notifications'
+export type Tab = 'discussion' | 'chat' | 'users' | 'profile' | 'notifications' | 'placements'
 
 export const Header = memo(function Header() {
   return (

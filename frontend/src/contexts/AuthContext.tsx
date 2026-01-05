@@ -53,6 +53,81 @@ function clearLocalAuthCache(): void {
   }
 }
 
+function clearSupabaseAuthStorage(): void {
+  try {
+    const keysToRemove: string[] = []
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith('sb-')) {
+        keysToRemove.push(key)
+      }
+    }
+    keysToRemove.forEach((key) => localStorage.removeItem(key))
+  } catch {
+    // localStorage not available
+  }
+
+  try {
+    const keysToRemove: string[] = []
+    for (let i = 0; i < sessionStorage.length; i += 1) {
+      const key = sessionStorage.key(i)
+      if (key && key.startsWith('sb-')) {
+        keysToRemove.push(key)
+      }
+    }
+    keysToRemove.forEach((key) => sessionStorage.removeItem(key))
+  } catch {
+    // sessionStorage not available
+  }
+}
+
+function getSupabaseAuthTokenFromStorage(): { access_token?: string } | null {
+  const readFrom = (storage: Storage) => {
+    for (let i = 0; i < storage.length; i += 1) {
+      const key = storage.key(i)
+      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        const raw = storage.getItem(key)
+        if (!raw) return null
+        try {
+          return JSON.parse(raw) as { access_token?: string }
+        } catch {
+          return null
+        }
+      }
+    }
+    return null
+  }
+
+  try {
+    return readFrom(localStorage)
+  } catch {
+    // localStorage not available
+  }
+
+  try {
+    return readFrom(sessionStorage)
+  } catch {
+    // sessionStorage not available
+  }
+
+  return null
+}
+
+function isTokenExpired(accessToken: string): boolean {
+  try {
+    const payload = accessToken.split('.')[1]
+    if (!payload) return false
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized + '==='.slice((normalized.length + 3) % 4)
+    const decoded = JSON.parse(atob(padded)) as { exp?: number }
+    if (!decoded.exp) return false
+    // 60s skew to avoid edge-of-expiry issues
+    return decoded.exp * 1000 < Date.now() - 60_000
+  } catch {
+    return false
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -113,6 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (newSession: Session | null, isActive: () => boolean, isInitialLoad: boolean = false): Promise<boolean> => {
       if (!newSession?.user) {
         if (isActive()) {
+          processingUserId.current = null // Reset on sign out
           clearLocalAuthCache()
           setSession(null)
           setUser(null)
@@ -123,9 +199,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const userId = newSession.user.id
 
-      // Prevent duplicate processing for the same user
+      // Prevent duplicate processing for the same user, but allow if same user trying again
+      // (could be a retry after previous attempt timed out)
       if (processingUserId.current === userId) {
-        return false // Already processing this user
+        // Only skip if we're still actively processing (give it 100ms grace)
+        return false
       }
       processingUserId.current = userId
 
@@ -239,40 +317,116 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isActive = true
     const checkIsActive = () => isActive
+    let initResolved = false
+
+    // Reset processingUserId on mount to prevent stale state from previous renders
+    processingUserId.current = null
+
+    // Check for expired tokens on mount and clear them properly
+    // This ensures stale auth data doesn't cause API calls to hang
+    const token = getSupabaseAuthTokenFromStorage()
+    const hasExpiredToken = token?.access_token && isTokenExpired(token.access_token)
+    if (hasExpiredToken) {
+      clearLocalAuthCache()
+      // signOut with scope: 'local' clears both storage AND in-memory Supabase client state
+      supabase.auth.signOut({ scope: 'local' }).catch(() => {
+        // If signOut fails, manually clear storage as fallback
+        clearSupabaseAuthStorage()
+      })
+    }
 
     // Timeout to prevent infinite loading state - show error to user
-    const timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(async () => {
       if (!isActive) return
+      clearLocalAuthCache()
+      // Use signOut to properly clear both storage AND in-memory Supabase client state
+      // This prevents stale tokens from being used in subsequent API calls
+      try {
+        await supabase.auth.signOut({ scope: 'local' })
+      } catch {
+        // If signOut fails, manually clear storage
+        clearSupabaseAuthStorage()
+      }
+      setSession(null)
+      setUser(null)
+      setIsAdmin(false)
       setAuthError('Authentication timed out. Please refresh and try again.')
       setLoading(false)
+      isInitialized.current = true
+      initResolved = true
+      try {
+        const reloadFlag = 'panda_auth_timeout_reloaded'
+        const hasReloaded = sessionStorage.getItem(reloadFlag)
+        if (!hasReloaded) {
+          sessionStorage.setItem(reloadFlag, 'true')
+          setTimeout(() => {
+            if (isActive) {
+              window.location.reload()
+            }
+          }, 100)
+        }
+      } catch {
+        // sessionStorage not available; skip auto-reload
+      }
     }, 5000)
+
+    const finalizeInit = async (session: Session | null) => {
+      if (!isActive || initResolved) return
+      initResolved = true
+      clearTimeout(timeoutId)
+
+      // Hard fallback - if handleUserSession hangs, force completion
+      const handled = await Promise.race([
+        handleUserSession(session, checkIsActive, true),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000)),
+      ])
+
+      if (!handled && isActive) {
+        // Force clean state if session handling failed/timed out
+        // Use signOut to clear both storage AND in-memory Supabase client state
+        clearLocalAuthCache()
+        try {
+          await supabase.auth.signOut({ scope: 'local' })
+        } catch {
+          clearSupabaseAuthStorage()
+        }
+        setSession(null)
+        setUser(null)
+        setIsAdmin(false)
+      }
+
+      isInitialized.current = true
+      if (isActive) setLoading(false)
+
+      // Clear reload guard on successful init so future timeouts can still trigger reload
+      if (handled) {
+        try {
+          sessionStorage.removeItem('panda_auth_timeout_reloaded')
+        } catch {
+          // sessionStorage not available
+        }
+      }
+    }
 
     // Get initial session - only runs once on mount
     const initSession = async () => {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-        clearTimeout(timeoutId)
-
-        if (!isActive) return
-
-        // Pass isInitialLoad=true to use local cache for instant display
-        await handleUserSession(session, checkIsActive, true)
-
-        // Mark as initialized AFTER session handling completes
-        // This ensures onAuthStateChange doesn't skip updates during initial processing
-        isInitialized.current = true
+        const sessionPromise = supabase.auth.getSession().then(({ data }) => data.session)
+        const timeoutPromise = new Promise<Session | null>((resolve) =>
+          setTimeout(() => resolve(null), 1500)
+        )
+        const session = await Promise.race([sessionPromise, timeoutPromise])
+        // Always finalize - even if session is null (user not logged in or timeout)
+        await finalizeInit(session)
       } catch {
-        clearTimeout(timeoutId)
         // Auth initialization failed - don't log details to console
         // Still mark as initialized so future auth changes are processed
-        isInitialized.current = true
+        if (isActive && !initResolved) {
+          isInitialized.current = true
+          setLoading(false)
+        }
       }
-      if (isActive) setLoading(false)
     }
-
-    initSession()
 
     // Listen for auth changes (sign in, sign out, token refresh)
     const {
@@ -280,21 +434,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!isActive) return
 
-      // Skip if this is the initial session (already handled above)
-      if (!isInitialized.current) return
+      if (!isInitialized.current) {
+        await finalizeInit(session)
+        return
+      }
 
       try {
-        await handleUserSession(session, checkIsActive)
+        // Timeout wrapper to prevent infinite loading on hung RPC calls
+        const handled = await Promise.race([
+          handleUserSession(session, checkIsActive),
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000)),
+        ])
 
         // Clean up OAuth hash from URL after successful sign-in
         if (session?.user) {
           cleanOAuthHash()
+        }
+
+        // If handling timed out and user had a session, force set state
+        if (!handled && session?.user && isActive) {
+          setSession(session)
+          setUser(session.user)
+          // Default to non-admin, will verify in background
+          setIsAdmin(false)
         }
       } catch {
         // Auth state change error - silently continue
       }
       if (isActive) setLoading(false)
     })
+
+    initSession()
 
     return () => {
       isActive = false

@@ -37,20 +37,19 @@ export function Terms({ onBack }: TermsProps) {
 
       <div className="terms-content">
         <h1>Terms and Conditions</h1>
-        <p className="terms-updated">Last updated: December 22, 2025</p>
+        <p className="terms-updated">Last updated: January 2026</p>
 
         <section>
           <h2>1. Acceptance of Terms</h2>
           <p>
-            By accessing and using MasterShifu ("the Platform"), you agree to be bound by these
-            Terms and Conditions. If you do not agree to these terms, please do not use the
-            Platform.
+            By accessing and using PandaInUniv ("the Platform"), you agree to these Terms and
+            Conditions. If you do not agree, do not use the Platform.
           </p>
         </section>
 
         <section>
           <h2>2. Description of Service</h2>
-          <p>MasterShifu is a platform that provides:</p>
+          <p>PandaInUniv is a platform that provides:</p>
           <ul>
             <li>A community discussion forum for users to share information and opinions</li>
             <li>Private messaging between users</li>
@@ -91,8 +90,8 @@ export function Terms({ onBack }: TermsProps) {
               Use automated systems (bots, scrapers) to access the Platform without permission
             </li>
             <li>Interfere with or disrupt the Platform's functionality</li>
-            <li>Post false or misleading financial information</li>
-            <li>Engage in market manipulation or securities fraud</li>
+            <li>Post false or misleading academic information or credentials</li>
+            <li>Engage in academic dishonesty, plagiarism, or doxxing</li>
           </ul>
         </section>
 
@@ -114,7 +113,7 @@ export function Terms({ onBack }: TermsProps) {
             </li>
           </ul>
           <p>
-            You may edit your posts within 30 minutes of posting. After this period, original posts
+            You may edit your posts within 15 minutes of posting. After this period, original posts
             may add additional comments but the original content cannot be changed. You may delete
             your own posts at any time.
           </p>
@@ -122,7 +121,7 @@ export function Terms({ onBack }: TermsProps) {
 
         <section>
           <h2>6. Content Moderation</h2>
-          <p>We reserve the right to moderate user content. This includes:</p>
+          <p>We reserve the right to moderate user content, including:</p>
           <ul>
             <li>Automated filtering of inappropriate language</li>
             <li>Manual review of flagged content by administrators</li>
@@ -161,8 +160,8 @@ export function Terms({ onBack }: TermsProps) {
         <section>
           <h2>9. Privacy</h2>
           <p>
-            Your use of the Platform is also governed by our Privacy Policy. By using the Platform,
-            you consent to the collection and use of information as described in our Privacy Policy.
+            We collect and use information needed to operate the Platform, including account
+            details, content you submit, and basic usage data for security and moderation.
           </p>
           <p>
             We use Supabase for authentication and data storage. Your data is stored securely and is
@@ -211,11 +210,13 @@ export function Terms({ onBack }: TermsProps) {
           </p>
           <p>Upon account deletion:</p>
           <ul>
-            <li>Your profile information will be removed</li>
+            <li>Your account will be deleted and you will no longer be able to log in</li>
+            <li>Your profile information and username will remain visible on the Platform</li>
+            <li>Your activity counts (threads, replies, votes) will remain associated with your username</li>
             <li>Your posts will remain visible under your username</li>
             <li>
               This action cannot be undone - if you register again using the same email, it will be
-              a new account and you will not be able to choose the same username
+              a new account with a new identity and you will not be able to choose the same username
             </li>
           </ul>
         </section>
@@ -223,8 +224,8 @@ export function Terms({ onBack }: TermsProps) {
         <section>
           <h2>11. Limitation of Liability</h2>
           <p>
-            The platform is provided "as is" without warranties of any kind, express or implied. We
-            do not warrant that the platform will be uninterrupted, error-free, or secure.
+            The Platform is provided "as is" without warranties of any kind. We do not warrant that
+            the Platform will be uninterrupted, error-free, or secure.
           </p>
           <p>
             To the maximum extent permitted by law, we shall not be liable for any indirect,
@@ -246,8 +247,7 @@ export function Terms({ onBack }: TermsProps) {
           <h2>13. Changes to Terms</h2>
           <p>
             We may update these Terms and Conditions at any time. Continued use of the Platform
-            after changes constitutes acceptance of the new terms. We encourage you to review these
-            terms periodically.
+            after changes constitutes acceptance. Please review periodically.
           </p>
         </section>
 
@@ -270,7 +270,7 @@ export function Terms({ onBack }: TermsProps) {
 
         <div className="terms-footer">
           <p>
-            By using MasterShifu, you acknowledge that you have read, understood, and agree to these
+            By using PandaInUniv, you acknowledge that you have read, understood, and agree to these
             Terms and Conditions.
           </p>
         </div>

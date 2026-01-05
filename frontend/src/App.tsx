@@ -10,6 +10,7 @@ import { Chat } from './pages/Chat'
 import { Profile } from './pages/Profile'
 import { Notifications } from './pages/Notifications'
 import { Terms } from './pages/Terms'
+import { Placements } from './pages/Placements'
 import { AlertBanner, ToastContainer } from './components/ui'
 import { useAuth } from './hooks/useAuth'
 import { ToastProvider } from './contexts/ToastContext'
@@ -20,7 +21,7 @@ import { usePrefetchUserData } from './hooks/usePrefetchUserData'
 import type { StartChatEvent } from './components/UserNameHover'
 import type { SearchDiscussionEvent } from './components/AuthButton'
 import type { Notification } from './types'
-import { TreePine, Users, MessagesSquare, User, Bell } from 'lucide-react'
+import { TreePine, Users, MessagesSquare, User, Bell, GraduationCap } from 'lucide-react'
 import './styles/index.css'
 
 // Configure React Query to use page visibility for focus detection
@@ -66,7 +67,7 @@ const TAB_STORAGE_KEY = 'activeTab'
 const getStoredTab = (): Tab => {
   try {
     const stored = localStorage.getItem(TAB_STORAGE_KEY)
-    if (stored && ['discussion', 'chat', 'users', 'profile', 'notifications'].includes(stored)) {
+    if (stored && ['discussion', 'chat', 'users', 'profile', 'notifications', 'placements'].includes(stored)) {
       return stored as Tab
     }
   } catch {
@@ -177,9 +178,9 @@ function AppContent() {
 
   // Compute effective tab - use stored tab if logged in, else discussion
   const effectiveTab = useMemo(() => {
-    // While auth is loading, show discussion (safest default)
+    // While auth is loading, allow public tabs (discussion/placements)
     if (authLoading) {
-      return 'discussion'
+      return activeTab === 'placements' ? 'placements' : 'discussion'
     }
     // If logged in, use the active tab (with admin check for users tab)
     if (user) {
@@ -188,8 +189,8 @@ function AppContent() {
       }
       return activeTab
     }
-    // Not logged in - always discussion
-    return 'discussion'
+    // Not logged in - allow public tabs only
+    return activeTab === 'placements' ? 'placements' : 'discussion'
   }, [user, isAdmin, activeTab, authLoading])
 
   // After a short delay, allow background tabs to mount
@@ -244,6 +245,13 @@ function AppContent() {
       >
         <TreePine size={18} />
         <span className="side-tab-label">Grove</span>
+      </button>
+      <button
+        className={`side-tab ${activeTab === 'placements' ? 'active' : ''}`}
+        onClick={() => setActiveTab('placements')}
+      >
+        <GraduationCap size={18} />
+        <span className="side-tab-label">Jobs</span>
       </button>
       {user && (
         <button
@@ -355,6 +363,14 @@ function AppContent() {
             <div className={`tab-content ${effectiveTab !== 'notifications' || showTerms ? 'hidden' : ''}`}>
               <ErrorBoundary fallbackMessage="Failed to load notifications. Please try again.">
                 <Notifications onNavigateToPost={handleNavigateToPost} />
+              </ErrorBoundary>
+            </div>
+          )}
+
+          {shouldMountTab('placements') && (
+            <div className={`tab-content ${effectiveTab !== 'placements' || showTerms ? 'hidden' : ''}`}>
+              <ErrorBoundary fallbackMessage="Failed to load placements. Please try again.">
+                <Placements isActive={effectiveTab === 'placements' && !showTerms} />
               </ErrorBoundary>
             </div>
           )}

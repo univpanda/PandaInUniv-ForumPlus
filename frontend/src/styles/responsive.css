@@ -146,4 +146,14 @@
   .bookmarks-btn {
     padding: 0.625rem;
   }
+
+  .footer-content {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .footer-right {
+    justify-content: center;
+  }
 }
