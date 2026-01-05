@@ -57,12 +57,15 @@ export function usePlacementSearch(params: PlacementSearchParams, enabled: boole
       const placements: Placement[] = (data || []).map((row: Record<string, unknown>) => ({
         id: row.id as string,
         name: row.name as string | null,
-        institution: row.institution as string | null,
+        placementUniv: row.placement_univ as string | null,
         role: row.role as string | null,
         year: row.year as number | null,
         university: row.university as string | null,
         program: row.program as string | null,
         degree: row.degree as string | null,
+        discipline: row.discipline as string | null,
+        school: null,
+        department: null,
       }))
 
       const totalCount = data?.[0]?.total_count || 0
@@ -80,7 +83,7 @@ export function useReverseSearch(params: ReverseSearchParams, enabled: boolean =
     queryKey: placementKeys.reverseSearch(params),
     queryFn: async (): Promise<PlacementSearchResult> => {
       const { data, error } = await supabase.rpc('reverse_search_placements', {
-        p_institution: params.institution,
+        p_placement_univ: params.placementUniv,
         p_degree: params.degree || null,
         p_program: params.program || null,
         p_from_year: params.fromYear || null,
@@ -94,19 +97,22 @@ export function useReverseSearch(params: ReverseSearchParams, enabled: boolean =
       const placements: Placement[] = (data || []).map((row: Record<string, unknown>) => ({
         id: row.id as string,
         name: row.name as string | null,
-        institution: row.institution as string | null,
+        placementUniv: row.placement_univ as string | null,
         role: row.role as string | null,
         year: row.year as number | null,
         university: row.university as string | null,
         program: row.program as string | null,
         degree: row.degree as string | null,
+        discipline: row.discipline as string | null,
+        school: null,
+        department: null,
       }))
 
       const totalCount = data?.[0]?.total_count || 0
 
       return { placements, totalCount }
     },
-    enabled: enabled && !!params.institution,
+    enabled: enabled && !!params.placementUniv,
     staleTime: 30 * 1000,
   })
 }

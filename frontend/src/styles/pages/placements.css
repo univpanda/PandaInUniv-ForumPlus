@@ -43,6 +43,7 @@
   border-radius: 12px;
   box-shadow: var(--shadow-xs);
   padding: 1.5rem;
+  padding-left: 2rem;
   margin-bottom: 1.5rem;
 }
 
@@ -442,6 +443,7 @@
   white-space: nowrap;
   position: sticky;
   top: 0;
+  text-align: center;
 }
 
 .placement-table tbody tr:hover {

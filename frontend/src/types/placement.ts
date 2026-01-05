@@ -3,12 +3,15 @@
 export interface Placement {
   id: string
   name: string | null
-  institution: string | null
+  placementUniv: string | null
   role: string | null
   year: number | null
   university: string | null
   program: string | null
   degree: string | null
+  discipline: string | null
+  school: string | null
+  department: string | null
 }
 
 export interface PlacementFilters {
@@ -29,7 +32,7 @@ export interface PlacementSearchParams {
 }
 
 export interface ReverseSearchParams {
-  institution: string
+  placementUniv: string
   degree?: string | null
   program?: string | null
   fromYear?: number | null
