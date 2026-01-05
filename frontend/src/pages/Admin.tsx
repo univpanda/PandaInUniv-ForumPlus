@@ -9,6 +9,7 @@ import {
   useDeleteUniversity,
 } from '../hooks/usePlacementQueries'
 import { useToast } from '../contexts/ToastContext'
+import { X } from 'lucide-react'
 
 type AdminSubTab = 'country' | 'university' | 'pandas'
 type UniversitySortColumn = 'university' | 'country' | 'rank' | 'top50'
@@ -269,7 +270,7 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
                   <th className="sortable" onClick={() => handleSort('code')}>
                     Code {sortColumn === 'code' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
-                  <th>Actions</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -310,8 +311,9 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
                       <button
                         className="admin-delete-btn"
                         onClick={() => handleDelete(country.id, country.name)}
+                        title="Delete"
                       >
-                        Delete
+                        <X size={16} />
                       </button>
                     </td>
                   </tr>
@@ -550,7 +552,7 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
                   <th className="sortable" onClick={() => handleSort('top50')}>
                     Top 50 {sortColumn === 'top50' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
-                  <th>Actions</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -623,8 +625,9 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
                       <button
                         className="admin-delete-btn"
                         onClick={() => handleDelete(uni.id, uni.university)}
+                        title="Delete"
                       >
-                        Delete
+                        <X size={16} />
                       </button>
                     </td>
                   </tr>
