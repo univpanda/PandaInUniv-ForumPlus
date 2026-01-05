@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
-import { ChevronDown, X } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import {
   usePlacementFilters,
   usePlacementSearch,
@@ -13,28 +13,41 @@ interface PlacementsProps {
   isActive?: boolean
 }
 
+const MIN_YEAR = 2016
+const CURRENT_YEAR = new Date().getFullYear()
+
 export function Placements({ isActive = true }: PlacementsProps) {
   const { data: filters, isLoading: filtersLoading } = usePlacementFilters()
   const degree = 'PhD'
-  const [fromYear, setFromYear] = useState<number | null>(null)
-  const [toYear, setToYear] = useState<number | null>(null)
+  const [fromYear, setFromYear] = useState<number>(CURRENT_YEAR - 1)
+  const [toYear, setToYear] = useState<number>(CURRENT_YEAR)
   const [subTab, setSubTab] = useState<PlacementSubTab>('search')
 
+  // Generate year options from 2016 to current year (descending)
+  const yearOptions = useMemo(() => {
+    const years: number[] = []
+    for (let y = CURRENT_YEAR; y >= MIN_YEAR; y--) {
+      years.push(y)
+    }
+    return years
+  }, [])
+
   const startYearOptions = useMemo(
-    () => ['All Years', ...(filters?.years || []).map(String)],
-    [filters?.years]
+    () => yearOptions.map(String),
+    [yearOptions]
   )
 
-  const endYearOptions = useMemo(() => {
-    if (!fromYear) return ['All Years', ...(filters?.years || []).map(String)]
-    return ['All Years', ...(filters?.years || []).filter((year) => year >= fromYear).map(String)]
-  }, [fromYear, filters?.years])
+  const endYearOptions = useMemo(
+    () => yearOptions.filter((year) => year >= fromYear).map(String),
+    [yearOptions, fromYear]
+  )
 
   const handleFromYearChange = useCallback((value: string | null) => {
-    const nextFromYear = value && value !== 'All Years' ? parseInt(value, 10) : null
+    if (!value) return
+    const nextFromYear = parseInt(value, 10)
     setFromYear(nextFromYear)
-    if (toYear && nextFromYear && toYear < nextFromYear) {
-      setToYear(null)
+    if (toYear < nextFromYear) {
+      setToYear(nextFromYear)
     }
   }, [toYear])
 
@@ -61,15 +74,15 @@ export function Placements({ isActive = true }: PlacementsProps) {
             disabled
           />
           <FilterSelect
-            value={fromYear?.toString() || 'All Years'}
+            value={fromYear.toString()}
             options={startYearOptions}
             onChange={handleFromYearChange}
             searchPlaceholder="Select start year"
           />
           <FilterSelect
-            value={toYear?.toString() || 'All Years'}
+            value={toYear.toString()}
             options={endYearOptions}
-            onChange={(val) => setToYear(val && val !== 'All Years' ? parseInt(val, 10) : null)}
+            onChange={(val) => val && setToYear(parseInt(val, 10))}
             searchPlaceholder="Select end year"
           />
         </div>
@@ -97,29 +110,29 @@ export function Placements({ isActive = true }: PlacementsProps) {
         </button>
       </div>
 
-      {/* Tab content */}
+      {/* Tab content - keep all mounted to preserve state */}
       <div className="placements-content">
-        {subTab === 'search' && (
+        <div className={subTab !== 'search' ? 'hidden' : ''}>
           <SearchTab
-            isActive={isActive}
+            isActive={isActive && subTab === 'search'}
             filters={filters}
             commonFilters={commonFilters}
           />
-        )}
-        {subTab === 'compare' && (
+        </div>
+        <div className={subTab !== 'compare' ? 'hidden' : ''}>
           <CompareTab
-            isActive={isActive}
+            isActive={isActive && subTab === 'compare'}
             filters={filters}
             commonFilters={commonFilters}
           />
-        )}
-        {subTab === 'reverse' && (
+        </div>
+        <div className={subTab !== 'reverse' ? 'hidden' : ''}>
           <ReverseSearchTab
-            isActive={isActive}
+            isActive={isActive && subTab === 'reverse'}
             filters={filters}
             commonFilters={commonFilters}
           />
-        )}
+        </div>
       </div>
     </div>
   )
@@ -154,15 +167,19 @@ function SearchTab({
     offset: page * pageSize,
   }), [commonFilters, program, university, page])
 
+  const canSearch = !!program && !!university
+
   const { data: searchResult, isLoading, isFetching } = usePlacementSearch(
     searchParams,
-    searchTriggered && isActive
+    searchTriggered && isActive && canSearch
   )
 
   const handleSearch = useCallback(() => {
-    setPage(0)
-    setSearchTriggered(true)
-  }, [])
+    if (program && university) {
+      setPage(0)
+      setSearchTriggered(true)
+    }
+  }, [program, university])
 
   const handleReset = useCallback(() => {
     setProgram(null)
@@ -185,19 +202,19 @@ function SearchTab({
               setProgram(val)
               setUniversity(null) // Reset university when program changes
             }}
-            placeholder="All programs"
+            placeholder="Select program"
             searchPlaceholder="Select program"
           />
           <FilterSelect
             value={university}
             options={universityOptions}
             onChange={setUniversity}
-            placeholder="All universities"
+            placeholder="Select university"
             searchPlaceholder="Select university"
           />
         </div>
         <div className="filter-actions">
-          <button className="btn-primary" onClick={handleSearch}>
+          <button className="btn-primary" onClick={handleSearch} disabled={!canSearch}>
             Search
           </button>
           <button className="btn-secondary" onClick={handleReset}>
@@ -207,7 +224,7 @@ function SearchTab({
       </div>
 
       {/* Results */}
-      {searchTriggered && (
+      {searchTriggered && canSearch && (
         <div className="placement-results">
           {isLoading ? (
             <LoadingSpinner className="placements-loading" />
@@ -250,148 +267,116 @@ function CompareTab({
   filters: PlacementFilters | undefined
   commonFilters: { degree: string; fromYear: number | null; toYear: number | null }
 }) {
-  const [entries, setEntries] = useState<CompareEntry[]>([
-    { program: null, university: null },
-    { program: null, university: null },
-  ])
+  const [entry1, setEntry1] = useState<CompareEntry>({ program: null, university: null })
+  const [entry2, setEntry2] = useState<CompareEntry>({ program: null, university: null })
   const [searchTriggered, setSearchTriggered] = useState(false)
 
   // Get filtered universities for each entry's program
-  const { data: filteredUniversities1 } = useUniversitiesForProgram(entries[0]?.program)
-  const { data: filteredUniversities2 } = useUniversitiesForProgram(entries[1]?.program)
-  const { data: filteredUniversities3 } = useUniversitiesForProgram(entries[2]?.program)
+  const { data: filteredUniversities1 } = useUniversitiesForProgram(entry1.program)
+  const { data: filteredUniversities2 } = useUniversitiesForProgram(entry2.program)
 
   // Search for each entry
   const search1 = usePlacementSearch(
     {
       degree: commonFilters.degree,
-      program: entries[0]?.program,
-      university: entries[0]?.university,
+      program: entry1.program,
+      university: entry1.university,
       fromYear: commonFilters.fromYear,
       toYear: commonFilters.toYear,
       limit: 200,
     },
-    searchTriggered && isActive && !!entries[0]?.program && !!entries[0]?.university
+    searchTriggered && isActive && !!entry1.program && !!entry1.university
   )
   const search2 = usePlacementSearch(
     {
       degree: commonFilters.degree,
-      program: entries[1]?.program,
-      university: entries[1]?.university,
+      program: entry2.program,
+      university: entry2.university,
       fromYear: commonFilters.fromYear,
       toYear: commonFilters.toYear,
       limit: 200,
     },
-    searchTriggered && isActive && !!entries[1]?.program && !!entries[1]?.university
-  )
-  const search3 = usePlacementSearch(
-    {
-      degree: commonFilters.degree,
-      program: entries[2]?.program || null,
-      university: entries[2]?.university || null,
-      fromYear: commonFilters.fromYear,
-      toYear: commonFilters.toYear,
-      limit: 200,
-    },
-    searchTriggered && isActive && !!entries[2]?.program && !!entries[2]?.university
+    searchTriggered && isActive && !!entry2.program && !!entry2.university
   )
 
   const handleCompare = useCallback(() => {
-    const validEntries = entries.filter(e => e.program && e.university)
-    if (validEntries.length >= 2) {
+    if (entry1.program && entry1.university && entry2.program && entry2.university) {
       setSearchTriggered(true)
     }
-  }, [entries])
+  }, [entry1, entry2])
 
   const handleReset = useCallback(() => {
-    setEntries([
-      { program: null, university: null },
-      { program: null, university: null },
-    ])
+    setEntry1({ program: null, university: null })
+    setEntry2({ program: null, university: null })
     setSearchTriggered(false)
   }, [])
 
-  const addEntry = useCallback(() => {
-    if (entries.length < 3) {
-      setEntries([...entries, { program: null, university: null }])
+  // Get university options, filtering out duplicates when same program is selected
+  const getUniversityOptions1 = () => {
+    const options = filteredUniversities1 || filters?.universities || []
+    // If same program, exclude the university selected in entry2
+    if (entry1.program === entry2.program && entry2.university) {
+      return options.filter(u => u !== entry2.university)
     }
-  }, [entries])
-
-  const removeEntry = useCallback((index: number) => {
-    if (entries.length > 2) {
-      setEntries(entries.filter((_, i) => i !== index))
-    }
-  }, [entries])
-
-  const updateEntry = useCallback((index: number, field: keyof CompareEntry, value: string | null) => {
-    setEntries(prev => {
-      const newEntries = [...prev]
-      newEntries[index] = { ...newEntries[index], [field]: value }
-      // Reset university when program changes
-      if (field === 'program') {
-        newEntries[index].university = null
-      }
-      return newEntries
-    })
-  }, [])
-
-  const getUniversityOptions = (index: number) => {
-    const program = entries[index]?.program
-    if (!program) return filters?.universities || []
-    if (index === 0) return filteredUniversities1 || []
-    if (index === 1) return filteredUniversities2 || []
-    if (index === 2) return filteredUniversities3 || []
-    return filters?.universities || []
+    return options
   }
 
-  const isLoading = search1.isLoading || search2.isLoading || search3.isLoading
-  const validEntriesCount = entries.filter(e => e.program && e.university).length
+  const getUniversityOptions2 = () => {
+    const options = filteredUniversities2 || filters?.universities || []
+    // If same program, exclude the university selected in entry1
+    if (entry1.program === entry2.program && entry1.university) {
+      return options.filter(u => u !== entry1.university)
+    }
+    return options
+  }
+
+  const isLoading = search1.isLoading || search2.isLoading
+  const canCompare = entry1.program && entry1.university && entry2.program && entry2.university
 
   return (
     <div className="placement-compare">
       <div className="placement-filters">
         <div className="compare-entries">
-          <label>Programs & Universities to Compare</label>
           <div className="compare-selects">
-            {entries.map((entry, idx) => (
-              <div key={idx} className="compare-select-row">
-                <FilterSelect
-                  value={entry.program}
-                  options={filters?.programs || []}
-                  onChange={(val) => updateEntry(idx, 'program', val)}
-                  placeholder={`Program ${idx + 1}`}
-                  searchPlaceholder="Select program"
-                      />
-                <FilterSelect
-                  value={entry.university}
-                  options={getUniversityOptions(idx)}
-                  onChange={(val) => updateEntry(idx, 'university', val)}
-                  placeholder={`University ${idx + 1}`}
-                  searchPlaceholder="Select university"
-                      />
-                {entries.length > 2 && (
-                  <button
-                    className="btn-icon"
-                    onClick={() => removeEntry(idx)}
-                    title="Remove"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-            ))}
-            {entries.length < 3 && (
-              <button className="btn-secondary btn-small" onClick={addEntry}>
-                + Add Entry
-              </button>
-            )}
+            <div className="compare-select-row">
+              <FilterSelect
+                value={entry1.program}
+                options={filters?.programs || []}
+                onChange={(val) => setEntry1({ program: val, university: null })}
+                placeholder="Select a program"
+                searchPlaceholder="Select a program"
+              />
+              <FilterSelect
+                value={entry1.university}
+                options={getUniversityOptions1()}
+                onChange={(val) => setEntry1(prev => ({ ...prev, university: val }))}
+                placeholder="Select a university"
+                searchPlaceholder="Select a university"
+              />
+            </div>
+            <div className="compare-select-row">
+              <FilterSelect
+                value={entry2.program}
+                options={filters?.programs || []}
+                onChange={(val) => setEntry2({ program: val, university: null })}
+                placeholder="Select a program"
+                searchPlaceholder="Select a program"
+              />
+              <FilterSelect
+                value={entry2.university}
+                options={getUniversityOptions2()}
+                onChange={(val) => setEntry2(prev => ({ ...prev, university: val }))}
+                placeholder="Select a university"
+                searchPlaceholder="Select a university"
+              />
+            </div>
           </div>
         </div>
         <div className="filter-actions">
           <button
             className="btn-primary"
             onClick={handleCompare}
-            disabled={validEntriesCount < 2}
+            disabled={!canCompare}
           >
             Compare
           </button>
@@ -409,10 +394,9 @@ function CompareTab({
           ) : (
             <ComparisonTable
               results={[
-                { label: entries[0]?.program && entries[0]?.university ? `${entries[0].program} - ${entries[0].university}` : null, placements: search1.data?.placements || [] },
-                { label: entries[1]?.program && entries[1]?.university ? `${entries[1].program} - ${entries[1].university}` : null, placements: search2.data?.placements || [] },
-                ...(entries[2]?.program && entries[2]?.university ? [{ label: `${entries[2].program} - ${entries[2].university}`, placements: search3.data?.placements || [] }] : []),
-              ].filter(r => r.label)}
+                { label: `${entry1.program} - ${entry1.university}`, placements: search1.data?.placements || [] },
+                { label: `${entry2.program} - ${entry2.university}`, placements: search2.data?.placements || [] },
+              ]}
             />
           )}
         </div>
@@ -471,17 +455,13 @@ function ReverseSearchTab({
   return (
     <div className="placement-reverse">
       <div className="placement-filters">
-        <p className="reverse-description">
-          Find PhD graduates who were placed at a specific institution
-        </p>
         <div className="filter-row">
           <div className="filter-group">
-            <label>Placement University</label>
             <input
               type="text"
               value={placementUniv}
               onChange={(e) => setPlacementUniv(e.target.value)}
-              placeholder="e.g., Harvard, Google, Federal Reserve"
+              placeholder="Enter an institution to find PhD graduates placed there (e.g., Harvard, Google)"
               className="filter-input"
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             />
@@ -492,7 +472,7 @@ function ReverseSearchTab({
             value={program}
             options={filters?.programs || []}
             onChange={setProgram}
-            placeholder="All programs"
+            placeholder="Select program"
             searchPlaceholder="Select program"
           />
         </div>
@@ -639,25 +619,21 @@ function PlacementTable({ placements, showUniversity = false }: PlacementTablePr
       <table className="placement-table">
         <thead>
           <tr>
+            {showUniversity && <th>University</th>}
+            <th>Program</th>
             <th>Year</th>
             <th>Name</th>
             <th>Placement</th>
-            <th>School</th>
-            <th>Department</th>
-            <th>Designation</th>
-            {showUniversity && <th>Graduating University</th>}
           </tr>
         </thead>
         <tbody>
           {placements.map(p => (
             <tr key={p.id}>
+              {showUniversity && <td>{p.university || '-'}</td>}
+              <td>{p.program || '-'}</td>
               <td>{p.year || '-'}</td>
               <td>{p.name || '-'}</td>
               <td>{p.placementUniv || '-'}</td>
-              <td>{p.school || '-'}</td>
-              <td>{p.department || '-'}</td>
-              <td>{p.role || '-'}</td>
-              {showUniversity && <td>{p.university || '-'}</td>}
             </tr>
           ))}
         </tbody>
@@ -667,56 +643,98 @@ function PlacementTable({ placements, showUniversity = false }: PlacementTablePr
 }
 
 interface ComparisonTableProps {
-  results: { label: string | null; placements: Placement[] }[]
+  results: { label: string; placements: Placement[] }[]
 }
 
 function ComparisonTable({ results }: ComparisonTableProps) {
-  // Group placements by year for comparison
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+
+  // Get all unique years across both results, sorted descending
   const years = [...new Set(
     results.flatMap(r => r.placements.map(p => p.year)).filter(Boolean)
-  )].sort((a, b) => (b || 0) - (a || 0))
+  )].sort((a, b) => (b || 0) - (a || 0)) as number[]
 
   if (results.every(r => r.placements.length === 0)) {
     return <div className="no-results">No placements found for comparison</div>
   }
 
+  // Group placements by placement institution for a given result and year
+  const groupByInstitution = (placements: Placement[]) => {
+    const grouped: Record<string, Placement[]> = {}
+    placements.forEach(p => {
+      const inst = p.placementUniv || 'Unknown'
+      if (!grouped[inst]) grouped[inst] = []
+      grouped[inst].push(p)
+    })
+    return Object.entries(grouped).sort((a, b) => a[0].localeCompare(b[0]))
+  }
+
+  const toggleRow = (rowKey: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev)
+      if (next.has(rowKey)) {
+        next.delete(rowKey)
+      } else {
+        next.add(rowKey)
+      }
+      return next
+    })
+  }
+
   return (
-    <div className="comparison-wrapper">
-      <div className="comparison-header">
-        <div className="comparison-cell header-cell">Year</div>
-        {results.map((r, idx) => (
-          <div key={idx} className="comparison-cell header-cell">
-            {r.label}
-            <span className="placement-count">({r.placements.length})</span>
-          </div>
-        ))}
-      </div>
-      <div className="comparison-body">
-        {years.map(year => (
-          <div key={year} className="comparison-row">
-            <div className="comparison-cell year-cell">{year}</div>
+    <div className="comparison-container">
+      {years.map(year => (
+        <div key={year} className="comparison-year-section">
+          <div className="comparison-year-header">{year}</div>
+          <div className="comparison-columns">
             {results.map((r, idx) => {
               const yearPlacements = r.placements.filter(p => p.year === year)
+              const grouped = groupByInstitution(yearPlacements)
               return (
-                <div key={idx} className="comparison-cell">
-                  {yearPlacements.length > 0 ? (
-                    <ul className="placement-list">
-                      {yearPlacements.map(p => (
-                        <li key={p.id}>
-                          <span className="placement-name">{p.name}</span>
-                          <span className="placement-inst">{p.placementUniv}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <span className="no-data">-</span>
-                  )}
+                <div key={idx} className="comparison-column">
+                  <div className="comparison-column-header">
+                    <div className="comparison-label">{r.label}</div>
+                  </div>
+                  <div className="comparison-count">
+                    <span className="count-number">{yearPlacements.length}</span>
+                    <span className="count-label">PLACEMENTS</span>
+                  </div>
+                  <div className="comparison-institutions">
+                    {grouped.length > 0 ? (
+                      grouped.map(([inst, placements]) => {
+                        const rowKey = `${year}-${idx}-${inst}`
+                        const isExpanded = expandedRows.has(rowKey)
+                        return (
+                          <div key={inst} className="institution-row">
+                            <button
+                              className="institution-name"
+                              onClick={() => toggleRow(rowKey)}
+                            >
+                              <span>{inst} ({placements.length})</span>
+                              <span className={`expand-icon ${isExpanded ? 'expanded' : ''}`}>+</span>
+                            </button>
+                            {isExpanded && (
+                              <div className="institution-details">
+                                {placements.map(p => (
+                                  <div key={p.id} className="placement-detail">
+                                    {p.role || 'Unknown designation'}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })
+                    ) : (
+                      <div className="no-placements">No placements</div>
+                    )}
+                  </div>
                 </div>
               )
             })}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   )
 }

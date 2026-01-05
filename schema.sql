@@ -3510,5 +3510,147 @@ GRANT EXECUTE ON FUNCTION get_user_profile_cache(UUID) TO authenticated;
 
 
 -- =============================================================================
+-- PLACEMENT TRACKING TABLES (pt_*)
+-- =============================================================================
+
+-- Country table
+CREATE TABLE IF NOT EXISTS pt_country (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  name TEXT NOT NULL UNIQUE,
+  code TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enforce lowercase country name and uppercase code
+CREATE OR REPLACE FUNCTION enforce_lowercase_country()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.name := LOWER(TRIM(REGEXP_REPLACE(NEW.name, '\s+', ' ', 'g')));
+  NEW.code := UPPER(TRIM(NEW.code));
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trigger_enforce_lowercase_country ON pt_country;
+CREATE TRIGGER trigger_enforce_lowercase_country
+  BEFORE INSERT OR UPDATE ON pt_country
+  FOR EACH ROW
+  EXECUTE FUNCTION enforce_lowercase_country();
+
+-- University table
+CREATE TABLE IF NOT EXISTS pt_university (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  university TEXT NOT NULL,
+  university_url TEXT,
+  top50 INTEGER DEFAULT 0,
+  country_id TEXT REFERENCES pt_country(id),
+  rank INTEGER,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enforce lowercase university names and normalize whitespace
+CREATE OR REPLACE FUNCTION enforce_lowercase_university()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- Lowercase, trim, and collapse multiple spaces to single space
+  NEW.university := LOWER(TRIM(REGEXP_REPLACE(NEW.university, '\s+', ' ', 'g')));
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS enforce_lowercase_university_trigger ON pt_university;
+CREATE TRIGGER enforce_lowercase_university_trigger
+  BEFORE INSERT OR UPDATE ON pt_university
+  FOR EACH ROW
+  EXECUTE FUNCTION enforce_lowercase_university();
+
+-- Unique index to prevent duplicates (case-insensitive)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pt_university_name_unique ON pt_university (LOWER(university));
+
+-- Department table
+CREATE TABLE IF NOT EXISTS pt_department (
+  id SERIAL PRIMARY KEY,
+  department TEXT NOT NULL,
+  school_id INTEGER,
+  university_id INTEGER REFERENCES pt_university(id),
+  status TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Placement data table
+CREATE TABLE IF NOT EXISTS pt_placement (
+  id SERIAL PRIMARY KEY,
+  name TEXT,
+  year INTEGER,
+  role TEXT,
+  placement_univ TEXT,
+  university TEXT,
+  degree TEXT,
+  discipline TEXT,
+  program TEXT,
+  program_url TEXT,
+  approval TEXT,
+  submit TEXT,
+  time_of_entry TIMESTAMPTZ,
+  last_check TIMESTAMPTZ,
+  times_verified INTEGER DEFAULT 0,
+  source_program_id INTEGER,
+  comparison_id INTEGER,
+  run_id INTEGER,
+  state TEXT,
+  run_flag TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Processing queue table
+CREATE TABLE IF NOT EXISTS pt_queue (
+  id SERIAL PRIMARY KEY,
+  program_id INTEGER,
+  status TEXT,
+  timestamp TIMESTAMPTZ,
+  processed BOOLEAN DEFAULT FALSE,
+  processed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Combined view for university-program mapping
+CREATE TABLE IF NOT EXISTS pt_univ_program_combined (
+  id SERIAL PRIMARY KEY,
+  program TEXT,
+  university TEXT
+);
+
+-- Indexes for placement queries
+CREATE INDEX IF NOT EXISTS idx_pt_placement_university ON pt_placement(university);
+CREATE INDEX IF NOT EXISTS idx_pt_placement_program ON pt_placement(program);
+CREATE INDEX IF NOT EXISTS idx_pt_placement_year ON pt_placement(year);
+CREATE INDEX IF NOT EXISTS idx_pt_placement_univ ON pt_placement(placement_univ);
+
+-- RLS Policies for placement tables (read-only for authenticated users)
+ALTER TABLE pt_university ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pt_placement ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pt_department ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pt_queue ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pt_univ_program_combined ENABLE ROW LEVEL SECURITY;
+
+-- Allow read access to all users (including anonymous for public search)
+CREATE POLICY "Allow read access to pt_university" ON pt_university FOR SELECT USING (true);
+CREATE POLICY "Allow read access to pt_placement" ON pt_placement FOR SELECT USING (true);
+CREATE POLICY "Allow read access to pt_department" ON pt_department FOR SELECT USING (true);
+CREATE POLICY "Allow read access to pt_univ_program_combined" ON pt_univ_program_combined FOR SELECT USING (true);
+
+-- Admin-only write access
+CREATE POLICY "Admin write access to pt_university" ON pt_university FOR ALL USING (public.check_is_admin());
+CREATE POLICY "Admin write access to pt_placement" ON pt_placement FOR ALL USING (public.check_is_admin());
+CREATE POLICY "Admin write access to pt_department" ON pt_department FOR ALL USING (public.check_is_admin());
+
+-- =============================================================================
 -- END OF SCHEMA
 -- =============================================================================

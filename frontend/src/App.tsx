@@ -5,23 +5,22 @@ import { Header, type Tab } from './components/Header'
 import { Footer } from './components/Footer'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Discussion } from './pages/Discussion'
-import { UserManagement } from './pages/UserManagement'
 import { Chat } from './pages/Chat'
 import { Profile } from './pages/Profile'
 import { Notifications } from './pages/Notifications'
 import { Terms } from './pages/Terms'
 import { Placements } from './pages/Placements'
+import { Admin } from './pages/Admin'
 import { AlertBanner, ToastContainer } from './components/ui'
 import { useAuth } from './hooks/useAuth'
 import { ToastProvider } from './contexts/ToastContext'
 import { useUnreadMessageCount } from './hooks/useChatQueries'
 import { useNotificationCount } from './hooks/useNotificationQueries'
-import { usePrefetchUsers } from './hooks/useUserQueries'
 import { usePrefetchUserData } from './hooks/usePrefetchUserData'
 import type { StartChatEvent } from './components/UserNameHover'
 import type { SearchDiscussionEvent } from './components/AuthButton'
 import type { Notification } from './types'
-import { TreePine, Users, MessagesSquare, User, Bell, GraduationCap } from 'lucide-react'
+import { TreePine, MessagesSquare, User, Bell, GraduationCap, Settings } from 'lucide-react'
 import './styles/index.css'
 
 // Configure React Query to use page visibility for focus detection
@@ -67,13 +66,13 @@ const TAB_STORAGE_KEY = 'activeTab'
 const getStoredTab = (): Tab => {
   try {
     const stored = localStorage.getItem(TAB_STORAGE_KEY)
-    if (stored && ['discussion', 'chat', 'users', 'profile', 'notifications', 'placements'].includes(stored)) {
+    if (stored && ['discussion', 'chat', 'users', 'profile', 'notifications', 'placements', 'admin'].includes(stored)) {
       return stored as Tab
     }
   } catch {
     // localStorage not available
   }
-  return 'discussion'
+  return 'placements'
 }
 
 // Compute initial tab at module load (before React renders)
@@ -109,7 +108,6 @@ function AppContent() {
   // React Query hooks for unread counts
   const { data: chatUnread } = useUnreadMessageCount(user?.id || null)
   const { data: notificationCount } = useNotificationCount(user?.id || null)
-  const prefetchUsers = usePrefetchUsers()
   const prefetchUserData = usePrefetchUserData()
 
   // Prefetch user data on login (bookmarks, conversations, profile)
@@ -118,13 +116,6 @@ function AppContent() {
       prefetchUserData(user.id)
     }
   }, [user?.id, prefetchUserData])
-
-  // Prefetch users on hover over Users tab
-  const handleUsersHover = useCallback(() => {
-    if (isAdmin) {
-      prefetchUsers(1, 50, '') // Prefetch first page with default settings
-    }
-  }, [isAdmin, prefetchUsers])
 
   // Listen for chat start events from username hover
   const handleStartChatEvent = useCallback((e: Event) => {
@@ -178,13 +169,13 @@ function AppContent() {
 
   // Compute effective tab - use stored tab if logged in, else discussion
   const effectiveTab = useMemo(() => {
-    // While auth is loading, allow public tabs (discussion/placements)
+    // While auth is loading, keep the current tab to avoid flicker
     if (authLoading) {
-      return activeTab === 'placements' ? 'placements' : 'discussion'
+      return activeTab
     }
-    // If logged in, use the active tab (with admin check for users tab)
+    // If logged in, use the active tab (with admin check for users/admin tabs)
     if (user) {
-      if (activeTab === 'users' && !isAdmin) {
+      if ((activeTab === 'users' || activeTab === 'admin') && !isAdmin) {
         return 'discussion'
       }
       return activeTab
@@ -240,18 +231,18 @@ function AppContent() {
   const tabsNav = (className: string) => (
     <nav className={`side-tabs ${className} ${showTerms ? 'hidden' : ''}`}>
       <button
+        className={`side-tab ${activeTab === 'placements' ? 'active' : ''}`}
+        onClick={() => setActiveTab('placements')}
+      >
+        <GraduationCap size={18} />
+        <span className="side-tab-label">Placements</span>
+      </button>
+      <button
         className={`side-tab ${activeTab === 'discussion' ? 'active' : ''}`}
         onClick={handleDiscussionClick}
       >
         <TreePine size={18} />
         <span className="side-tab-label">Grove</span>
-      </button>
-      <button
-        className={`side-tab ${activeTab === 'placements' ? 'active' : ''}`}
-        onClick={() => setActiveTab('placements')}
-      >
-        <GraduationCap size={18} />
-        <span className="side-tab-label">Jobs</span>
       </button>
       {user && (
         <button
@@ -273,16 +264,6 @@ function AppContent() {
           {chatUnread > 0 && <span className="side-tab-badge">{chatUnread}</span>}
         </button>
       )}
-      {isAdmin && (
-        <button
-          className={`side-tab ${activeTab === 'users' ? 'active' : ''}`}
-          onClick={() => setActiveTab('users')}
-          onMouseEnter={handleUsersHover}
-        >
-          <Users size={18} />
-          <span className="side-tab-label">Pandas</span>
-        </button>
-      )}
       {user && (
         <button
           className={`side-tab ${activeTab === 'profile' ? 'active' : ''}`}
@@ -290,6 +271,15 @@ function AppContent() {
         >
           <User size={18} />
           <span className="side-tab-label">Profile</span>
+        </button>
+      )}
+      {isAdmin && (
+        <button
+          className={`side-tab ${activeTab === 'admin' ? 'active' : ''}`}
+          onClick={() => setActiveTab('admin')}
+        >
+          <Settings size={18} />
+          <span className="side-tab-label">Admin</span>
         </button>
       )}
     </nav>
@@ -341,16 +331,6 @@ function AppContent() {
             </div>
           )}
 
-          {isAdmin && shouldMountTab('users') && (
-            <div className={`tab-content ${effectiveTab !== 'users' || showTerms ? 'hidden' : ''}`}>
-              <ErrorBoundary fallbackMessage="Failed to load user management. Please try again.">
-                <UserManagement
-                  isActive={effectiveTab === 'users' && !showTerms}
-                />
-              </ErrorBoundary>
-            </div>
-          )}
-
           {user && shouldMountTab('profile') && (
             <div className={`tab-content ${effectiveTab !== 'profile' || showTerms ? 'hidden' : ''}`}>
               <ErrorBoundary fallbackMessage="Failed to load profile. Please try again.">
@@ -371,6 +351,14 @@ function AppContent() {
             <div className={`tab-content ${effectiveTab !== 'placements' || showTerms ? 'hidden' : ''}`}>
               <ErrorBoundary fallbackMessage="Failed to load placements. Please try again.">
                 <Placements isActive={effectiveTab === 'placements' && !showTerms} />
+              </ErrorBoundary>
+            </div>
+          )}
+
+          {isAdmin && shouldMountTab('admin') && (
+            <div className={`tab-content ${effectiveTab !== 'admin' || showTerms ? 'hidden' : ''}`}>
+              <ErrorBoundary fallbackMessage="Failed to load admin. Please try again.">
+                <Admin isActive={effectiveTab === 'admin' && !showTerms} />
               </ErrorBoundary>
             </div>
           )}

@@ -429,7 +429,7 @@
 .placement-table th,
 .placement-table td {
   padding: 0.875rem 1rem;
-  text-align: left;
+  text-align: center;
   border-bottom: 1px solid var(--placement-border);
 }
 
@@ -439,12 +439,8 @@
   color: var(--placement-text-secondary);
   font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-  position: sticky;
-  top: 0;
-  text-align: center;
 }
+
 
 .placement-table tbody tr:hover {
   background: var(--placement-primary-light);
@@ -486,110 +482,146 @@
   min-width: 0;
 }
 
-/* Comparison Results */
-.comparison-wrapper {
+/* Comparison Results - Side by Side Layout */
+.comparison-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.comparison-year-section {
   background: var(--placement-bg);
   border: 1px solid var(--placement-border);
   border-radius: 12px;
+  overflow: hidden;
   box-shadow: var(--shadow-xs);
-  overflow: auto;
 }
 
-.comparison-header {
-  display: flex;
+.comparison-year-header {
   background: var(--color-bg-light);
-  border-bottom: 1px solid var(--placement-border);
-  position: sticky;
-  top: 0;
-}
-
-.comparison-header .comparison-cell {
+  padding: 0.75rem 1rem;
+  font-size: 1.125rem;
   font-weight: 600;
-  color: var(--placement-text-secondary);
-  font-size: 0.875rem;
-}
-
-.comparison-header .header-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.comparison-header .placement-count {
-  font-size: 0.75rem;
-  font-weight: 400;
-  color: var(--placement-text-muted);
-}
-
-.comparison-body {
-  max-height: 500px;
-  overflow-y: auto;
-}
-
-.comparison-row {
-  display: flex;
+  text-align: center;
+  color: var(--placement-text);
   border-bottom: 1px solid var(--placement-border);
 }
 
-.comparison-row:last-child {
-  border-bottom: none;
+.comparison-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 }
 
-.comparison-row:hover {
-  background: var(--placement-primary-light);
-}
-
-.comparison-cell {
-  flex: 1;
-  padding: 0.875rem 1rem;
-  min-width: 200px;
+.comparison-column {
+  padding: 1rem;
   border-right: 1px solid var(--placement-border);
 }
 
-.comparison-cell:last-child {
+.comparison-column:last-child {
   border-right: none;
 }
 
-.comparison-cell.year-cell {
-  flex: 0 0 100px;
-  min-width: 100px;
+.comparison-column-header {
+  background: var(--placement-primary-light);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.comparison-label {
   font-weight: 600;
-  color: var(--placement-text-secondary);
   font-size: 0.875rem;
+  color: var(--placement-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
-.comparison-cell .no-data {
+.comparison-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  background: var(--color-bg-light);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.comparison-count .count-number {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--placement-text);
+}
+
+.comparison-count .count-label {
+  font-size: 0.75rem;
   color: var(--placement-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.placement-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.comparison-institutions {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.placement-list li {
-  padding: 0.5rem 0.75rem;
+.institution-row {
   background: var(--color-bg-light);
-  border-radius: 6px;
-  border-left: 3px solid var(--placement-primary);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.placement-list .placement-name {
-  display: block;
+.institution-name {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
   font-weight: 500;
-  font-size: 0.8125rem;
   color: var(--placement-text);
+  text-transform: uppercase;
+  cursor: pointer;
+  background: none;
+  border: none;
+  text-align: left;
 }
 
-.placement-list .placement-inst {
-  display: block;
-  font-size: 0.75rem;
+.institution-name:hover {
+  background: var(--placement-primary-light);
+}
+
+.expand-icon {
+  font-size: 1.25rem;
+  font-weight: 300;
   color: var(--placement-text-muted);
-  margin-top: 0.125rem;
+  transition: transform 0.2s ease;
+}
+
+.expand-icon.expanded {
+  transform: rotate(45deg);
+}
+
+.institution-details {
+  padding: 0 1rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.placement-detail {
+  font-size: 0.8125rem;
+  color: var(--placement-text-secondary);
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--placement-primary);
+}
+
+.no-placements {
+  text-align: center;
+  color: var(--placement-text-muted);
+  font-size: 0.875rem;
+  padding: 1rem;
 }
 
 /* Reverse Search */

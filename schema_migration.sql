@@ -703,3 +703,40 @@ GRANT EXECUTE ON FUNCTION get_thread_view(INTEGER, INTEGER, INTEGER, TEXT) TO an
 GRANT EXECUTE ON FUNCTION get_post_by_id(INTEGER) TO anon;
 GRANT EXECUTE ON FUNCTION get_poll_data(INTEGER) TO anon;
 GRANT EXECUTE ON FUNCTION get_user_profile_cache(UUID) TO authenticated;
+
+-- =============================================================================
+-- Enforce lowercase university names in pt_university
+-- =============================================================================
+
+-- 1. Convert existing university names to lowercase
+UPDATE pt_university SET university = LOWER(university);
+
+-- 2. Create trigger function to enforce lowercase and normalize whitespace
+CREATE OR REPLACE FUNCTION enforce_lowercase_university()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- Lowercase, trim, and collapse multiple spaces to single space
+  NEW.university := LOWER(TRIM(REGEXP_REPLACE(NEW.university, '\s+', ' ', 'g')));
+  RETURN NEW;
+END;
+$$;
+
+-- 3. Create trigger on pt_university table
+DROP TRIGGER IF EXISTS enforce_lowercase_university_trigger ON pt_university;
+CREATE TRIGGER enforce_lowercase_university_trigger
+  BEFORE INSERT OR UPDATE ON pt_university
+  FOR EACH ROW
+  EXECUTE FUNCTION enforce_lowercase_university();
+
+-- 4. Add unique constraint on lowercase university name to prevent duplicates
+-- First, remove any duplicates (keep the one with lowest id)
+DELETE FROM pt_university a
+USING pt_university b
+WHERE a.id > b.id
+  AND LOWER(a.university) = LOWER(b.university);
+
+-- Then add unique index on lowercase university
+DROP INDEX IF EXISTS idx_pt_university_name_unique;
+CREATE UNIQUE INDEX idx_pt_university_name_unique ON pt_university (LOWER(university));
