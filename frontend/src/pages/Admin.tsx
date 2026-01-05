@@ -9,7 +9,6 @@ import {
   useDeleteUniversity,
 } from '../hooks/usePlacementQueries'
 import { useToast } from '../contexts/ToastContext'
-import { useToast } from '../contexts/ToastContext'
 
 type AdminSubTab = 'country' | 'university' | 'pandas'
 type UniversitySortColumn = 'university' | 'country' | 'rank' | 'top50'
