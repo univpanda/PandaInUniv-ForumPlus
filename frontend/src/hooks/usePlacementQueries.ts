@@ -280,19 +280,29 @@ export function usePlacementSearch(params: PlacementSearchParams, enabled: boole
 
       if (error) throw error
 
-      const placements: Placement[] = (data || []).map((row: Record<string, unknown>) => ({
-        id: row.id as string,
-        name: row.name as string | null,
-        placementUniv: row.placement_univ as string | null,
-        role: row.role as string | null,
-        year: row.year as number | null,
-        university: row.university as string | null,
-        program: row.program as string | null,
-        degree: row.degree as string | null,
-        discipline: row.discipline as string | null,
-        school: null,
-        department: null,
-      }))
+      const placements: Placement[] = (data || []).map((row: Record<string, unknown>) => {
+        const rawYear = row.year ?? row.date
+        const parsedYear = typeof rawYear === 'number'
+          ? rawYear
+          : rawYear
+            ? parseInt(String(rawYear), 10)
+            : null
+        const placementUniv = (row.placement_univ ?? row.institution ?? row.placement) as string | null
+
+        return {
+          id: row.id as string,
+          name: row.name as string | null,
+          placementUniv,
+          role: row.role as string | null,
+          year: Number.isNaN(parsedYear) ? null : parsedYear,
+          university: row.university as string | null,
+          program: row.program as string | null,
+          degree: row.degree as string | null,
+          discipline: row.discipline as string | null,
+          school: null,
+          department: null,
+        }
+      })
 
       const totalCount = data?.[0]?.total_count || 0
 
@@ -320,19 +330,29 @@ export function useReverseSearch(params: ReverseSearchParams, enabled: boolean =
 
       if (error) throw error
 
-      const placements: Placement[] = (data || []).map((row: Record<string, unknown>) => ({
-        id: row.id as string,
-        name: row.name as string | null,
-        placementUniv: row.placement_univ as string | null,
-        role: row.role as string | null,
-        year: row.year as number | null,
-        university: row.university as string | null,
-        program: row.program as string | null,
-        degree: row.degree as string | null,
-        discipline: row.discipline as string | null,
-        school: null,
-        department: null,
-      }))
+      const placements: Placement[] = (data || []).map((row: Record<string, unknown>) => {
+        const rawYear = row.year ?? row.date
+        const parsedYear = typeof rawYear === 'number'
+          ? rawYear
+          : rawYear
+            ? parseInt(String(rawYear), 10)
+            : null
+        const placementUniv = (row.placement_univ ?? row.institution ?? row.placement) as string | null
+
+        return {
+          id: row.id as string,
+          name: row.name as string | null,
+          placementUniv,
+          role: row.role as string | null,
+          year: Number.isNaN(parsedYear) ? null : parsedYear,
+          university: row.university as string | null,
+          program: row.program as string | null,
+          degree: row.degree as string | null,
+          discipline: row.discipline as string | null,
+          school: null,
+          department: null,
+        }
+      })
 
       const totalCount = data?.[0]?.total_count || 0
 

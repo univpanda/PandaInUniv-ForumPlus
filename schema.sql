@@ -3652,5 +3652,173 @@ CREATE POLICY "Admin write access to pt_placement" ON pt_placement FOR ALL USING
 CREATE POLICY "Admin write access to pt_department" ON pt_department FOR ALL USING (public.check_is_admin());
 
 -- =============================================================================
+-- PLACEMENT TRACKER RPC FUNCTIONS
+-- =============================================================================
+
+-- Get filter options for placement search
+CREATE OR REPLACE FUNCTION public.get_placement_filters()
+ RETURNS json
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  result JSON;
+BEGIN
+  SELECT json_build_object(
+    'degrees', (SELECT json_agg(DISTINCT degree) FROM pt_placement WHERE degree IS NOT NULL AND degree != ''),
+    'programs', (SELECT json_agg(DISTINCT program ORDER BY program) FROM pt_placement WHERE program IS NOT NULL AND program != ''),
+    'universities', (SELECT json_agg(DISTINCT university ORDER BY university) FROM pt_placement WHERE university IS NOT NULL AND university != ''),
+    'years', (SELECT json_agg(DISTINCT year ORDER BY year DESC) FROM pt_placement WHERE year IS NOT NULL)
+  ) INTO result;
+
+  RETURN result;
+END;
+$function$;
+
+-- Search placements by degree, program, university, and year range
+CREATE OR REPLACE FUNCTION public.search_placements(
+  p_degree text DEFAULT NULL,
+  p_program text DEFAULT NULL,
+  p_university text DEFAULT NULL,
+  p_from_year integer DEFAULT NULL,
+  p_to_year integer DEFAULT NULL,
+  p_limit integer DEFAULT 100,
+  p_offset integer DEFAULT 0
+)
+ RETURNS TABLE(id text, name text, placement_univ text, role text, year integer, university text, program text, degree text, discipline text, total_count bigint)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN QUERY
+  WITH filtered AS (
+    SELECT
+      p.id,
+      p.name,
+      p.placement_univ,
+      p.role,
+      p.year,
+      p.university,
+      p.program,
+      p.degree,
+      p.discipline
+    FROM pt_placement p
+    WHERE
+      (p_degree IS NULL OR UPPER(p.degree) = UPPER(p_degree))
+      AND (p_program IS NULL OR UPPER(p.program) = UPPER(p_program))
+      AND (p_university IS NULL OR UPPER(p.university) = UPPER(p_university))
+      AND (p_from_year IS NULL OR p.year >= p_from_year)
+      AND (p_to_year IS NULL OR p.year <= p_to_year)
+  ),
+  counted AS (
+    SELECT COUNT(*) AS cnt FROM filtered
+  )
+  SELECT
+    f.id,
+    f.name,
+    f.placement_univ,
+    f.role,
+    f.year,
+    f.university,
+    f.program,
+    f.degree,
+    f.discipline,
+    c.cnt AS total_count
+  FROM filtered f, counted c
+  ORDER BY f.year DESC NULLS LAST, f.name ASC NULLS LAST
+  LIMIT p_limit OFFSET p_offset;
+END;
+$function$;
+
+-- Reverse search: find placements by hiring institution
+CREATE OR REPLACE FUNCTION public.reverse_search_placements(
+  p_placement_univ text,
+  p_degree text DEFAULT NULL,
+  p_program text DEFAULT NULL,
+  p_from_year integer DEFAULT NULL,
+  p_to_year integer DEFAULT NULL,
+  p_limit integer DEFAULT 100,
+  p_offset integer DEFAULT 0
+)
+ RETURNS TABLE(id text, name text, placement_univ text, role text, year integer, university text, program text, degree text, discipline text, total_count bigint)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN QUERY
+  WITH filtered AS (
+    SELECT
+      p.id,
+      p.name,
+      p.placement_univ,
+      p.role,
+      p.year,
+      p.university,
+      p.program,
+      p.degree,
+      p.discipline
+    FROM pt_placement p
+    WHERE
+      UPPER(p.placement_univ) LIKE '%' || UPPER(p_placement_univ) || '%'
+      AND (p_degree IS NULL OR UPPER(p.degree) = UPPER(p_degree))
+      AND (p_program IS NULL OR UPPER(p.program) = UPPER(p_program))
+      AND (p_from_year IS NULL OR p.year >= p_from_year)
+      AND (p_to_year IS NULL OR p.year <= p_to_year)
+  ),
+  counted AS (
+    SELECT COUNT(*) AS cnt FROM filtered
+  )
+  SELECT
+    f.id,
+    f.name,
+    f.placement_univ,
+    f.role,
+    f.year,
+    f.university,
+    f.program,
+    f.degree,
+    f.discipline,
+    c.cnt AS total_count
+  FROM filtered f, counted c
+  ORDER BY f.year DESC NULLS LAST, f.name ASC NULLS LAST
+  LIMIT p_limit OFFSET p_offset;
+END;
+$function$;
+
+-- Get programs offered at a specific university
+CREATE OR REPLACE FUNCTION public.get_programs_for_university(p_university text)
+ RETURNS json
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN (
+    SELECT json_agg(DISTINCT program ORDER BY program)
+    FROM pt_placement
+    WHERE university = p_university
+      AND program IS NOT NULL
+      AND program != ''
+  );
+END;
+$function$;
+
+-- Get universities that offer a specific program
+CREATE OR REPLACE FUNCTION public.get_universities_for_program(p_program text)
+ RETURNS json
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN (
+    SELECT json_agg(DISTINCT university ORDER BY university)
+    FROM pt_placement
+    WHERE program = p_program
+      AND university IS NOT NULL
+      AND university != ''
+  );
+END;
+$function$;
+
+-- =============================================================================
 -- END OF SCHEMA
 -- =============================================================================

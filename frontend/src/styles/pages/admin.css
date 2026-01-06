@@ -276,8 +276,13 @@
   border-color: var(--color-danger-light);
 }
 
-/* Display university names with title case */
+/* Display names with title case */
 .university-table td:nth-child(2) {
+  text-transform: capitalize;
+}
+
+/* Country column in University table (3rd column, but not in Country table) */
+.university-table:not(.country-table) td:nth-child(3) {
   text-transform: capitalize;
 }
 
