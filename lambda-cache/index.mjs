@@ -711,7 +711,7 @@ export const handler = async (event) => {
         return response(401, { error: 'Unauthorized' }, requestOrigin);
       }
 
-      const requesterProfile = await getUserProfile(token.sub);
+      const requesterProfile = await getUserProfile(token.sub, authHeader?.slice(7));
       if (requesterProfile?.role !== 'admin') {
         return response(403, { error: 'Admin access required' }, requestOrigin);
       }
@@ -726,7 +726,7 @@ export const handler = async (event) => {
         return response(401, { error: 'Unauthorized' }, requestOrigin);
       }
 
-      const requesterProfile = await getUserProfile(token.sub);
+      const requesterProfile = await getUserProfile(token.sub, authHeader?.slice(7));
       if (requesterProfile?.role !== 'admin') {
         return response(403, { error: 'Admin access required' }, requestOrigin);
       }

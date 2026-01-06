@@ -122,7 +122,7 @@ function isTokenExpired(accessToken: string): boolean {
     const decoded = JSON.parse(atob(padded)) as { exp?: number }
     if (!decoded.exp) return false
     // 60s skew to avoid edge-of-expiry issues
-    return decoded.exp * 1000 < Date.now() - 60_000
+    return decoded.exp * 1000 < Date.now() + 60_000
   } catch {
     return false
   }
