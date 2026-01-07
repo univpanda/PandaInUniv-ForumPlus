@@ -668,7 +668,7 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
           onError: (error: { code?: string; message?: string }) => {
             const message = error?.message?.toLowerCase() || ''
             if (error?.code === '23505' || message.includes('duplicate') || message.includes('unique')) {
-              toast.showError('University already exists')
+              toast.showError('University already exists in this country')
               return
             }
             toast.showError('Failed to add university')

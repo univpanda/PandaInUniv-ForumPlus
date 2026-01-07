@@ -3573,8 +3573,9 @@ CREATE TRIGGER enforce_lowercase_university_trigger
   FOR EACH ROW
   EXECUTE FUNCTION enforce_lowercase_university();
 
--- Unique index to prevent duplicates (case-insensitive)
-CREATE UNIQUE INDEX IF NOT EXISTS idx_pt_university_name_unique ON pt_university (LOWER(university));
+-- Unique index to prevent duplicates (case-insensitive university name per country)
+DROP INDEX IF EXISTS idx_pt_university_name_unique;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pt_university_name_country_unique ON pt_university (LOWER(university), country_id);
 
 -- School type enum
 DO $$ BEGIN
