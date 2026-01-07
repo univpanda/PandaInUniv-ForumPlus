@@ -3578,12 +3578,67 @@ CREATE TRIGGER enforce_lowercase_university_trigger
 -- Unique index to prevent duplicates (case-insensitive)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_pt_university_name_unique ON pt_university (LOWER(university));
 
+-- School type enum
+DO $$ BEGIN
+  CREATE TYPE school_type AS ENUM ('degree_granting', 'continuing_education', 'non_degree', 'administrative');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+-- School table (schools within universities)
+CREATE TABLE IF NOT EXISTS pt_school (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  school TEXT NOT NULL,
+  university_id TEXT REFERENCES pt_university(id),
+  url TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  type school_type DEFAULT 'degree_granting'
+);
+
+CREATE INDEX IF NOT EXISTS idx_pt_school_university ON pt_school(university_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pt_school_name_unique ON pt_school (university_id, LOWER(school));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pt_school_university_name_unique ON pt_school (university_id, LOWER(school));
+
+-- Enforce lowercase school names
+CREATE OR REPLACE FUNCTION enforce_lowercase_school()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.school := LOWER(TRIM(REGEXP_REPLACE(NEW.school, '\s+', ' ', 'g')));
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS enforce_lowercase_school_trigger ON pt_school;
+CREATE TRIGGER enforce_lowercase_school_trigger
+  BEFORE INSERT OR UPDATE ON pt_school
+  FOR EACH ROW
+  EXECUTE FUNCTION enforce_lowercase_school();
+
+-- Auto-update updated_at on pt_school
+CREATE OR REPLACE FUNCTION update_pt_school_updated_at()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trigger_pt_school_updated_at ON pt_school;
+CREATE TRIGGER trigger_pt_school_updated_at
+  BEFORE UPDATE ON pt_school
+  FOR EACH ROW
+  EXECUTE FUNCTION update_pt_school_updated_at();
+
 -- Department table
 CREATE TABLE IF NOT EXISTS pt_department (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   department TEXT NOT NULL,
-  school_id INTEGER,
-  university_id INTEGER REFERENCES pt_university(id),
+  school_id TEXT REFERENCES pt_school(id) ON DELETE CASCADE,
+  university_id TEXT REFERENCES pt_university(id),
   status TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -3632,6 +3687,76 @@ CREATE TABLE IF NOT EXISTS pt_univ_program_combined (
   university TEXT
 );
 
+-- Program table (for scraper metadata)
+CREATE TABLE IF NOT EXISTS pt_program (
+  id TEXT PRIMARY KEY,
+  university_id TEXT,
+  program TEXT NOT NULL,
+  degree TEXT,
+  placement_url TEXT,
+  program_url TEXT,
+  status TEXT,
+  alert_flag INTEGER DEFAULT 0,
+  alert_reasons TEXT,
+  approval INTEGER,
+  approved INTEGER DEFAULT 0,
+  comment TEXT,
+  current_run_id TEXT,
+  current_run_scraped_records_count INTEGER,
+  edited INTEGER DEFAULT 0,
+  error_comment JSONB,
+  last_successful_run_id TEXT,
+  last_successful_run_scraped_records_count INTEGER,
+  manual INTEGER DEFAULT 0,
+  needs_review INTEGER DEFAULT 0,
+  rejected INTEGER DEFAULT 0,
+  scraper_tag TEXT,
+  scraping_error_details TEXT,
+  time_to_scrape NUMERIC,
+  total_preapproved_placements INTEGER,
+  total_newly_inserted_placements_count INTEGER,
+  url_selection_confidence INTEGER,
+  url_selection_reasoning TEXT,
+  last_checked TIMESTAMPTZ,
+  scraped_status TEXT,
+  scraped_timestamp TIMESTAMPTZ,
+  current_extracted_records_count INTEGER,
+  schools TEXT[],
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_pt_program_university ON pt_program(university_id);
+
+-- Program-University junction table
+CREATE TABLE IF NOT EXISTS pt_program_university (
+  id TEXT PRIMARY KEY,
+  program TEXT,
+  university TEXT,
+  program_id TEXT,
+  university_id TEXT
+);
+
+-- Faculty table
+CREATE TABLE IF NOT EXISTS pt_faculty (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  education JSONB,
+  source_url TEXT,
+  department_id TEXT,
+  university_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pt_faculty_university ON pt_faculty(university_id);
+
+-- Debug log table (for development/debugging)
+CREATE TABLE IF NOT EXISTS debug_log (
+  id SERIAL PRIMARY KEY,
+  message TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Indexes for placement queries
 CREATE INDEX IF NOT EXISTS idx_pt_placement_university ON pt_placement(university);
 CREATE INDEX IF NOT EXISTS idx_pt_placement_program ON pt_placement(program);
@@ -3640,21 +3765,32 @@ CREATE INDEX IF NOT EXISTS idx_pt_placement_univ ON pt_placement(placement_univ)
 
 -- RLS Policies for placement tables (read-only for authenticated users)
 ALTER TABLE pt_university ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pt_school ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pt_placement ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pt_department ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pt_queue ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pt_univ_program_combined ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pt_program ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pt_program_university ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pt_faculty ENABLE ROW LEVEL SECURITY;
 
 -- Allow read access to all users (including anonymous for public search)
 CREATE POLICY "Allow read access to pt_university" ON pt_university FOR SELECT USING (true);
+CREATE POLICY "Allow read access to pt_school" ON pt_school FOR SELECT USING (true);
 CREATE POLICY "Allow read access to pt_placement" ON pt_placement FOR SELECT USING (true);
 CREATE POLICY "Allow read access to pt_department" ON pt_department FOR SELECT USING (true);
 CREATE POLICY "Allow read access to pt_univ_program_combined" ON pt_univ_program_combined FOR SELECT USING (true);
+CREATE POLICY "Allow read access to pt_program" ON pt_program FOR SELECT USING (true);
+CREATE POLICY "Allow read access to pt_program_university" ON pt_program_university FOR SELECT USING (true);
+CREATE POLICY "Allow read access to pt_faculty" ON pt_faculty FOR SELECT USING (true);
 
 -- Admin-only write access
 CREATE POLICY "Admin write access to pt_university" ON pt_university FOR ALL USING (public.check_is_admin());
+CREATE POLICY "Admin write access to pt_school" ON pt_school FOR ALL USING (public.check_is_admin());
 CREATE POLICY "Admin write access to pt_placement" ON pt_placement FOR ALL USING (public.check_is_admin());
 CREATE POLICY "Admin write access to pt_department" ON pt_department FOR ALL USING (public.check_is_admin());
+CREATE POLICY "Admin write access to pt_program" ON pt_program FOR ALL USING (public.check_is_admin());
+CREATE POLICY "Admin write access to pt_faculty" ON pt_faculty FOR ALL USING (public.check_is_admin());
 
 -- =============================================================================
 -- PLACEMENT TRACKER RPC FUNCTIONS
