@@ -241,8 +241,8 @@
   overflow: hidden;
 }
 
-.country-table th,
-.country-table td {
+.university-table.country-table th,
+.university-table.country-table td {
   text-align: center;
 }
 

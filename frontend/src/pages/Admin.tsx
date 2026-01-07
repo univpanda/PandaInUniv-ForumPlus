@@ -20,8 +20,8 @@ import { SearchInput } from '../components/ui'
 import { Plus, X } from 'lucide-react'
 
 type AdminSubTab = 'country' | 'university' | 'school' | 'pandas'
-type UniversitySortColumn = 'university' | 'country' | 'us_news_2025_rank'
-type CountrySortColumn = 'name' | 'code'
+type UniversitySortColumn = 'university' | 'country' | 'us_news_2025_rank' | 'school_count'
+type CountrySortColumn = 'name' | 'code' | 'university_count'
 type SchoolSortColumn = 'school' | 'university' | 'type'
 type SortDirection = 'asc' | 'desc'
 
@@ -358,8 +358,25 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
     const rest = filtered.filter((country) => !pinnedSet.has(country.id) && !country.id.startsWith('temp-'))
 
     const sortedRest = [...rest].sort((a, b) => {
-      const aVal = sortColumn === 'name' ? a.name : a.code
-      const bVal = sortColumn === 'name' ? b.name : b.code
+      let aVal: string | number
+      let bVal: string | number
+
+      switch (sortColumn) {
+        case 'name':
+          aVal = a.name
+          bVal = b.name
+          break
+        case 'code':
+          aVal = a.code
+          bVal = b.code
+          break
+        case 'university_count':
+          aVal = a.university_count ?? 0
+          bVal = b.university_count ?? 0
+          break
+        default:
+          return 0
+      }
 
       if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1
@@ -409,7 +426,9 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
                   <th className="sortable" onClick={() => handleSort('code')}>
                     Code {sortColumn === 'code' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
-                  <th>Universities</th>
+                  <th className="sortable" onClick={() => handleSort('university_count')}>
+                    Universities {sortColumn === 'university_count' && (sortDirection === 'asc' ? '▲' : '▼')}
+                  </th>
                   <th className="table-header-action-cell">
                     {!isAdding && (
                       <button
@@ -682,8 +701,8 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
     const rest = filtered.filter((university) => !pinnedSet.has(university.id) && !university.id.startsWith('temp-'))
 
     const sortedRest = [...rest].sort((a, b) => {
-      let aVal: string | number | boolean | null
-      let bVal: string | number | boolean | null
+      let aVal: string | number
+      let bVal: string | number
 
       switch (sortColumn) {
         case 'university':
@@ -697,6 +716,10 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
         case 'us_news_2025_rank':
           aVal = a.us_news_2025_rank ?? Infinity
           bVal = b.us_news_2025_rank ?? Infinity
+          break
+        case 'school_count':
+          aVal = a.school_count ?? 0
+          bVal = b.school_count ?? 0
           break
         default:
           return 0
@@ -832,7 +855,9 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
                   <th className="sortable" onClick={() => handleSort('us_news_2025_rank')}>
                     US News 2025 {sortColumn === 'us_news_2025_rank' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
-                  <th>Schools</th>
+                  <th className="sortable" onClick={() => handleSort('school_count')}>
+                    Schools {sortColumn === 'school_count' && (sortDirection === 'asc' ? '▲' : '▼')}
+                  </th>
                   <th className="table-header-action-cell">
                     {!isAdding && (
                       <button
