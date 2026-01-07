@@ -335,8 +335,16 @@ export function Discussion({
           </div>
         )}
 
-        {/* Query Error - show even during loading to surface permission errors */}
-        {status.queryError && (
+        {/* Loading - only show spinner for initial load (no data yet) */}
+        {status.loading && <LoadingSpinner className="discussion-loading" />}
+
+        {/* Background fetching indicator - subtle, doesn't block content */}
+        {status.isFetching && !status.loading && (
+          <div className="discussion-fetching-indicator" />
+        )}
+
+        {/* Query Error */}
+        {status.queryError && !status.loading && (
           <QueryErrorBanner
             message={
               nav.view === 'list'
@@ -345,14 +353,6 @@ export function Discussion({
             }
             onRetry={handleRetry}
           />
-        )}
-
-        {/* Loading - only show spinner for initial load (no data yet) and no error */}
-        {status.loading && !status.queryError && <LoadingSpinner className="discussion-loading" />}
-
-        {/* Background fetching indicator - subtle, doesn't block content */}
-        {status.isFetching && !status.loading && !status.queryError && (
-          <div className="discussion-fetching-indicator" />
         )}
 
         {/* Private User Search Message */}
