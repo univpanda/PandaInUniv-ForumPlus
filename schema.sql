@@ -3598,6 +3598,9 @@ CREATE INDEX IF NOT EXISTS idx_pt_school_university ON pt_school(university_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_pt_school_name_unique ON pt_school (university_id, LOWER(school));
 CREATE UNIQUE INDEX IF NOT EXISTS idx_pt_school_university_name_unique ON pt_school (university_id, LOWER(school));
 
+CREATE INDEX IF NOT EXISTS idx_pt_department_school ON pt_department(school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pt_department_name_unique ON pt_department (school_id, LOWER(department));
+
 -- Enforce lowercase school names
 CREATE OR REPLACE FUNCTION enforce_lowercase_school()
 RETURNS TRIGGER
@@ -3614,6 +3617,23 @@ CREATE TRIGGER enforce_lowercase_school_trigger
   BEFORE INSERT OR UPDATE ON pt_school
   FOR EACH ROW
   EXECUTE FUNCTION enforce_lowercase_school();
+
+-- Enforce lowercase department names
+CREATE OR REPLACE FUNCTION enforce_lowercase_department()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.department := LOWER(TRIM(REGEXP_REPLACE(NEW.department, '\s+', ' ', 'g')));
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS enforce_lowercase_department_trigger ON pt_department;
+CREATE TRIGGER enforce_lowercase_department_trigger
+  BEFORE INSERT OR UPDATE ON pt_department
+  FOR EACH ROW
+  EXECUTE FUNCTION enforce_lowercase_department();
 
 -- Auto-update updated_at on pt_school
 CREATE OR REPLACE FUNCTION update_pt_school_updated_at()
