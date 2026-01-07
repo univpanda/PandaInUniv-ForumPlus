@@ -334,7 +334,7 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
 
   return (
     <div className="university-admin">
-      <div className="admin-section">
+      <div className="admin-section country-tab-content">
         <div className="admin-toolbar">
           <p className="admin-description">
             {sortedCountries.length} of {countries.length} countries

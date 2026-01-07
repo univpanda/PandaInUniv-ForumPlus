@@ -203,6 +203,13 @@
   overflow: hidden;
 }
 
+/* Country tab - centered layout matching table width */
+.country-tab-content .admin-toolbar {
+  max-width: 720px;
+  margin: 0 auto 1rem;
+  justify-content: center;
+}
+
 /* Country table - no scroll wrapper, uses page scroll */
 .country-table {
   max-width: 720px;
@@ -217,6 +224,11 @@
 .country-table th,
 .country-table td {
   text-align: center;
+}
+
+/* Left-align inline inputs within centered table cells */
+.country-table .inline-input {
+  text-align: left;
 }
 
 .university-table {
@@ -257,24 +269,39 @@
 
 .table-header-action-cell {
   text-align: center;
-  width: 48px;
 }
 
-.table-header-action {
-  padding: 0;
+.admin-delete-btn.table-header-action {
+  padding: 0.25rem;
   line-height: 1.1;
   font-size: 0.85rem;
+  color: var(--color-primary);
+}
+
+.admin-delete-btn.table-header-action:hover {
+  background: var(--color-primary-bg, rgba(59, 130, 246, 0.1));
   color: var(--color-primary);
 }
 
 .university-table th:first-child,
 .university-table td:first-child {
   text-align: center;
+  width: 72px;
+  padding-left: 2rem;
+  padding-right: 0;
+}
+
+.university-table th:nth-child(2),
+.university-table td:nth-child(2) {
+  padding-left: 0.5rem;
 }
 
 .university-table th:last-child,
 .university-table td:last-child {
   text-align: center;
+  width: 72px;
+  padding-left: 0.5rem;
+  padding-right: 2rem;
 }
 
 .university-table td:first-child {
