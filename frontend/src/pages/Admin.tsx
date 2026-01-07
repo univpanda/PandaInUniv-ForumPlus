@@ -11,7 +11,8 @@ import {
   useUpdateUniversity,
 } from '../hooks/usePlacementQueries'
 import { useToast } from '../contexts/ToastContext'
-import { X } from 'lucide-react'
+import { SearchInput } from '../components/ui'
+import { Plus, X } from 'lucide-react'
 
 type AdminSubTab = 'country' | 'university' | 'pandas'
 type UniversitySortColumn = 'university' | 'country' | 'rank' | 'top50'
@@ -338,27 +339,12 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
           <p className="admin-description">
             {sortedCountries.length} of {countries.length} countries
           </p>
-          <input
-            type="text"
-            placeholder="Search countries..."
+          <SearchInput
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={setSearchQuery}
+            placeholder="Search countries..."
             className="admin-search-input"
           />
-          {isAdding ? (
-            <div className="admin-actions">
-              <button className="admin-add-btn" onClick={handleSaveNew}>
-                Save
-              </button>
-              <button className="admin-cancel-btn" onClick={handleCancelAdd}>
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button className="admin-add-btn" onClick={handleAddClick}>
-              + Add
-            </button>
-          )}
         </div>
 
         {isLoading && <div className="admin-placeholder">Loading countries...</div>}
@@ -381,7 +367,18 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
                   <th className="sortable" onClick={() => handleSort('code')}>
                     Code {sortColumn === 'code' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
-                  <th />
+                  <th className="table-header-action-cell">
+                    {!isAdding && (
+                      <button
+                        className="admin-delete-btn table-header-action"
+                        onClick={handleAddClick}
+                        title="Add country"
+                        type="button"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    )}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -410,7 +407,11 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
                         className="inline-input"
                       />
                     </td>
-                    <td />
+                    <td>
+                      <button className="admin-delete-btn" onClick={handleCancelAdd} title="Cancel">
+                        <X size={16} />
+                      </button>
+                    </td>
                   </tr>
                 )}
                 {paginatedCountries.map((country, index) => {
@@ -773,11 +774,10 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
           <p className="admin-description">
             {sortedUniversities.length} of {universities.length} universities
           </p>
-          <input
-            type="text"
-            placeholder="Search universities..."
+          <SearchInput
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={setSearchQuery}
+            placeholder="Search universities..."
             className="admin-search-input"
           />
           {isAdding ? (
@@ -791,7 +791,7 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
             </div>
           ) : (
             <button className="admin-add-btn" onClick={handleAddClick}>
-              + Add
+              +
             </button>
           )}
         </div>

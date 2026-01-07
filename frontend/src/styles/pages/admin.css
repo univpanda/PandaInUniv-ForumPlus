@@ -75,9 +75,14 @@
 .admin-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 1rem;
   margin-bottom: 1rem;
+}
+
+.admin-toolbar .admin-add-btn,
+.admin-toolbar .admin-actions {
+  margin-left: auto;
 }
 
 .admin-actions {
@@ -86,24 +91,29 @@
   gap: 0.5rem;
 }
 
-.admin-search-input {
-  flex: 1;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
+.admin-search-input.search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.9rem;
+  background: white;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-bg);
-  color: var(--color-text);
-  transition: border-color 0.2s ease;
+  border-radius: var(--radius-lg);
+  margin-bottom: 0;
+  flex: 0 1 360px;
+  max-width: 360px;
+  width: 100%;
 }
 
-.admin-search-input:focus {
+.admin-search-input.search-box input {
+  flex: 1;
+  border: none;
   outline: none;
-  border-color: var(--color-primary);
+  font-size: 0.95rem;
 }
 
-.admin-search-input::placeholder {
-  color: var(--color-text-muted);
+.admin-search-input.search-box svg {
+  color: var(--color-text-light);
 }
 
 .admin-add-btn {
@@ -243,6 +253,18 @@
 
 .university-table th.sortable:hover {
   background: var(--color-bg-hover, #e5e7eb);
+}
+
+.table-header-action-cell {
+  text-align: center;
+  width: 48px;
+}
+
+.table-header-action {
+  padding: 0;
+  line-height: 1.1;
+  font-size: 0.85rem;
+  color: var(--color-primary);
 }
 
 .university-table th:first-child,
