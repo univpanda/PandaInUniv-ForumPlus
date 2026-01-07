@@ -30,6 +30,7 @@ interface CountryTabState {
   searchQuery: string
   sortColumn: CountrySortColumn
   sortDirection: SortDirection
+  page: number
 }
 
 export function Admin({ isActive = true }: AdminProps) {
@@ -40,6 +41,7 @@ export function Admin({ isActive = true }: AdminProps) {
     searchQuery: '',
     sortColumn: 'name',
     sortDirection: 'asc',
+    page: 1,
   })
 
   const [universityState, setUniversityState] = useState<UniversityTabState>({
@@ -102,12 +104,14 @@ interface CountryTabProps {
   setState: React.Dispatch<React.SetStateAction<CountryTabState>>
 }
 
+const COUNTRIES_PER_PAGE = 20
+
 function CountryTab({ isActive, state, setState }: CountryTabProps) {
   const { data: countries = [], isLoading, error } = useCountries()
   const createCountry = useCreateCountry()
   const deleteCountry = useDeleteCountry()
   const toast = useToast()
-  const { searchQuery, sortColumn, sortDirection } = state
+  const { searchQuery, sortColumn, sortDirection, page } = state
 
   const [isAdding, setIsAdding] = useState(false)
   const [newName, setNewName] = useState('')
@@ -122,15 +126,19 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
   }, [isAdding])
 
   const setSearchQuery = (query: string) => {
-    setState(prev => ({ ...prev, searchQuery: query }))
+    setState(prev => ({ ...prev, searchQuery: query, page: 1 }))
+  }
+
+  const setPage = (newPage: number) => {
+    setState(prev => ({ ...prev, page: newPage }))
   }
 
   const handleSort = (column: CountrySortColumn) => {
     setState(prev => {
       if (prev.sortColumn === column) {
-        return { ...prev, sortDirection: prev.sortDirection === 'asc' ? 'desc' : 'asc' }
+        return { ...prev, sortDirection: prev.sortDirection === 'asc' ? 'desc' : 'asc', page: 1 }
       } else {
-        return { ...prev, sortColumn: column, sortDirection: 'asc' }
+        return { ...prev, sortColumn: column, sortDirection: 'asc', page: 1 }
       }
     })
   }
@@ -220,6 +228,11 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
     return [...pinned, ...temps, ...sortedRest]
   }, [countries, searchQuery, sortColumn, sortDirection, pinnedCountryIds])
 
+  // Pagination
+  const totalPages = Math.ceil(sortedCountries.length / COUNTRIES_PER_PAGE)
+  const startIndex = (page - 1) * COUNTRIES_PER_PAGE
+  const paginatedCountries = sortedCountries.slice(startIndex, startIndex + COUNTRIES_PER_PAGE)
+
   return (
     <div className="university-admin">
       <div className="admin-section">
@@ -259,7 +272,7 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
         )}
 
         {!isLoading && !error && (sortedCountries.length > 0 || isAdding) && (
-          <div className="university-table-wrapper country-table-wrapper">
+          <>
             <table className="university-table country-table">
               <thead>
                 <tr>
@@ -302,9 +315,9 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
                     <td />
                   </tr>
                 )}
-                {sortedCountries.map((country, index) => (
+                {paginatedCountries.map((country, index) => (
                   <tr key={country.id}>
-                    <td>{index + 1}</td>
+                    <td>{startIndex + index + 1}</td>
                     <td>{country.name}</td>
                     <td>{country.code}</td>
                     <td>
@@ -320,7 +333,28 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
                 ))}
               </tbody>
             </table>
-          </div>
+            {totalPages > 1 && (
+              <div className="admin-pagination">
+                <button
+                  className="btn-secondary btn-small"
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
+                >
+                  Previous
+                </button>
+                <span className="page-info">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  className="btn-secondary btn-small"
+                  onClick={() => setPage(page + 1)}
+                  disabled={page >= totalPages}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
         )}
 
         {!isLoading && !error && sortedCountries.length === 0 && !isAdding && (

@@ -193,9 +193,12 @@
   border-radius: 8px;
 }
 
-.country-table-wrapper {
+/* Country table - no scroll wrapper, uses page scroll */
+.country-table {
   max-width: 720px;
   margin: 0 auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
 }
 
 .country-table th,
@@ -316,6 +319,26 @@
 
 .university-table .inline-input::placeholder {
   color: var(--color-text-muted);
+}
+
+/* Admin Pagination */
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 0.75rem 0;
+}
+
+.admin-pagination .page-info {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.admin-pagination .btn-secondary {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
 }
 
 /* Responsive */

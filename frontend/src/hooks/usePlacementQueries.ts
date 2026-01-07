@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabasePublic } from '../lib/supabase'
+import { supabase, supabasePublic } from '../lib/supabase'
 import { withTimeout } from '../utils/timeout'
 import type {
   PlacementFilters,
