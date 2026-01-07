@@ -6,7 +6,7 @@ import {
   useReverseSearch,
   useUniversitiesForProgram,
 } from '../hooks/usePlacementQueries'
-import { LoadingSpinner } from '../components/ui'
+import { LoadingSpinner, QueryErrorBanner } from '../components/ui'
 import type { PlacementSubTab, Placement, PlacementFilters } from '../types'
 
 interface PlacementsProps {
@@ -17,7 +17,7 @@ const MIN_YEAR = 2016
 const CURRENT_YEAR = new Date().getFullYear()
 
 export function Placements({ isActive = true }: PlacementsProps) {
-  const { data: filters, isLoading: filtersLoading } = usePlacementFilters()
+  const { data: filters, isLoading: filtersLoading, isError: filtersError, refetch: refetchFilters } = usePlacementFilters()
   const degree = 'PhD'
   const [fromYear, setFromYear] = useState<number>(CURRENT_YEAR - 1)
   const [toYear, setToYear] = useState<number>(CURRENT_YEAR)
@@ -56,6 +56,18 @@ export function Placements({ isActive = true }: PlacementsProps) {
     fromYear,
     toYear,
   }), [degree, fromYear, toYear])
+
+  // Show error state if filters failed to load
+  if (filtersError) {
+    return (
+      <div className="placements-container">
+        <QueryErrorBanner
+          message="Failed to load placement filters. Please try again."
+          onRetry={() => refetchFilters()}
+        />
+      </div>
+    )
+  }
 
   if (filtersLoading) {
     return <LoadingSpinner className="placements-loading" />
