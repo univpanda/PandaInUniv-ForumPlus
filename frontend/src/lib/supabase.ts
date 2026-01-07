@@ -11,6 +11,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+// Public client: avoids any persisted session or auto-refresh for signed-out flows.
+export const supabasePublic = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
+  },
+})
+
 // Helper to get public storage URLs without hardcoding the project ID
 export const getStorageUrl = (bucket: string, path: string): string => {
   return `${supabaseUrl}/storage/v1/object/public/${bucket}/${path}`

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
-import { supabase } from '../lib/supabase'
+import { supabase, supabasePublic } from '../lib/supabase'
 import { STALE_TIME, PAGE_SIZE } from '../utils/constants'
 import { getCachedThreadView, invalidateThreadCache, invalidateThreadsCache, isCacheEnabled } from '../lib/cacheApi'
 import { extractPaginatedResponse } from '../utils/queryHelpers'
@@ -11,11 +11,15 @@ import type { Post, Thread, GetPaginatedPostsResponse } from '../types'
 
 // Fetch a single post by ID (used to resolve stub posts in replies view)
 export function usePostById(postId: number, enabled: boolean = true) {
+  const { session } = useAuth()
+  const client = session?.access_token ? supabase : supabasePublic
+
   return useQuery({
     queryKey: ['forum', 'post', postId],
+    networkMode: 'always',
     queryFn: async (): Promise<Post | null> => {
       const { data, error } = await withTimeout(
-        supabase.rpc('get_post_by_id', {
+        client.rpc('get_post_by_id', {
           p_post_id: postId,
         }),
         15000,
@@ -39,11 +43,15 @@ export function usePaginatedPosts(
   sort: 'popular' | 'new' = 'popular',
   enabled: boolean = true
 ) {
+  const { session } = useAuth()
+  const client = session?.access_token ? supabase : supabasePublic
+
   return useQuery({
     queryKey: forumKeys.paginatedPosts(threadId, parentId, page, sort),
+    networkMode: 'always',
     queryFn: async (): Promise<GetPaginatedPostsResponse> => {
       const { data, error } = await withTimeout(
-        supabase.rpc('get_paginated_thread_posts', {
+        client.rpc('get_paginated_thread_posts', {
           p_thread_id: threadId,
           p_parent_id: parentId,
           p_limit: pageSize,
@@ -79,9 +87,11 @@ export function useThreadView(
   enabled: boolean = true
 ) {
   const { session, isAdmin } = useAuth()
+  const client = session?.access_token ? supabase : supabasePublic
 
   return useQuery({
     queryKey: forumKeys.threadView(threadId, page, sort),
+    networkMode: 'always',
     queryFn: async (): Promise<ThreadViewResponse> => {
       let rows: Array<Post & { is_op: boolean; total_count: number }> = []
 
@@ -99,7 +109,7 @@ export function useThreadView(
 
       if (rows.length === 0) {
         const { data, error } = await withTimeout(
-          supabase.rpc('get_thread_view', {
+          client.rpc('get_thread_view', {
             p_thread_id: threadId,
             p_limit: pageSize,
             p_offset: (page - 1) * pageSize,

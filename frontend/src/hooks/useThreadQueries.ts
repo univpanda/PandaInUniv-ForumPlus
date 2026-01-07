@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../lib/supabase'
+import { supabase, supabasePublic } from '../lib/supabase'
 import { STALE_TIME, PAGE_SIZE } from '../utils/constants'
 import { getCachedThreads, invalidateThreadsCache, isCacheEnabled } from '../lib/cacheApi'
 import { extractPaginatedResponse } from '../utils/queryHelpers'
@@ -24,10 +24,12 @@ export function usePaginatedThreads(
   isDeleted: boolean = false,
   isFlagged: boolean = false
 ) {
-  const { isAdmin } = useAuth()
+  const { isAdmin, session } = useAuth()
+  const client = session?.access_token ? supabase : supabasePublic
 
   return useQuery({
     queryKey: forumKeys.paginatedThreads(sortBy, page, authorUsername, searchText, isDeleted, isFlagged),
+    networkMode: 'always',
     queryFn: async (): Promise<GetPaginatedThreadsResponse> => {
       const isCachedEligible = !isAdmin && !isDeleted && !isFlagged && isCacheEnabled()
 
@@ -50,7 +52,7 @@ export function usePaginatedThreads(
       }
 
       // Add timeout to prevent infinite loading for anonymous users
-      const rpcPromise = supabase.rpc('get_paginated_forum_threads', {
+      const rpcPromise = client.rpc('get_paginated_forum_threads', {
         p_category_ids: null,
         p_limit: pageSize,
         p_offset: (page - 1) * pageSize,

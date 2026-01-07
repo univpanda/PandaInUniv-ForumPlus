@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../lib/supabase'
+import { supabasePublic } from '../lib/supabase'
 import { withTimeout } from '../utils/timeout'
 import type {
   PlacementFilters,
@@ -45,9 +45,10 @@ export const placementKeys = {
 export function usePlacementFilters() {
   return useQuery({
     queryKey: placementKeys.filters(),
+    networkMode: 'always',
     queryFn: async (): Promise<PlacementFilters> => {
       const { data, error } = await withTimeout(
-        supabase.rpc('get_placement_filters'),
+        supabasePublic.rpc('get_placement_filters'),
         15000,
         'Request timeout: placement filters took too long'
       )
@@ -272,9 +273,10 @@ export function useDeleteUniversity() {
 export function usePlacementSearch(params: PlacementSearchParams, enabled: boolean = true) {
   return useQuery({
     queryKey: placementKeys.search(params),
+    networkMode: 'always',
     queryFn: async (): Promise<PlacementSearchResult> => {
       const { data, error } = await withTimeout(
-        supabase.rpc('search_placements', {
+        supabasePublic.rpc('search_placements', {
           p_degree: params.degree || null,
           p_program: params.program || null,
           p_university: params.university || null,
@@ -326,9 +328,10 @@ export function usePlacementSearch(params: PlacementSearchParams, enabled: boole
 export function useReverseSearch(params: ReverseSearchParams, enabled: boolean = true) {
   return useQuery({
     queryKey: placementKeys.reverseSearch(params),
+    networkMode: 'always',
     queryFn: async (): Promise<PlacementSearchResult> => {
       const { data, error } = await withTimeout(
-        supabase.rpc('reverse_search_placements', {
+        supabasePublic.rpc('reverse_search_placements', {
           p_placement_univ: params.placementUniv,
           p_degree: params.degree || null,
           p_program: params.program || null,
@@ -380,10 +383,11 @@ export function useReverseSearch(params: ReverseSearchParams, enabled: boolean =
 export function useProgramsForUniversity(university: string | null) {
   return useQuery({
     queryKey: placementKeys.programsForUniversity(university || ''),
+    networkMode: 'always',
     queryFn: async (): Promise<string[]> => {
       if (!university) return []
       const { data, error } = await withTimeout(
-        supabase.rpc('get_programs_for_university', {
+        supabasePublic.rpc('get_programs_for_university', {
           p_university: university,
         }),
         15000,
@@ -401,10 +405,11 @@ export function useProgramsForUniversity(university: string | null) {
 export function useUniversitiesForProgram(program: string | null) {
   return useQuery({
     queryKey: placementKeys.universitiesForProgram(program || ''),
+    networkMode: 'always',
     queryFn: async (): Promise<string[]> => {
       if (!program) return []
       const { data, error } = await withTimeout(
-        supabase.rpc('get_universities_for_program', {
+        supabasePublic.rpc('get_universities_for_program', {
           p_program: program,
         }),
         15000,

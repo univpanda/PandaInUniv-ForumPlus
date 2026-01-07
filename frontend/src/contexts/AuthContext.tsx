@@ -190,6 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (isActive()) {
           processingUserId.current = null // Reset on sign out
           clearLocalAuthCache()
+          clearSupabaseAuthStorage()
           setSession(null)
           setUser(null)
           setIsAdmin(false)
@@ -497,6 +498,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Ignore errors - state is already cleared locally
     } catch {
       // Sign out error - state is already cleared, user appears signed out
+    } finally {
+      clearSupabaseAuthStorage()
     }
   }, [])
 
