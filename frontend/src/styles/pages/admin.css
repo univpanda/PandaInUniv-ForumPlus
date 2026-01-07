@@ -217,6 +217,19 @@
   justify-content: center;
 }
 
+/* University tab - same clean layout */
+.university-tab-content {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.university-tab-content .admin-toolbar {
+  margin: 0 0 1rem;
+  justify-content: center;
+}
+
 /* Country table - no scroll wrapper, uses page scroll */
 .country-table {
   max-width: 720px;
@@ -298,9 +311,10 @@
   padding-right: 0;
 }
 
-.university-table th:nth-child(2),
-.university-table td:nth-child(2) {
-  padding-left: 0.5rem;
+/* Center align all content columns in university table (except first/last which are already centered) */
+.university-table:not(.country-table) th,
+.university-table:not(.country-table) td {
+  text-align: center;
 }
 
 .university-table th:last-child,
@@ -315,13 +329,11 @@
   color: var(--color-text-muted);
 }
 
-.university-table a {
+.university-table a,
+.university-table .university-name-link {
   color: var(--color-primary);
   text-decoration: none;
-}
-
-.university-table a:hover {
-  text-decoration: underline;
+  cursor: pointer;
 }
 
 .admin-delete-btn {

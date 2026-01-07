@@ -769,7 +769,7 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
 
   return (
     <div className="university-admin">
-      <div className="admin-section">
+      <div className="admin-section university-tab-content">
         <div className="admin-toolbar">
           <p className="admin-description">
             {sortedUniversities.length} of {universities.length} universities
@@ -780,20 +780,6 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
             placeholder="Search universities..."
             className="admin-search-input"
           />
-          {isAdding ? (
-            <div className="admin-actions">
-              <button className="admin-add-btn" onClick={handleSaveNew}>
-                Save
-              </button>
-              <button className="admin-cancel-btn" onClick={handleCancelAdd}>
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button className="admin-add-btn" onClick={handleAddClick}>
-              +
-            </button>
-          )}
         </div>
 
         {isLoading && <div className="admin-placeholder">Loading universities...</div>}
@@ -819,10 +805,18 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
                   <th className="sortable" onClick={() => handleSort('rank')}>
                     Rank {sortColumn === 'rank' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
-                  <th className="sortable" onClick={() => handleSort('top50')}>
-                    Top 50 {sortColumn === 'top50' && (sortDirection === 'asc' ? '▲' : '▼')}
+                  <th className="table-header-action-cell">
+                    {!isAdding && (
+                      <button
+                        className="admin-delete-btn table-header-action"
+                        onClick={handleAddClick}
+                        title="Add university"
+                        type="button"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    )}
                   </th>
-                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -866,14 +860,10 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
                       />
                     </td>
                     <td>
-                      <input
-                        type="checkbox"
-                        checked={newTop50}
-                        onChange={(e) => setNewTop50(e.target.checked)}
-                        onKeyDown={handleKeyDown}
-                      />
+                      <button className="admin-delete-btn" onClick={handleCancelAdd} title="Cancel">
+                        <X size={16} />
+                      </button>
                     </td>
-                    <td />
                   </tr>
                 )}
                 {paginatedUniversities.map((uni, index) => {
@@ -902,7 +892,7 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
                             {uni.university}
                           </a>
                         ) : (
-                          uni.university
+                          <span className="university-name-link">{uni.university}</span>
                         )}
                       </td>
                       <td
@@ -950,32 +940,11 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
                           uni.rank || '-'
                         )}
                       </td>
-                      <td
-                        className={!isEditing ? 'editable-cell' : ''}
-                        onDoubleClick={() => !isEditing && handleStartEdit(uni)}
-                      >
-                        {isEditing && editingValue ? (
-                          <input
-                            type="checkbox"
-                            checked={editingValue.top50}
-                            onChange={(e) =>
-                              setEditingUniversity({ ...editingValue, top50: e.target.checked })
-                            }
-                          />
-                        ) : (
-                          uni.top50 ? 'Yes' : 'No'
-                        )}
-                      </td>
                       <td>
                         {isEditing ? (
-                          <div className="admin-actions">
-                            <button className="admin-add-btn" onClick={handleSaveEdit}>
-                              Save
-                            </button>
-                            <button className="admin-cancel-btn" onClick={handleCancelEdit}>
-                              Cancel
-                            </button>
-                          </div>
+                          <button className="admin-delete-btn" onClick={handleCancelEdit} title="Cancel">
+                            <X size={16} />
+                          </button>
                         ) : (
                           <button
                             className="admin-delete-btn"
