@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { withTimeout } from '../utils/timeout'
 import type {
   PlacementFilters,
   PlacementSearchParams,
@@ -45,7 +46,11 @@ export function usePlacementFilters() {
   return useQuery({
     queryKey: placementKeys.filters(),
     queryFn: async (): Promise<PlacementFilters> => {
-      const { data, error } = await supabase.rpc('get_placement_filters')
+      const { data, error } = await withTimeout(
+        supabase.rpc('get_placement_filters'),
+        15000,
+        'Request timeout: placement filters took too long'
+      )
       if (error) throw error
 
       return {
@@ -268,15 +273,19 @@ export function usePlacementSearch(params: PlacementSearchParams, enabled: boole
   return useQuery({
     queryKey: placementKeys.search(params),
     queryFn: async (): Promise<PlacementSearchResult> => {
-      const { data, error } = await supabase.rpc('search_placements', {
-        p_degree: params.degree || null,
-        p_program: params.program || null,
-        p_university: params.university || null,
-        p_from_year: params.fromYear || null,
-        p_to_year: params.toYear || null,
-        p_limit: params.limit || 100,
-        p_offset: params.offset || 0,
-      })
+      const { data, error } = await withTimeout(
+        supabase.rpc('search_placements', {
+          p_degree: params.degree || null,
+          p_program: params.program || null,
+          p_university: params.university || null,
+          p_from_year: params.fromYear || null,
+          p_to_year: params.toYear || null,
+          p_limit: params.limit || 100,
+          p_offset: params.offset || 0,
+        }),
+        15000,
+        'Request timeout: placement search took too long'
+      )
 
       if (error) throw error
 
@@ -318,15 +327,19 @@ export function useReverseSearch(params: ReverseSearchParams, enabled: boolean =
   return useQuery({
     queryKey: placementKeys.reverseSearch(params),
     queryFn: async (): Promise<PlacementSearchResult> => {
-      const { data, error } = await supabase.rpc('reverse_search_placements', {
-        p_placement_univ: params.placementUniv,
-        p_degree: params.degree || null,
-        p_program: params.program || null,
-        p_from_year: params.fromYear || null,
-        p_to_year: params.toYear || null,
-        p_limit: params.limit || 100,
-        p_offset: params.offset || 0,
-      })
+      const { data, error } = await withTimeout(
+        supabase.rpc('reverse_search_placements', {
+          p_placement_univ: params.placementUniv,
+          p_degree: params.degree || null,
+          p_program: params.program || null,
+          p_from_year: params.fromYear || null,
+          p_to_year: params.toYear || null,
+          p_limit: params.limit || 100,
+          p_offset: params.offset || 0,
+        }),
+        15000,
+        'Request timeout: reverse placement search took too long'
+      )
 
       if (error) throw error
 
@@ -369,9 +382,13 @@ export function useProgramsForUniversity(university: string | null) {
     queryKey: placementKeys.programsForUniversity(university || ''),
     queryFn: async (): Promise<string[]> => {
       if (!university) return []
-      const { data, error } = await supabase.rpc('get_programs_for_university', {
-        p_university: university,
-      })
+      const { data, error } = await withTimeout(
+        supabase.rpc('get_programs_for_university', {
+          p_university: university,
+        }),
+        15000,
+        'Request timeout: programs lookup took too long'
+      )
       if (error) throw error
       return (data || []).filter(Boolean).sort()
     },
@@ -386,9 +403,13 @@ export function useUniversitiesForProgram(program: string | null) {
     queryKey: placementKeys.universitiesForProgram(program || ''),
     queryFn: async (): Promise<string[]> => {
       if (!program) return []
-      const { data, error } = await supabase.rpc('get_universities_for_program', {
-        p_program: program,
-      })
+      const { data, error } = await withTimeout(
+        supabase.rpc('get_universities_for_program', {
+          p_program: program,
+        }),
+        15000,
+        'Request timeout: universities lookup took too long'
+      )
       if (error) throw error
       return (data || []).filter(Boolean).sort()
     },

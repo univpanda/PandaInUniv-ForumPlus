@@ -3505,7 +3505,13 @@ GRANT EXECUTE ON FUNCTION get_public_user_stats(UUID) TO anon;
 GRANT EXECUTE ON FUNCTION get_paginated_forum_threads(INTEGER[], INTEGER, INTEGER, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN, BOOLEAN) TO anon;
 GRANT EXECUTE ON FUNCTION get_thread_view(INTEGER, INTEGER, INTEGER, TEXT) TO anon;
 GRANT EXECUTE ON FUNCTION get_post_by_id(INTEGER) TO anon;
+GRANT EXECUTE ON FUNCTION get_paginated_thread_posts(INTEGER, INTEGER, INTEGER, INTEGER, TEXT) TO anon;
 GRANT EXECUTE ON FUNCTION get_poll_data(INTEGER) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_placement_filters() TO anon;
+GRANT EXECUTE ON FUNCTION public.search_placements(TEXT, TEXT, TEXT, INTEGER, INTEGER, INTEGER, INTEGER) TO anon;
+GRANT EXECUTE ON FUNCTION public.reverse_search_placements(TEXT, TEXT, TEXT, INTEGER, INTEGER, INTEGER, INTEGER) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_programs_for_university(TEXT) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_universities_for_program(TEXT) TO anon;
 GRANT EXECUTE ON FUNCTION get_user_profile_cache(UUID) TO authenticated;
 
 

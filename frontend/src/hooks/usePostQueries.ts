@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { STALE_TIME, PAGE_SIZE } from '../utils/constants'
 import { getCachedThreadView, invalidateThreadCache, invalidateThreadsCache, isCacheEnabled } from '../lib/cacheApi'
 import { extractPaginatedResponse } from '../utils/queryHelpers'
+import { withTimeout } from '../utils/timeout'
 import { forumKeys } from './forumQueryKeys'
 import { profileKeys } from './useUserProfile'
 import { useAuth } from './useAuth'
@@ -13,9 +14,13 @@ export function usePostById(postId: number, enabled: boolean = true) {
   return useQuery({
     queryKey: ['forum', 'post', postId],
     queryFn: async (): Promise<Post | null> => {
-      const { data, error } = await supabase.rpc('get_post_by_id', {
-        p_post_id: postId,
-      })
+      const { data, error } = await withTimeout(
+        supabase.rpc('get_post_by_id', {
+          p_post_id: postId,
+        }),
+        15000,
+        'Request timeout: post lookup took too long'
+      )
       if (error) throw error
       const rows = (data ?? []) as Post[]
       return rows[0] ?? null
@@ -37,13 +42,17 @@ export function usePaginatedPosts(
   return useQuery({
     queryKey: forumKeys.paginatedPosts(threadId, parentId, page, sort),
     queryFn: async (): Promise<GetPaginatedPostsResponse> => {
-      const { data, error } = await supabase.rpc('get_paginated_thread_posts', {
-        p_thread_id: threadId,
-        p_parent_id: parentId,
-        p_limit: pageSize,
-        p_offset: (page - 1) * pageSize,
-        p_sort: sort,
-      })
+      const { data, error } = await withTimeout(
+        supabase.rpc('get_paginated_thread_posts', {
+          p_thread_id: threadId,
+          p_parent_id: parentId,
+          p_limit: pageSize,
+          p_offset: (page - 1) * pageSize,
+          p_sort: sort,
+        }),
+        15000,
+        'Request timeout: thread posts took too long'
+      )
       if (error) throw error
       const { items: posts, totalCount } = extractPaginatedResponse<Post>(data)
       return { posts, totalCount }
@@ -89,12 +98,16 @@ export function useThreadView(
       }
 
       if (rows.length === 0) {
-        const { data, error } = await supabase.rpc('get_thread_view', {
-          p_thread_id: threadId,
-          p_limit: pageSize,
-          p_offset: (page - 1) * pageSize,
-          p_sort: sort,
-        })
+        const { data, error } = await withTimeout(
+          supabase.rpc('get_thread_view', {
+            p_thread_id: threadId,
+            p_limit: pageSize,
+            p_offset: (page - 1) * pageSize,
+            p_sort: sort,
+          }),
+          15000,
+          'Request timeout: thread view took too long'
+        )
         if (error) throw error
         rows = (data ?? []) as Array<Post & { is_op: boolean; total_count: number }>
       }
