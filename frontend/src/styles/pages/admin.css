@@ -186,11 +186,11 @@
 }
 
 .university-table-wrapper {
-  overflow-x: auto;
-  max-height: 500px;
-  overflow-y: auto;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-xl, 16px);
+  background: white;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
 }
 
 /* Country table - no scroll wrapper, uses page scroll */
@@ -198,7 +198,10 @@
   max-width: 720px;
   margin: 0 auto;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-xl, 16px);
+  background: white;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
 }
 
 .country-table th,
@@ -223,7 +226,10 @@
 .university-table th {
   background: var(--color-bg-light);
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
   position: sticky;
   top: 0;
   z-index: 1;
@@ -263,20 +269,20 @@
 }
 
 .admin-delete-btn {
-  padding: 0.35rem 0.75rem;
+  padding: 0.25rem;
   font-size: 0.8rem;
   font-weight: 500;
   color: var(--color-danger);
-  background: var(--color-danger-bg);
-  border: 1px solid var(--color-danger-border);
+  background: transparent;
+  border: none;
   border-radius: 6px;
   cursor: pointer;
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .admin-delete-btn:hover {
-  background: var(--color-danger-bg-dark);
-  border-color: var(--color-danger-light);
+  background: var(--color-danger-bg);
+  border-color: transparent;
 }
 
 /* Display names with title case */
@@ -304,21 +310,31 @@
 
 .university-table .inline-input {
   width: 100%;
-  padding: 0.375rem 0.5rem;
-  font-size: 0.875rem;
-  border: 1px solid var(--color-primary);
-  border-radius: 4px;
-  background: var(--color-bg);
+  padding: 0;
+  font-size: inherit;
+  border: none;
+  border-bottom: 1px solid var(--color-primary);
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text);
   outline: none;
 }
 
 .university-table .inline-input:focus {
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+  border-bottom-width: 2px;
 }
 
 .university-table .inline-input::placeholder {
   color: var(--color-text-muted);
+}
+
+/* Editable cells */
+.editable-cell {
+  cursor: pointer;
+}
+
+.editing-row {
+  background: var(--color-bg-light);
 }
 
 /* Admin Pagination */

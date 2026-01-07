@@ -7,6 +7,8 @@ import {
   useCreateUniversity,
   useDeleteCountry,
   useDeleteUniversity,
+  useUpdateCountry,
+  useUpdateUniversity,
 } from '../hooks/usePlacementQueries'
 import { useToast } from '../contexts/ToastContext'
 import { X } from 'lucide-react'
@@ -24,6 +26,7 @@ interface UniversityTabState {
   searchQuery: string
   sortColumn: UniversitySortColumn
   sortDirection: SortDirection
+  page: number
 }
 
 interface CountryTabState {
@@ -48,6 +51,7 @@ export function Admin({ isActive = true }: AdminProps) {
     searchQuery: '',
     sortColumn: 'university',
     sortDirection: 'asc',
+    page: 1,
   })
 
   return (
@@ -105,11 +109,33 @@ interface CountryTabProps {
 }
 
 const COUNTRIES_PER_PAGE = 20
+const UNIVERSITIES_PER_PAGE = 20
+
+interface EditingCountry {
+  id: string
+  name: string
+  code: string
+  originalName: string
+  originalCode: string
+}
+
+interface EditingUniversity {
+  id: string
+  university: string
+  country_id: string | null
+  rank: string
+  top50: boolean
+  originalUniversity: string
+  originalCountryId: string | null
+  originalRank: string
+  originalTop50: boolean
+}
 
 function CountryTab({ isActive, state, setState }: CountryTabProps) {
   const { data: countries = [], isLoading, error } = useCountries()
   const createCountry = useCreateCountry()
   const deleteCountry = useDeleteCountry()
+  const updateCountry = useUpdateCountry()
   const toast = useToast()
   const { searchQuery, sortColumn, sortDirection, page } = state
 
@@ -117,7 +143,9 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
   const [newName, setNewName] = useState('')
   const [newCode, setNewCode] = useState('')
   const [pinnedCountryIds, setPinnedCountryIds] = useState<string[]>([])
+  const [editingCountry, setEditingCountry] = useState<EditingCountry | null>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
+  const editNameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (isAdding && nameInputRef.current) {
@@ -200,6 +228,76 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
       handleCancelAdd()
     }
   }
+
+  // Inline editing handlers
+  const handleStartEdit = (country: { id: string; name: string; code: string }) => {
+    setEditingCountry({
+      id: country.id,
+      name: country.name,
+      code: country.code,
+      originalName: country.name,
+      originalCode: country.code,
+    })
+  }
+
+  const handleCancelEdit = () => {
+    setEditingCountry(null)
+  }
+
+  const handleSaveEdit = () => {
+    if (!editingCountry) return
+
+    const nameChanged = editingCountry.name.trim().toLowerCase() !== editingCountry.originalName.toLowerCase()
+    const codeChanged = editingCountry.code.trim().toUpperCase() !== editingCountry.originalCode.toUpperCase()
+
+    // No changes, just cancel
+    if (!nameChanged && !codeChanged) {
+      setEditingCountry(null)
+      return
+    }
+
+    if (!editingCountry.name.trim() || !editingCountry.code.trim()) {
+      toast.showError('Name and code are required')
+      return
+    }
+
+    updateCountry.mutate(
+      {
+        id: editingCountry.id,
+        name: editingCountry.name.trim(),
+        code: editingCountry.code.trim(),
+      },
+      {
+        onSuccess: () => {
+          setEditingCountry(null)
+          toast.showSuccess('Country updated')
+        },
+        onError: (error: { code?: string; message?: string }) => {
+          const message = error?.message?.toLowerCase() || ''
+          if (error?.code === '23505' || message.includes('duplicate') || message.includes('unique')) {
+            toast.showError('Country name or code already exists')
+            return
+          }
+          toast.showError('Failed to update country')
+        },
+      }
+    )
+  }
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveEdit()
+    } else if (e.key === 'Escape') {
+      handleCancelEdit()
+    }
+  }
+
+  // Focus the edit input when editing starts
+  useEffect(() => {
+    if (editingCountry && editNameInputRef.current) {
+      editNameInputRef.current.focus()
+    }
+  }, [editingCountry?.id])
 
   const sortedCountries = useMemo(() => {
     const filtered = countries.filter((c) =>
@@ -315,22 +413,59 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
                     <td />
                   </tr>
                 )}
-                {paginatedCountries.map((country, index) => (
-                  <tr key={country.id}>
-                    <td>{startIndex + index + 1}</td>
-                    <td>{country.name}</td>
-                    <td>{country.code}</td>
-                    <td>
-                      <button
-                        className="admin-delete-btn"
-                        onClick={() => handleDelete(country.id, country.name)}
-                        title="Delete"
+                {paginatedCountries.map((country, index) => {
+                  const isEditing = editingCountry?.id === country.id
+                  return (
+                    <tr key={country.id} className={isEditing ? 'editing-row' : ''}>
+                      <td>{startIndex + index + 1}</td>
+                      <td
+                        className={!isEditing ? 'editable-cell' : ''}
+                        onDoubleClick={() => !isEditing && handleStartEdit(country)}
                       >
-                        <X size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                        {isEditing ? (
+                          <input
+                            ref={editNameInputRef}
+                            type="text"
+                            value={editingCountry.name}
+                            onChange={(e) => setEditingCountry({ ...editingCountry, name: e.target.value })}
+                            onKeyDown={handleEditKeyDown}
+                            onBlur={handleSaveEdit}
+                            className="inline-input"
+                          />
+                        ) : (
+                          country.name
+                        )}
+                      </td>
+                      <td
+                        className={!isEditing ? 'editable-cell' : ''}
+                        onDoubleClick={() => !isEditing && handleStartEdit(country)}
+                      >
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editingCountry.code}
+                            onChange={(e) => setEditingCountry({ ...editingCountry, code: e.target.value.toUpperCase() })}
+                            onKeyDown={handleEditKeyDown}
+                            onBlur={handleSaveEdit}
+                            maxLength={3}
+                            className="inline-input"
+                          />
+                        ) : (
+                          country.code
+                        )}
+                      </td>
+                      <td>
+                        <button
+                          className="admin-delete-btn"
+                          onClick={() => handleDelete(country.id, country.name)}
+                          title="Delete"
+                        >
+                          <X size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
             {totalPages > 1 && (
@@ -378,8 +513,9 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
   const { data: countries = [] } = useCountries()
   const createUniversity = useCreateUniversity()
   const deleteUniversity = useDeleteUniversity()
+  const updateUniversity = useUpdateUniversity()
   const toast = useToast()
-  const { searchQuery, sortColumn, sortDirection } = state
+  const { searchQuery, sortColumn, sortDirection, page } = state
 
   const [isAdding, setIsAdding] = useState(false)
   const [newUniversity, setNewUniversity] = useState('')
@@ -389,6 +525,8 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
   const [newUrl, setNewUrl] = useState('')
   const [pinnedUniversityIds, setPinnedUniversityIds] = useState<string[]>([])
   const universityInputRef = useRef<HTMLInputElement>(null)
+  const editUniversityInputRef = useRef<HTMLInputElement>(null)
+  const [editingUniversity, setEditingUniversity] = useState<EditingUniversity | null>(null)
 
   useEffect(() => {
     if (isAdding && universityInputRef.current) {
@@ -396,16 +534,26 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
     }
   }, [isAdding])
 
+  useEffect(() => {
+    if (editingUniversity && editUniversityInputRef.current) {
+      editUniversityInputRef.current.focus()
+    }
+  }, [editingUniversity])
+
   const setSearchQuery = (query: string) => {
-    setState(prev => ({ ...prev, searchQuery: query }))
+    setState(prev => ({ ...prev, searchQuery: query, page: 1 }))
+  }
+
+  const setPage = (newPage: number) => {
+    setState(prev => ({ ...prev, page: newPage }))
   }
 
   const handleSort = (column: UniversitySortColumn) => {
     setState(prev => {
       if (prev.sortColumn === column) {
-        return { ...prev, sortDirection: prev.sortDirection === 'asc' ? 'desc' : 'asc' }
+        return { ...prev, sortDirection: prev.sortDirection === 'asc' ? 'desc' : 'asc', page: 1 }
       } else {
-        return { ...prev, sortColumn: column, sortDirection: 'asc' }
+        return { ...prev, sortColumn: column, sortDirection: 'asc', page: 1 }
       }
     })
   }
@@ -530,6 +678,94 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
     return [...pinned, ...temps, ...sortedRest]
   }, [universities, searchQuery, sortColumn, sortDirection, pinnedUniversityIds])
 
+  const startIndex = (page - 1) * UNIVERSITIES_PER_PAGE
+  const totalPages = Math.ceil(sortedUniversities.length / UNIVERSITIES_PER_PAGE)
+  const paginatedUniversities = sortedUniversities.slice(startIndex, startIndex + UNIVERSITIES_PER_PAGE)
+
+  useEffect(() => {
+    if (totalPages > 0 && page > totalPages) {
+      setPage(totalPages)
+    }
+  }, [page, totalPages])
+
+  const handleStartEdit = (uni: typeof universities[number]) => {
+    setEditingUniversity({
+      id: uni.id,
+      university: uni.university,
+      country_id: uni.country_id || null,
+      rank: uni.rank !== null && uni.rank !== undefined ? String(uni.rank) : '',
+      top50: Boolean(uni.top50),
+      originalUniversity: uni.university,
+      originalCountryId: uni.country_id || null,
+      originalRank: uni.rank !== null && uni.rank !== undefined ? String(uni.rank) : '',
+      originalTop50: Boolean(uni.top50),
+    })
+  }
+
+  const handleCancelEdit = () => {
+    setEditingUniversity(null)
+  }
+
+  const handleSaveEdit = () => {
+    if (!editingUniversity) return
+
+    const trimmedName = editingUniversity.university.trim()
+    if (!trimmedName) {
+      toast.showError('University name cannot be empty.')
+      return
+    }
+
+    const rankValue = editingUniversity.rank.trim() === ''
+      ? null
+      : Number(editingUniversity.rank)
+
+    if (rankValue !== null && Number.isNaN(rankValue)) {
+      toast.showError('Rank must be a valid number.')
+      return
+    }
+
+    const hasChanges =
+      trimmedName !== editingUniversity.originalUniversity ||
+      (editingUniversity.country_id || null) !== editingUniversity.originalCountryId ||
+      (editingUniversity.rank.trim() || '') !== (editingUniversity.originalRank || '') ||
+      editingUniversity.top50 !== editingUniversity.originalTop50
+
+    if (!hasChanges) {
+      setEditingUniversity(null)
+      return
+    }
+
+    updateUniversity.mutate(
+      {
+        id: editingUniversity.id,
+        university: trimmedName,
+        country_id: editingUniversity.country_id || null,
+        rank: rankValue,
+        top50: editingUniversity.top50,
+      },
+      {
+        onSuccess: () => {
+          toast.showSuccess('University updated.')
+          setEditingUniversity(null)
+        },
+        onError: () => {
+          toast.showError('Failed to update university.')
+        },
+      }
+    )
+  }
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleSaveEdit()
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      handleCancelEdit()
+    }
+  }
+
   return (
     <div className="university-admin">
       <div className="admin-section">
@@ -640,34 +876,142 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
                     <td />
                   </tr>
                 )}
-                {sortedUniversities.map((uni, index) => (
-                  <tr key={uni.id}>
-                    <td>{index + 1}</td>
-                    <td>
-                      {uni.university_url ? (
-                        <a href={uni.university_url} target="_blank" rel="noopener noreferrer">
-                          {uni.university}
-                        </a>
-                      ) : (
-                        uni.university
-                      )}
-                    </td>
-                    <td>{uni.country?.name || '-'}</td>
-                    <td>{uni.rank || '-'}</td>
-                    <td>{uni.top50 ? 'Yes' : 'No'}</td>
-                    <td>
-                      <button
-                        className="admin-delete-btn"
-                        onClick={() => handleDelete(uni.id, uni.university)}
-                        title="Delete"
+                {paginatedUniversities.map((uni, index) => {
+                  const isEditing = editingUniversity?.id === uni.id
+                  const editingValue = isEditing ? editingUniversity : null
+                  return (
+                    <tr key={uni.id} className={isEditing ? 'editing-row' : ''}>
+                      <td>{startIndex + index + 1}</td>
+                      <td
+                        className={!isEditing ? 'editable-cell' : ''}
+                        onDoubleClick={() => !isEditing && handleStartEdit(uni)}
                       >
-                        <X size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                        {isEditing && editingValue ? (
+                          <input
+                            ref={editUniversityInputRef}
+                            type="text"
+                            value={editingValue.university}
+                            onChange={(e) =>
+                              setEditingUniversity({ ...editingValue, university: e.target.value })
+                            }
+                            onKeyDown={handleEditKeyDown}
+                            className="inline-input"
+                          />
+                        ) : uni.university_url ? (
+                          <a href={uni.university_url} target="_blank" rel="noopener noreferrer">
+                            {uni.university}
+                          </a>
+                        ) : (
+                          uni.university
+                        )}
+                      </td>
+                      <td
+                        className={!isEditing ? 'editable-cell' : ''}
+                        onDoubleClick={() => !isEditing && handleStartEdit(uni)}
+                      >
+                        {isEditing && editingValue ? (
+                          <select
+                            value={editingValue.country_id || ''}
+                            onChange={(e) =>
+                              setEditingUniversity({
+                                ...editingValue,
+                                country_id: e.target.value || null,
+                              })
+                            }
+                            onKeyDown={handleEditKeyDown}
+                            className="inline-input"
+                          >
+                            <option value="">Select country</option>
+                            {countries.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          uni.country?.name || '-'
+                        )}
+                      </td>
+                      <td
+                        className={!isEditing ? 'editable-cell' : ''}
+                        onDoubleClick={() => !isEditing && handleStartEdit(uni)}
+                      >
+                        {isEditing && editingValue ? (
+                          <input
+                            type="number"
+                            value={editingValue.rank}
+                            onChange={(e) =>
+                              setEditingUniversity({ ...editingValue, rank: e.target.value })
+                            }
+                            onKeyDown={handleEditKeyDown}
+                            className="inline-input"
+                          />
+                        ) : (
+                          uni.rank || '-'
+                        )}
+                      </td>
+                      <td
+                        className={!isEditing ? 'editable-cell' : ''}
+                        onDoubleClick={() => !isEditing && handleStartEdit(uni)}
+                      >
+                        {isEditing && editingValue ? (
+                          <input
+                            type="checkbox"
+                            checked={editingValue.top50}
+                            onChange={(e) =>
+                              setEditingUniversity({ ...editingValue, top50: e.target.checked })
+                            }
+                          />
+                        ) : (
+                          uni.top50 ? 'Yes' : 'No'
+                        )}
+                      </td>
+                      <td>
+                        {isEditing ? (
+                          <div className="admin-actions">
+                            <button className="admin-add-btn" onClick={handleSaveEdit}>
+                              Save
+                            </button>
+                            <button className="admin-cancel-btn" onClick={handleCancelEdit}>
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            className="admin-delete-btn"
+                            onClick={() => handleDelete(uni.id, uni.university)}
+                            title="Delete"
+                          >
+                            <X size={16} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
+            {totalPages > 1 && (
+              <div className="admin-pagination">
+                <button
+                  className="btn-secondary btn-small"
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
+                >
+                  Previous
+                </button>
+                <span className="page-info">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  className="btn-secondary btn-small"
+                  onClick={() => setPage(page + 1)}
+                  disabled={page >= totalPages}
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         )}
 

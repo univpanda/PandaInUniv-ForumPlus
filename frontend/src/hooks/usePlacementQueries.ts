@@ -180,6 +180,46 @@ export function useDeleteCountry() {
   })
 }
 
+// Update a country
+export function useUpdateCountry() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, name, code }: { id: string; name: string; code: string }): Promise<Country> => {
+      const { data, error } = await supabase
+        .from('pt_country')
+        .update({ name, code })
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    },
+    onMutate: async ({ id, name, code }) => {
+      await queryClient.cancelQueries({ queryKey: placementKeys.countries() })
+      const previousCountries = queryClient.getQueryData<Country[]>(placementKeys.countries())
+
+      // Optimistically update
+      if (previousCountries) {
+        queryClient.setQueryData<Country[]>(placementKeys.countries(), (current) => {
+          if (!current) return current
+          return current.map((country) =>
+            country.id === id ? { ...country, name: name.toLowerCase(), code: code.toUpperCase() } : country
+          )
+        })
+      }
+
+      return { previousCountries }
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousCountries) {
+        queryClient.setQueryData(placementKeys.countries(), context.previousCountries)
+      }
+    },
+  })
+}
+
 // Create a new university
 export function useCreateUniversity() {
   const queryClient = useQueryClient()
@@ -265,6 +305,74 @@ export function useDeleteUniversity() {
         if (!current) return current
         return current.filter((university) => university.id !== universityId)
       })
+    },
+  })
+}
+
+// Update a university
+export function useUpdateUniversity() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (updates: {
+      id: string
+      university: string
+      country_id: string | null
+      rank: number | null
+      top50: boolean | null
+    }): Promise<University> => {
+      const { data, error } = await supabase
+        .from('pt_university')
+        .update({
+          university: updates.university,
+          country_id: updates.country_id,
+          rank: updates.rank,
+          top50: updates.top50,
+        })
+        .eq('id', updates.id)
+        .select(`
+          *,
+          country:pt_country(id, name, code)
+        `)
+        .single()
+
+      if (error) throw error
+      return data
+    },
+    onMutate: async (updates) => {
+      await queryClient.cancelQueries({ queryKey: placementKeys.universities() })
+      const previousUniversities = queryClient.getQueryData<University[]>(placementKeys.universities())
+
+      if (previousUniversities) {
+        queryClient.setQueryData<University[]>(placementKeys.universities(), (current) => {
+          if (!current) return current
+          return current.map((uni) => {
+            if (uni.id !== updates.id) return uni
+            const keepCountry = updates.country_id === uni.country_id
+            return {
+              ...uni,
+              university: updates.university.toLowerCase(),
+              country_id: updates.country_id,
+              rank: updates.rank,
+              top50: updates.top50,
+              country: keepCountry ? uni.country : null,
+            }
+          })
+        })
+      }
+
+      return { previousUniversities }
+    },
+    onSuccess: (updatedUniversity) => {
+      queryClient.setQueryData<University[]>(placementKeys.universities(), (current) => {
+        if (!current) return current
+        return current.map((uni) => (uni.id === updatedUniversity.id ? updatedUniversity : uni))
+      })
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousUniversities) {
+        queryClient.setQueryData(placementKeys.universities(), context.previousUniversities)
+      }
     },
   })
 }
