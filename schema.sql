@@ -3549,11 +3549,9 @@ CREATE TRIGGER trigger_enforce_lowercase_country
 CREATE TABLE IF NOT EXISTS pt_university (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   university TEXT NOT NULL,
-  university_url TEXT,
-  top50 INTEGER DEFAULT 0,
+  url TEXT,
   country_id TEXT REFERENCES pt_country(id),
-  rank INTEGER,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
+  us_news_2025_rank INTEGER,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 

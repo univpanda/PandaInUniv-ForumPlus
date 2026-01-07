@@ -15,7 +15,7 @@ import { SearchInput } from '../components/ui'
 import { Plus, X } from 'lucide-react'
 
 type AdminSubTab = 'country' | 'university' | 'pandas'
-type UniversitySortColumn = 'university' | 'country' | 'rank' | 'top50'
+type UniversitySortColumn = 'university' | 'country' | 'us_news_2025_rank'
 type CountrySortColumn = 'name' | 'code'
 type SortDirection = 'asc' | 'desc'
 
@@ -124,12 +124,10 @@ interface EditingUniversity {
   id: string
   university: string
   country_id: string | null
-  rank: string
-  top50: boolean
+  us_news_2025_rank: string
   originalUniversity: string
   originalCountryId: string | null
   originalRank: string
-  originalTop50: boolean
 }
 
 function CountryTab({ isActive, state, setState }: CountryTabProps) {
@@ -522,8 +520,6 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
   const [newUniversity, setNewUniversity] = useState('')
   const [newCountryId, setNewCountryId] = useState<string>('')
   const [newRank, setNewRank] = useState('')
-  const [newTop50, setNewTop50] = useState(false)
-  const [newUrl, setNewUrl] = useState('')
   const [pinnedUniversityIds, setPinnedUniversityIds] = useState<string[]>([])
   const universityInputRef = useRef<HTMLInputElement>(null)
   const editUniversityInputRef = useRef<HTMLInputElement>(null)
@@ -564,8 +560,6 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
     setNewUniversity('')
     setNewCountryId('')
     setNewRank('')
-    setNewTop50(false)
-    setNewUrl('')
   }
 
   const handleCancelAdd = () => {
@@ -573,8 +567,6 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
     setNewUniversity('')
     setNewCountryId('')
     setNewRank('')
-    setNewTop50(false)
-    setNewUrl('')
   }
 
   const handleDelete = (universityId: string, name: string) => {
@@ -596,9 +588,7 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
         {
           university: newUniversity.trim(),
           country_id: newCountryId || null,
-          rank: newRank ? parseInt(newRank, 10) : null,
-          top50: newTop50 ? 1 : 0,
-          university_url: newUrl.trim() || null,
+          us_news_2025_rank: newRank ? parseInt(newRank, 10) : null,
         },
         {
           onSuccess: (university) => {
@@ -606,8 +596,6 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
             setNewUniversity('')
             setNewCountryId('')
             setNewRank('')
-            setNewTop50(false)
-            setNewUrl('')
             setPinnedUniversityIds((prev) => [...prev, university.id])
             toast.showSuccess('University added')
           },
@@ -659,13 +647,9 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
           aVal = a.country?.name || ''
           bVal = b.country?.name || ''
           break
-        case 'rank':
-          aVal = a.rank ?? Infinity
-          bVal = b.rank ?? Infinity
-          break
-        case 'top50':
-          aVal = a.top50 ? 1 : 0
-          bVal = b.top50 ? 1 : 0
+        case 'us_news_2025_rank':
+          aVal = a.us_news_2025_rank ?? Infinity
+          bVal = b.us_news_2025_rank ?? Infinity
           break
         default:
           return 0
@@ -694,12 +678,10 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
       id: uni.id,
       university: uni.university,
       country_id: uni.country_id || null,
-      rank: uni.rank !== null && uni.rank !== undefined ? String(uni.rank) : '',
-      top50: Boolean(uni.top50),
+      us_news_2025_rank: uni.us_news_2025_rank !== null && uni.us_news_2025_rank !== undefined ? String(uni.us_news_2025_rank) : '',
       originalUniversity: uni.university,
       originalCountryId: uni.country_id || null,
-      originalRank: uni.rank !== null && uni.rank !== undefined ? String(uni.rank) : '',
-      originalTop50: Boolean(uni.top50),
+      originalRank: uni.us_news_2025_rank !== null && uni.us_news_2025_rank !== undefined ? String(uni.us_news_2025_rank) : '',
     })
   }
 
@@ -716,9 +698,9 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
       return
     }
 
-    const rankValue = editingUniversity.rank.trim() === ''
+    const rankValue = editingUniversity.us_news_2025_rank.trim() === ''
       ? null
-      : Number(editingUniversity.rank)
+      : Number(editingUniversity.us_news_2025_rank)
 
     if (rankValue !== null && Number.isNaN(rankValue)) {
       toast.showError('Rank must be a valid number.')
@@ -728,8 +710,7 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
     const hasChanges =
       trimmedName !== editingUniversity.originalUniversity ||
       (editingUniversity.country_id || null) !== editingUniversity.originalCountryId ||
-      (editingUniversity.rank.trim() || '') !== (editingUniversity.originalRank || '') ||
-      editingUniversity.top50 !== editingUniversity.originalTop50
+      (editingUniversity.us_news_2025_rank.trim() || '') !== (editingUniversity.originalRank || '')
 
     if (!hasChanges) {
       setEditingUniversity(null)
@@ -741,8 +722,7 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
         id: editingUniversity.id,
         university: trimmedName,
         country_id: editingUniversity.country_id || null,
-        rank: rankValue,
-        top50: editingUniversity.top50,
+        us_news_2025_rank: rankValue,
       },
       {
         onSuccess: () => {
@@ -802,8 +782,8 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
                   <th className="sortable" onClick={() => handleSort('country')}>
                     Country {sortColumn === 'country' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
-                  <th className="sortable" onClick={() => handleSort('rank')}>
-                    Rank {sortColumn === 'rank' && (sortDirection === 'asc' ? '▲' : '▼')}
+                  <th className="sortable" onClick={() => handleSort('us_news_2025_rank')}>
+                    US News 2025 {sortColumn === 'us_news_2025_rank' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
                   <th className="table-header-action-cell">
                     {!isAdding && (
@@ -887,8 +867,8 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
                             onKeyDown={handleEditKeyDown}
                             className="inline-input"
                           />
-                        ) : uni.university_url ? (
-                          <a href={uni.university_url} target="_blank" rel="noopener noreferrer">
+                        ) : uni.url ? (
+                          <a href={uni.url} target="_blank" rel="noopener noreferrer">
                             {uni.university}
                           </a>
                         ) : (
@@ -929,15 +909,15 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
                         {isEditing && editingValue ? (
                           <input
                             type="number"
-                            value={editingValue.rank}
+                            value={editingValue.us_news_2025_rank}
                             onChange={(e) =>
-                              setEditingUniversity({ ...editingValue, rank: e.target.value })
+                              setEditingUniversity({ ...editingValue, us_news_2025_rank: e.target.value })
                             }
                             onKeyDown={handleEditKeyDown}
                             className="inline-input"
                           />
                         ) : (
-                          uni.rank || '-'
+                          uni.us_news_2025_rank || '-'
                         )}
                       </td>
                       <td>

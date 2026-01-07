@@ -20,12 +20,10 @@ export interface Country {
 export interface University {
   id: string
   university: string
-  university_url: string | null
-  top50: boolean | null
+  url: string | null
   country_id: string | null
   country: Country | null
-  rank: number | null
-  created_at: string
+  us_news_2025_rank: number | null
   updated_at: string
 }
 
@@ -228,9 +226,8 @@ export function useCreateUniversity() {
     mutationFn: async (newUniversity: {
       university: string
       country_id?: string | null
-      rank?: number | null
-      top50?: number | null
-      university_url?: string | null
+      us_news_2025_rank?: number | null
+      url?: string | null
     }): Promise<University> => {
       const { data, error } = await supabase
         .from('pt_university')
@@ -254,12 +251,10 @@ export function useCreateUniversity() {
         const optimisticUniversity: University = {
           id: optimisticId,
           university: newUniversity.university.toLowerCase(),
-          university_url: newUniversity.university_url || null,
-          top50: newUniversity.top50 || null,
+          url: newUniversity.url || null,
           country_id: newUniversity.country_id || null,
           country: null,
-          rank: newUniversity.rank || null,
-          created_at: new Date().toISOString(),
+          us_news_2025_rank: newUniversity.us_news_2025_rank || null,
           updated_at: new Date().toISOString(),
         }
         queryClient.setQueryData<University[]>(
@@ -318,16 +313,14 @@ export function useUpdateUniversity() {
       id: string
       university: string
       country_id: string | null
-      rank: number | null
-      top50: boolean | null
+      us_news_2025_rank: number | null
     }): Promise<University> => {
       const { data, error } = await supabase
         .from('pt_university')
         .update({
           university: updates.university,
           country_id: updates.country_id,
-          rank: updates.rank,
-          top50: updates.top50,
+          us_news_2025_rank: updates.us_news_2025_rank,
         })
         .eq('id', updates.id)
         .select(`
@@ -353,8 +346,7 @@ export function useUpdateUniversity() {
               ...uni,
               university: updates.university.toLowerCase(),
               country_id: updates.country_id,
-              rank: updates.rank,
-              top50: updates.top50,
+              us_news_2025_rank: updates.us_news_2025_rank,
               country: keepCountry ? uni.country : null,
             }
           })
