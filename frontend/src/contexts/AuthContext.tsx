@@ -215,11 +215,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const userId = newSession.user.id
 
-      // Prevent duplicate processing for the same user, but allow if same user trying again
-      // (could be a retry after previous attempt timed out)
+      // Prevent duplicate processing for the same user, but keep session fresh on token refresh.
       if (processingUserId.current === userId) {
-        // Only skip if we're still actively processing (give it 100ms grace)
-        return false
+        if (isActive()) {
+          setSession(newSession)
+          setUser(newSession.user)
+        }
+        return true
       }
       processingUserId.current = userId
 
