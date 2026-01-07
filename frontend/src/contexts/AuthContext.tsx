@@ -81,6 +81,19 @@ function clearSupabaseAuthStorage(): void {
   }
 }
 
+function isAuthCallbackUrl(): boolean {
+  if (typeof window === 'undefined') return false
+  const hash = window.location.hash || ''
+  if (hash.includes('access_token=') || hash.includes('refresh_token=') || hash.includes('provider_token=')) {
+    return true
+  }
+  const search = window.location.search || ''
+  if (search.includes('code=')) {
+    return true
+  }
+  return false
+}
+
 function getSupabaseAuthTokenFromStorage(): { access_token?: string } | null {
   const readFrom = (storage: Storage) => {
     for (let i = 0; i < storage.length; i += 1) {
@@ -190,7 +203,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (isActive()) {
           processingUserId.current = null // Reset on sign out
           clearLocalAuthCache()
-          clearSupabaseAuthStorage()
+          if (!isAuthCallbackUrl()) {
+            clearSupabaseAuthStorage()
+          }
           setSession(null)
           setUser(null)
           setIsAdmin(false)
