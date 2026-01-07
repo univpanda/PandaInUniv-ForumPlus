@@ -473,8 +473,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!handled && session?.user && isActive) {
           setSession(session)
           setUser(session.user)
-          // Default to non-admin, will verify in background
-          setIsAdmin(false)
         }
       } catch {
         // Auth state change error - silently continue
