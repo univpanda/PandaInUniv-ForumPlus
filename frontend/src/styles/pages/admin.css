@@ -204,6 +204,13 @@
 }
 
 /* Country tab - centered layout matching table width */
+.country-tab-content {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
 .country-tab-content .admin-toolbar {
   max-width: 720px;
   margin: 0 auto 1rem;
