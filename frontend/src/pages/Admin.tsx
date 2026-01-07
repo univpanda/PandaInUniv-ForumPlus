@@ -3,7 +3,7 @@ import { UserManagement } from './UserManagement'
 import {
   useUniversities,
   useCountries,
-  useSchools,
+  useSchoolsByUniversity,
   useCreateCountry,
   useCreateUniversity,
   useCreateSchool,
@@ -14,7 +14,7 @@ import {
   useUpdateUniversity,
   useUpdateSchool,
 } from '../hooks/usePlacementQueries'
-import type { SchoolType } from '../hooks/usePlacementQueries'
+import type { SchoolType, University } from '../hooks/usePlacementQueries'
 import { useToast } from '../contexts/ToastContext'
 import { SearchInput } from '../components/ui'
 import { Plus, X } from 'lucide-react'
@@ -37,6 +37,7 @@ interface UniversityTabState {
 }
 
 interface SchoolTabState {
+  selectedUniversityId: string | null
   searchQuery: string
   sortColumn: SchoolSortColumn
   sortDirection: SortDirection
@@ -69,6 +70,7 @@ export function Admin({ isActive = true }: AdminProps) {
   })
 
   const [schoolState, setSchoolState] = useState<SchoolTabState>({
+    selectedUniversityId: null,
     searchQuery: '',
     sortColumn: 'school',
     sortDirection: 'asc',
@@ -167,10 +169,8 @@ interface EditingUniversity {
 interface EditingSchool {
   id: string
   school: string
-  university_id: string | null
   type: SchoolType
   originalSchool: string
-  originalUniversityId: string | null
   originalType: SchoolType
 }
 
@@ -409,6 +409,7 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
                   <th className="sortable" onClick={() => handleSort('code')}>
                     Code {sortColumn === 'code' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
+                  <th>Universities</th>
                   <th className="table-header-action-cell">
                     {!isAdding && (
                       <button
@@ -449,6 +450,7 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
                         className="inline-input"
                       />
                     </td>
+                    <td>-</td>
                     <td>
                       <button className="admin-delete-btn" onClick={handleCancelAdd} title="Cancel">
                         <X size={16} />
@@ -497,6 +499,7 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
                           country.code
                         )}
                       </td>
+                      <td>{country.university_count || 0}</td>
                       <td>
                         <button
                           className="admin-delete-btn"
@@ -829,6 +832,7 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
                   <th className="sortable" onClick={() => handleSort('us_news_2025_rank')}>
                     US News 2025 {sortColumn === 'us_news_2025_rank' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
+                  <th>Schools</th>
                   <th className="table-header-action-cell">
                     {!isAdding && (
                       <button
@@ -883,6 +887,7 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
                         className="inline-input"
                       />
                     </td>
+                    <td>-</td>
                     <td>
                       <button className="admin-delete-btn" onClick={handleCancelAdd} title="Cancel">
                         <X size={16} />
@@ -964,6 +969,7 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
                           uni.us_news_2025_rank || '-'
                         )}
                       </td>
+                      <td>{uni.school_count || 0}</td>
                       <td>
                         {isEditing ? (
                           <button className="admin-delete-btn" onClick={handleCancelEdit} title="Cancel">
@@ -1032,22 +1038,33 @@ const SCHOOL_TYPE_OPTIONS: { value: SchoolType; label: string }[] = [
 ]
 
 function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
-  const { data: schools = [], isLoading, error } = useSchools()
   const { data: universities = [] } = useUniversities()
-  const createSchool = useCreateSchool()
-  const deleteSchool = useDeleteSchool()
-  const updateSchool = useUpdateSchool()
+  const { selectedUniversityId, searchQuery, sortColumn, sortDirection, page } = state
+  const { data: schools = [], isLoading, error } = useSchoolsByUniversity(selectedUniversityId)
+  const createSchool = useCreateSchool(selectedUniversityId)
+  const deleteSchool = useDeleteSchool(selectedUniversityId)
+  const updateSchool = useUpdateSchool(selectedUniversityId)
   const toast = useToast()
-  const { searchQuery, sortColumn, sortDirection, page } = state
 
+  const [universitySearch, setUniversitySearch] = useState('')
   const [isAdding, setIsAdding] = useState(false)
   const [newSchool, setNewSchool] = useState('')
-  const [newUniversityId, setNewUniversityId] = useState<string>('')
   const [newType, setNewType] = useState<SchoolType>('degree_granting')
   const [pinnedSchoolIds, setPinnedSchoolIds] = useState<string[]>([])
   const schoolInputRef = useRef<HTMLInputElement>(null)
   const editSchoolInputRef = useRef<HTMLInputElement>(null)
   const [editingSchool, setEditingSchool] = useState<EditingSchool | null>(null)
+
+  // Filter universities for search dropdown
+  const filteredUniversities = useMemo(() => {
+    if (!universitySearch.trim()) return universities.slice(0, 20)
+    const search = universitySearch.toLowerCase()
+    return universities.filter(u => u.university.toLowerCase().includes(search)).slice(0, 20)
+  }, [universities, universitySearch])
+
+  const selectedUniversity = useMemo(() => {
+    return universities.find(u => u.id === selectedUniversityId) || null
+  }, [universities, selectedUniversityId])
 
   useEffect(() => {
     if (isAdding && schoolInputRef.current) {
@@ -1060,6 +1077,13 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
       editSchoolInputRef.current.focus()
     }
   }, [editingSchool])
+
+  const setSelectedUniversityId = (id: string | null) => {
+    setState(prev => ({ ...prev, selectedUniversityId: id, searchQuery: '', page: 1 }))
+    setPinnedSchoolIds([])
+    setIsAdding(false)
+    setEditingSchool(null)
+  }
 
   const setSearchQuery = (query: string) => {
     setState(prev => ({ ...prev, searchQuery: query, page: 1 }))
@@ -1082,14 +1106,12 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
   const handleAddClick = () => {
     setIsAdding(true)
     setNewSchool('')
-    setNewUniversityId('')
     setNewType('degree_granting')
   }
 
   const handleCancelAdd = () => {
     setIsAdding(false)
     setNewSchool('')
-    setNewUniversityId('')
     setNewType('degree_granting')
   }
 
@@ -1107,18 +1129,17 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
   }
 
   const handleSaveNew = () => {
-    if (newSchool.trim()) {
+    if (newSchool.trim() && selectedUniversityId) {
       createSchool.mutate(
         {
           school: newSchool.trim(),
-          university_id: newUniversityId || null,
+          university_id: selectedUniversityId,
           type: newType,
         },
         {
           onSuccess: (school) => {
             setIsAdding(false)
             setNewSchool('')
-            setNewUniversityId('')
             setNewType('degree_granting')
             setPinnedSchoolIds((prev) => [...prev, school.id])
             toast.showSuccess('School added')
@@ -1146,8 +1167,7 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
 
   const sortedSchools = useMemo(() => {
     const filtered = schools.filter((s) =>
-      s.school.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.university?.university.toLowerCase().includes(searchQuery.toLowerCase())
+      s.school.toLowerCase().includes(searchQuery.toLowerCase())
     )
 
     const pinnedSet = new Set(pinnedSchoolIds)
@@ -1160,17 +1180,13 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
     const rest = filtered.filter((school) => !pinnedSet.has(school.id) && !school.id.startsWith('temp-'))
 
     const sortedRest = [...rest].sort((a, b) => {
-      let aVal: string | number | boolean | null
-      let bVal: string | number | boolean | null
+      let aVal: string
+      let bVal: string
 
       switch (sortColumn) {
         case 'school':
           aVal = a.school
           bVal = b.school
-          break
-        case 'university':
-          aVal = a.university?.university || ''
-          bVal = b.university?.university || ''
           break
         case 'type':
           aVal = a.type
@@ -1202,10 +1218,8 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
     setEditingSchool({
       id: s.id,
       school: s.school,
-      university_id: s.university_id || null,
       type: s.type,
       originalSchool: s.school,
-      originalUniversityId: s.university_id || null,
       originalType: s.type,
     })
   }
@@ -1225,7 +1239,6 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
 
     const hasChanges =
       trimmedName !== editingSchool.originalSchool ||
-      (editingSchool.university_id || null) !== editingSchool.originalUniversityId ||
       editingSchool.type !== editingSchool.originalType
 
     if (!hasChanges) {
@@ -1237,7 +1250,6 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
       {
         id: editingSchool.id,
         school: trimmedName,
-        university_id: editingSchool.university_id || null,
         type: editingSchool.type,
       },
       {
@@ -1270,169 +1282,136 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
   return (
     <div className="university-admin">
       <div className="admin-section university-tab-content">
+        {/* University selector and school search */}
         <div className="admin-toolbar">
           <p className="admin-description">
-            {sortedSchools.length} of {schools.length} schools
+            {selectedUniversityId
+              ? `${sortedSchools.length} school${sortedSchools.length !== 1 ? 's' : ''}`
+              : '\u00A0'}
           </p>
-          <SearchInput
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Search schools..."
-            className="admin-search-input"
-          />
+          <div className="admin-search-input search-box">
+            <input
+              type="text"
+              value={selectedUniversity ? selectedUniversity.university : universitySearch}
+              onChange={(e) => {
+                setUniversitySearch(e.target.value)
+                if (selectedUniversityId) {
+                  setSelectedUniversityId(null)
+                }
+              }}
+              placeholder="Search university..."
+            />
+            {selectedUniversityId && (
+              <button
+                className="admin-delete-btn"
+                onClick={() => {
+                  setSelectedUniversityId(null)
+                  setUniversitySearch('')
+                }}
+                title="Clear selection"
+                type="button"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          {selectedUniversityId && (
+            <SearchInput
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search schools..."
+              className="admin-search-input"
+            />
+          )}
         </div>
 
-        {isLoading && <div className="admin-placeholder">Loading schools...</div>}
-
-        {error && (
-          <div className="admin-placeholder" style={{ color: 'var(--color-error)' }}>
-            Failed to load schools.
-          </div>
-        )}
-
-        {!isLoading && !error && (sortedSchools.length > 0 || isAdding) && (
-          <div className="university-table-wrapper">
+        {/* University search results */}
+        {!selectedUniversityId && universitySearch && filteredUniversities.length > 0 && (
+          <div className="university-table-wrapper" style={{ maxHeight: '300px', overflow: 'auto' }}>
             <table className="university-table">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th className="sortable" onClick={() => handleSort('school')}>
-                    School {sortColumn === 'school' && (sortDirection === 'asc' ? '▲' : '▼')}
-                  </th>
-                  <th className="sortable" onClick={() => handleSort('university')}>
-                    University {sortColumn === 'university' && (sortDirection === 'asc' ? '▲' : '▼')}
-                  </th>
-                  <th className="sortable" onClick={() => handleSort('type')}>
-                    Type {sortColumn === 'type' && (sortDirection === 'asc' ? '▲' : '▼')}
-                  </th>
-                  <th className="table-header-action-cell">
-                    {!isAdding && (
-                      <button
-                        className="admin-delete-btn table-header-action"
-                        onClick={handleAddClick}
-                        title="Add school"
-                        type="button"
-                      >
-                        <Plus size={16} />
-                      </button>
-                    )}
-                  </th>
+                  <th>University</th>
+                  <th>Country</th>
                 </tr>
               </thead>
               <tbody>
-                {isAdding && (
-                  <tr className="adding-row">
-                    <td>-</td>
-                    <td>
-                      <input
-                        ref={schoolInputRef}
-                        type="text"
-                        value={newSchool}
-                        onChange={(e) => setNewSchool(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder="School name"
-                        className="inline-input"
-                      />
-                    </td>
-                    <td>
-                      <select
-                        value={newUniversityId}
-                        onChange={(e) => setNewUniversityId(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        className="inline-input"
-                      >
-                        <option value="">Select university</option>
-                        {universities.map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.university}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <select
-                        value={newType}
-                        onChange={(e) => setNewType(e.target.value as SchoolType)}
-                        onKeyDown={handleKeyDown}
-                        className="inline-input"
-                      >
-                        {SCHOOL_TYPE_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <button className="admin-delete-btn" onClick={handleCancelAdd} title="Cancel">
-                        <X size={16} />
-                      </button>
-                    </td>
+                {filteredUniversities.map((u) => (
+                  <tr
+                    key={u.id}
+                    onClick={() => {
+                      setSelectedUniversityId(u.id)
+                      setUniversitySearch('')
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <td>{u.university}</td>
+                    <td>{u.country?.name || '-'}</td>
                   </tr>
-                )}
-                {paginatedSchools.map((s, index) => {
-                  const isEditing = editingSchool?.id === s.id
-                  const editingValue = isEditing ? editingSchool : null
-                  return (
-                    <tr key={s.id} className={isEditing ? 'editing-row' : ''}>
-                      <td>{startIndex + index + 1}</td>
-                      <td
-                        className={!isEditing ? 'editable-cell' : ''}
-                        onDoubleClick={() => !isEditing && handleStartEdit(s)}
-                      >
-                        {isEditing && editingValue ? (
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Schools list - only show when university is selected */}
+        {selectedUniversityId && (
+          <>
+
+            {isLoading && <div className="admin-placeholder">Loading schools...</div>}
+
+            {error && (
+              <div className="admin-placeholder" style={{ color: 'var(--color-error)' }}>
+                Failed to load schools.
+              </div>
+            )}
+
+            {!isLoading && !error && (sortedSchools.length > 0 || isAdding) && (
+              <div className="university-table-wrapper">
+                <table className="university-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th className="sortable" onClick={() => handleSort('school')}>
+                        School {sortColumn === 'school' && (sortDirection === 'asc' ? '▲' : '▼')}
+                      </th>
+                      <th className="sortable" onClick={() => handleSort('type')}>
+                        Type {sortColumn === 'type' && (sortDirection === 'asc' ? '▲' : '▼')}
+                      </th>
+                      <th className="table-header-action-cell">
+                        {!isAdding && (
+                          <button
+                            className="admin-delete-btn table-header-action"
+                            onClick={handleAddClick}
+                            title="Add school"
+                            type="button"
+                          >
+                            <Plus size={16} />
+                          </button>
+                        )}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isAdding && (
+                      <tr className="adding-row">
+                        <td>-</td>
+                        <td>
                           <input
-                            ref={editSchoolInputRef}
+                            ref={schoolInputRef}
                             type="text"
-                            value={editingValue.school}
-                            onChange={(e) =>
-                              setEditingSchool({ ...editingValue, school: e.target.value })
-                            }
-                            onKeyDown={handleEditKeyDown}
+                            value={newSchool}
+                            onChange={(e) => setNewSchool(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            placeholder="School name"
                             className="inline-input"
                           />
-                        ) : (
-                          s.school
-                        )}
-                      </td>
-                      <td
-                        className={!isEditing ? 'editable-cell' : ''}
-                        onDoubleClick={() => !isEditing && handleStartEdit(s)}
-                      >
-                        {isEditing && editingValue ? (
+                        </td>
+                        <td>
                           <select
-                            value={editingValue.university_id || ''}
-                            onChange={(e) =>
-                              setEditingSchool({
-                                ...editingValue,
-                                university_id: e.target.value || null,
-                              })
-                            }
-                            onKeyDown={handleEditKeyDown}
-                            className="inline-input"
-                          >
-                            <option value="">Select university</option>
-                            {universities.map((u) => (
-                              <option key={u.id} value={u.id}>
-                                {u.university}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          s.university?.university || '-'
-                        )}
-                      </td>
-                      <td
-                        className={!isEditing ? 'editable-cell' : ''}
-                        onDoubleClick={() => !isEditing && handleStartEdit(s)}
-                      >
-                        {isEditing && editingValue ? (
-                          <select
-                            value={editingValue.type}
-                            onChange={(e) =>
-                              setEditingSchool({ ...editingValue, type: e.target.value as SchoolType })
-                            }
-                            onKeyDown={handleEditKeyDown}
+                            value={newType}
+                            onChange={(e) => setNewType(e.target.value as SchoolType)}
+                            onKeyDown={handleKeyDown}
                             className="inline-input"
                           >
                             {SCHOOL_TYPE_OPTIONS.map((opt) => (
@@ -1441,57 +1420,121 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
                               </option>
                             ))}
                           </select>
-                        ) : (
-                          formatSchoolType(s.type)
-                        )}
-                      </td>
-                      <td>
-                        {isEditing ? (
-                          <button className="admin-delete-btn" onClick={handleCancelEdit} title="Cancel">
+                        </td>
+                        <td>
+                          <button className="admin-delete-btn" onClick={handleCancelAdd} title="Cancel">
                             <X size={16} />
                           </button>
-                        ) : (
-                          <button
-                            className="admin-delete-btn"
-                            onClick={() => handleDelete(s.id, s.school)}
-                            title="Delete"
+                        </td>
+                      </tr>
+                    )}
+                    {paginatedSchools.map((s, index) => {
+                      const isEditing = editingSchool?.id === s.id
+                      const editingValue = isEditing ? editingSchool : null
+                      return (
+                        <tr key={s.id} className={isEditing ? 'editing-row' : ''}>
+                          <td>{startIndex + index + 1}</td>
+                          <td
+                            className={!isEditing ? 'editable-cell' : ''}
+                            onDoubleClick={() => !isEditing && handleStartEdit(s)}
                           >
-                            <X size={16} />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            {totalPages > 1 && (
-              <div className="admin-pagination">
-                <button
-                  className="btn-secondary btn-small"
-                  onClick={() => setPage(page - 1)}
-                  disabled={page === 1}
-                >
-                  Previous
-                </button>
-                <span className="page-info">
-                  Page {page} of {totalPages}
-                </span>
-                <button
-                  className="btn-secondary btn-small"
-                  onClick={() => setPage(page + 1)}
-                  disabled={page >= totalPages}
-                >
-                  Next
-                </button>
+                            {isEditing && editingValue ? (
+                              <input
+                                ref={editSchoolInputRef}
+                                type="text"
+                                value={editingValue.school}
+                                onChange={(e) =>
+                                  setEditingSchool({ ...editingValue, school: e.target.value })
+                                }
+                                onKeyDown={handleEditKeyDown}
+                                className="inline-input"
+                              />
+                            ) : s.url ? (
+                              <a href={s.url} target="_blank" rel="noopener noreferrer">
+                                {s.school}
+                              </a>
+                            ) : (
+                              <span className="university-name-link">{s.school}</span>
+                            )}
+                          </td>
+                          <td
+                            className={!isEditing ? 'editable-cell' : ''}
+                            onDoubleClick={() => !isEditing && handleStartEdit(s)}
+                          >
+                            {isEditing && editingValue ? (
+                              <select
+                                value={editingValue.type}
+                                onChange={(e) =>
+                                  setEditingSchool({ ...editingValue, type: e.target.value as SchoolType })
+                                }
+                                onKeyDown={handleEditKeyDown}
+                                className="inline-input"
+                              >
+                                {SCHOOL_TYPE_OPTIONS.map((opt) => (
+                                  <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              formatSchoolType(s.type)
+                            )}
+                          </td>
+                          <td>
+                            {isEditing ? (
+                              <button className="admin-delete-btn" onClick={handleCancelEdit} title="Cancel">
+                                <X size={16} />
+                              </button>
+                            ) : (
+                              <button
+                                className="admin-delete-btn"
+                                onClick={() => handleDelete(s.id, s.school)}
+                                title="Delete"
+                              >
+                                <X size={16} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                {totalPages > 1 && (
+                  <div className="admin-pagination">
+                    <button
+                      className="btn-secondary btn-small"
+                      onClick={() => setPage(page - 1)}
+                      disabled={page === 1}
+                    >
+                      Previous
+                    </button>
+                    <span className="page-info">
+                      Page {page} of {totalPages}
+                    </span>
+                    <button
+                      className="btn-secondary btn-small"
+                      onClick={() => setPage(page + 1)}
+                      disabled={page >= totalPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
               </div>
             )}
-          </div>
+
+            {!isLoading && !error && sortedSchools.length === 0 && !isAdding && (
+              <div className="admin-placeholder">
+                {searchQuery ? 'No schools match your search.' : 'No schools found for this university.'}
+              </div>
+            )}
+          </>
         )}
 
-        {!isLoading && !error && sortedSchools.length === 0 && !isAdding && (
+        {!selectedUniversityId && !universitySearch && (
           <div className="admin-placeholder">
-            {searchQuery ? 'No schools match your search.' : 'No schools found.'}
+            Search for a university to view its schools.
           </div>
         )}
       </div>

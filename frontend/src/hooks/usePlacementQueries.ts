@@ -14,6 +14,7 @@ export interface Country {
   id: string
   name: string
   code: string
+  university_count?: number
 }
 
 // University type from pt_university table
@@ -25,6 +26,7 @@ export interface University {
   country: Country | null
   us_news_2025_rank: number | null
   updated_at: string
+  school_count?: number
 }
 
 // School type enum
@@ -47,7 +49,7 @@ export const placementKeys = {
   filters: () => [...placementKeys.all, 'filters'] as const,
   universities: () => [...placementKeys.all, 'universities'] as const,
   countries: () => [...placementKeys.all, 'countries'] as const,
-  schools: () => [...placementKeys.all, 'schools'] as const,
+  schoolsByUniversity: (universityId: string) => [...placementKeys.all, 'schools', universityId] as const,
   search: (params: PlacementSearchParams) => [...placementKeys.all, 'search', params] as const,
   reverseSearch: (params: ReverseSearchParams) => [...placementKeys.all, 'reverse', params] as const,
   programsForUniversity: (university: string) => [...placementKeys.all, 'programs', university] as const,
@@ -78,7 +80,7 @@ export function usePlacementFilters() {
   })
 }
 
-// Fetch all universities from pt_university table
+// Fetch all universities from pt_university table with school count
 export function useUniversities() {
   return useQuery({
     queryKey: placementKeys.universities(),
@@ -87,29 +89,44 @@ export function useUniversities() {
         .from('pt_university')
         .select(`
           *,
-          country:pt_country(id, name, code)
+          country:pt_country(id, name, code),
+          pt_school(count)
         `)
         .order('university', { ascending: true })
 
       if (error) throw error
-      return data || []
+      return (data || []).map((u: Record<string, unknown>) => ({
+        id: u.id as string,
+        university: u.university as string,
+        url: u.url as string | null,
+        country_id: u.country_id as string | null,
+        country: u.country as Country | null,
+        us_news_2025_rank: u.us_news_2025_rank as number | null,
+        updated_at: u.updated_at as string,
+        school_count: (u.pt_school as { count: number }[])?.[0]?.count || 0,
+      }))
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
 }
 
-// Fetch all countries from pt_country table
+// Fetch all countries from pt_country table with university count
 export function useCountries() {
   return useQuery({
     queryKey: placementKeys.countries(),
     queryFn: async (): Promise<Country[]> => {
       const { data, error } = await supabase
         .from('pt_country')
-        .select('*')
+        .select('*, pt_university(count)')
         .order('name', { ascending: true })
 
       if (error) throw error
-      return data || []
+      return (data || []).map((c: { id: string; name: string; code: string; pt_university: { count: number }[] }) => ({
+        id: c.id,
+        name: c.name,
+        code: c.code,
+        university_count: c.pt_university?.[0]?.count || 0,
+      }))
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
@@ -384,34 +401,37 @@ export function useUpdateUniversity() {
   })
 }
 
-// Fetch all schools from pt_school table
-export function useSchools() {
+// Fetch schools for a specific university
+export function useSchoolsByUniversity(universityId: string | null) {
   return useQuery({
-    queryKey: placementKeys.schools(),
+    queryKey: placementKeys.schoolsByUniversity(universityId || ''),
     queryFn: async (): Promise<School[]> => {
+      if (!universityId) return []
       const { data, error } = await supabase
         .from('pt_school')
         .select(`
           *,
           university:pt_university(id, university, url, country_id, us_news_2025_rank, updated_at)
         `)
+        .eq('university_id', universityId)
         .order('school', { ascending: true })
 
       if (error) throw error
       return data || []
     },
+    enabled: !!universityId,
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
 }
 
 // Create a new school
-export function useCreateSchool() {
+export function useCreateSchool(universityId: string | null) {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (newSchool: {
       school: string
-      university_id?: string | null
+      university_id: string
       url?: string | null
       type?: SchoolType
     }): Promise<School> => {
@@ -428,32 +448,31 @@ export function useCreateSchool() {
       return data
     },
     onMutate: async (newSchool) => {
-      await queryClient.cancelQueries({ queryKey: placementKeys.schools() })
+      const queryKey = placementKeys.schoolsByUniversity(newSchool.university_id)
+      await queryClient.cancelQueries({ queryKey })
 
-      const previousSchools = queryClient.getQueryData<School[]>(placementKeys.schools())
+      const previousSchools = queryClient.getQueryData<School[]>(queryKey)
       const optimisticId = 'temp-' + Date.now()
 
       if (previousSchools) {
         const optimisticSchool: School = {
           id: optimisticId,
           school: newSchool.school.toLowerCase(),
-          university_id: newSchool.university_id || null,
+          university_id: newSchool.university_id,
           university: null,
           url: newSchool.url || null,
           type: newSchool.type || 'degree_granting',
           updated_at: new Date().toISOString(),
         }
-        queryClient.setQueryData<School[]>(
-          placementKeys.schools(),
-          [optimisticSchool, ...previousSchools]
-        )
+        queryClient.setQueryData<School[]>(queryKey, [optimisticSchool, ...previousSchools])
       }
 
-      return { previousSchools, optimisticId }
+      return { previousSchools, optimisticId, universityId: newSchool.university_id }
     },
     onSuccess: (createdSchool, newSchool, context) => {
       if (!context?.optimisticId) return
-      queryClient.setQueryData<School[]>(placementKeys.schools(), (current) => {
+      const queryKey = placementKeys.schoolsByUniversity(newSchool.university_id)
+      queryClient.setQueryData<School[]>(queryKey, (current) => {
         if (!current) return current
         return current.map((school) =>
           school.id === context.optimisticId ? createdSchool : school
@@ -461,15 +480,16 @@ export function useCreateSchool() {
       })
     },
     onError: (err, newSchool, context) => {
-      if (context?.previousSchools) {
-        queryClient.setQueryData(placementKeys.schools(), context.previousSchools)
+      if (context?.previousSchools && context?.universityId) {
+        const queryKey = placementKeys.schoolsByUniversity(context.universityId)
+        queryClient.setQueryData(queryKey, context.previousSchools)
       }
     },
   })
 }
 
 // Delete a school
-export function useDeleteSchool() {
+export function useDeleteSchool(universityId: string | null) {
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -482,7 +502,9 @@ export function useDeleteSchool() {
       if (error) throw error
     },
     onSuccess: (_, schoolId) => {
-      queryClient.setQueryData<School[]>(placementKeys.schools(), (current) => {
+      if (!universityId) return
+      const queryKey = placementKeys.schoolsByUniversity(universityId)
+      queryClient.setQueryData<School[]>(queryKey, (current) => {
         if (!current) return current
         return current.filter((school) => school.id !== schoolId)
       })
@@ -491,21 +513,19 @@ export function useDeleteSchool() {
 }
 
 // Update a school
-export function useUpdateSchool() {
+export function useUpdateSchool(universityId: string | null) {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (updates: {
       id: string
       school: string
-      university_id: string | null
       type: SchoolType
     }): Promise<School> => {
       const { data, error } = await supabase
         .from('pt_school')
         .update({
           school: updates.school,
-          university_id: updates.university_id,
           type: updates.type,
         })
         .eq('id', updates.id)
@@ -519,21 +539,20 @@ export function useUpdateSchool() {
       return data
     },
     onMutate: async (updates) => {
-      await queryClient.cancelQueries({ queryKey: placementKeys.schools() })
-      const previousSchools = queryClient.getQueryData<School[]>(placementKeys.schools())
+      if (!universityId) return { previousSchools: null }
+      const queryKey = placementKeys.schoolsByUniversity(universityId)
+      await queryClient.cancelQueries({ queryKey })
+      const previousSchools = queryClient.getQueryData<School[]>(queryKey)
 
       if (previousSchools) {
-        queryClient.setQueryData<School[]>(placementKeys.schools(), (current) => {
+        queryClient.setQueryData<School[]>(queryKey, (current) => {
           if (!current) return current
           return current.map((s) => {
             if (s.id !== updates.id) return s
-            const keepUniversity = updates.university_id === s.university_id
             return {
               ...s,
               school: updates.school.toLowerCase(),
-              university_id: updates.university_id,
               type: updates.type,
-              university: keepUniversity ? s.university : null,
             }
           })
         })
@@ -542,14 +561,17 @@ export function useUpdateSchool() {
       return { previousSchools }
     },
     onSuccess: (updatedSchool) => {
-      queryClient.setQueryData<School[]>(placementKeys.schools(), (current) => {
+      if (!universityId) return
+      const queryKey = placementKeys.schoolsByUniversity(universityId)
+      queryClient.setQueryData<School[]>(queryKey, (current) => {
         if (!current) return current
         return current.map((s) => (s.id === updatedSchool.id ? updatedSchool : s))
       })
     },
     onError: (err, variables, context) => {
-      if (context?.previousSchools) {
-        queryClient.setQueryData(placementKeys.schools(), context.previousSchools)
+      if (context?.previousSchools && universityId) {
+        const queryKey = placementKeys.schoolsByUniversity(universityId)
+        queryClient.setQueryData(queryKey, context.previousSchools)
       }
     },
   })
