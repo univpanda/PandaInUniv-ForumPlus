@@ -3,20 +3,26 @@ import { UserManagement } from './UserManagement'
 import {
   useUniversities,
   useCountries,
+  useSchools,
   useCreateCountry,
   useCreateUniversity,
+  useCreateSchool,
   useDeleteCountry,
   useDeleteUniversity,
+  useDeleteSchool,
   useUpdateCountry,
   useUpdateUniversity,
+  useUpdateSchool,
 } from '../hooks/usePlacementQueries'
+import type { SchoolType } from '../hooks/usePlacementQueries'
 import { useToast } from '../contexts/ToastContext'
 import { SearchInput } from '../components/ui'
 import { Plus, X } from 'lucide-react'
 
-type AdminSubTab = 'country' | 'university' | 'pandas'
+type AdminSubTab = 'country' | 'university' | 'school' | 'pandas'
 type UniversitySortColumn = 'university' | 'country' | 'us_news_2025_rank'
 type CountrySortColumn = 'name' | 'code'
+type SchoolSortColumn = 'school' | 'university' | 'type'
 type SortDirection = 'asc' | 'desc'
 
 interface AdminProps {
@@ -26,6 +32,13 @@ interface AdminProps {
 interface UniversityTabState {
   searchQuery: string
   sortColumn: UniversitySortColumn
+  sortDirection: SortDirection
+  page: number
+}
+
+interface SchoolTabState {
+  searchQuery: string
+  sortColumn: SchoolSortColumn
   sortDirection: SortDirection
   page: number
 }
@@ -55,6 +68,13 @@ export function Admin({ isActive = true }: AdminProps) {
     page: 1,
   })
 
+  const [schoolState, setSchoolState] = useState<SchoolTabState>({
+    searchQuery: '',
+    sortColumn: 'school',
+    sortDirection: 'asc',
+    page: 1,
+  })
+
   return (
     <div className="admin-container">
       {/* Sub-tab navigation */}
@@ -70,6 +90,12 @@ export function Admin({ isActive = true }: AdminProps) {
           onClick={() => setSubTab('university')}
         >
           University
+        </button>
+        <button
+          className={`admin-tab ${subTab === 'school' ? 'active' : ''}`}
+          onClick={() => setSubTab('school')}
+        >
+          School
         </button>
         <button
           className={`admin-tab ${subTab === 'pandas' ? 'active' : ''}`}
@@ -95,6 +121,13 @@ export function Admin({ isActive = true }: AdminProps) {
             setState={setUniversityState}
           />
         </div>
+        <div className={subTab !== 'school' ? 'hidden' : ''}>
+          <SchoolTab
+            isActive={isActive && subTab === 'school'}
+            state={schoolState}
+            setState={setSchoolState}
+          />
+        </div>
         <div className={subTab !== 'pandas' ? 'hidden' : ''}>
           <UserManagement isActive={isActive && subTab === 'pandas'} />
         </div>
@@ -111,6 +144,7 @@ interface CountryTabProps {
 
 const COUNTRIES_PER_PAGE = 20
 const UNIVERSITIES_PER_PAGE = 20
+const SCHOOLS_PER_PAGE = 20
 
 interface EditingCountry {
   id: string
@@ -128,6 +162,16 @@ interface EditingUniversity {
   originalUniversity: string
   originalCountryId: string | null
   originalRank: string
+}
+
+interface EditingSchool {
+  id: string
+  school: string
+  university_id: string | null
+  type: SchoolType
+  originalSchool: string
+  originalUniversityId: string | null
+  originalType: SchoolType
 }
 
 function CountryTab({ isActive, state, setState }: CountryTabProps) {
@@ -967,6 +1011,487 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
         {!isLoading && !error && sortedUniversities.length === 0 && !isAdding && (
           <div className="admin-placeholder">
             {searchQuery ? 'No universities match your search.' : 'No universities found.'}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+interface SchoolTabProps {
+  isActive: boolean
+  state: SchoolTabState
+  setState: React.Dispatch<React.SetStateAction<SchoolTabState>>
+}
+
+const SCHOOL_TYPE_OPTIONS: { value: SchoolType; label: string }[] = [
+  { value: 'degree_granting', label: 'Degree Granting' },
+  { value: 'continuing_education', label: 'Continuing Education' },
+  { value: 'non_degree', label: 'Non-Degree' },
+  { value: 'administrative', label: 'Administrative' },
+]
+
+function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
+  const { data: schools = [], isLoading, error } = useSchools()
+  const { data: universities = [] } = useUniversities()
+  const createSchool = useCreateSchool()
+  const deleteSchool = useDeleteSchool()
+  const updateSchool = useUpdateSchool()
+  const toast = useToast()
+  const { searchQuery, sortColumn, sortDirection, page } = state
+
+  const [isAdding, setIsAdding] = useState(false)
+  const [newSchool, setNewSchool] = useState('')
+  const [newUniversityId, setNewUniversityId] = useState<string>('')
+  const [newType, setNewType] = useState<SchoolType>('degree_granting')
+  const [pinnedSchoolIds, setPinnedSchoolIds] = useState<string[]>([])
+  const schoolInputRef = useRef<HTMLInputElement>(null)
+  const editSchoolInputRef = useRef<HTMLInputElement>(null)
+  const [editingSchool, setEditingSchool] = useState<EditingSchool | null>(null)
+
+  useEffect(() => {
+    if (isAdding && schoolInputRef.current) {
+      schoolInputRef.current.focus()
+    }
+  }, [isAdding])
+
+  useEffect(() => {
+    if (editingSchool && editSchoolInputRef.current) {
+      editSchoolInputRef.current.focus()
+    }
+  }, [editingSchool])
+
+  const setSearchQuery = (query: string) => {
+    setState(prev => ({ ...prev, searchQuery: query, page: 1 }))
+  }
+
+  const setPage = (newPage: number) => {
+    setState(prev => ({ ...prev, page: newPage }))
+  }
+
+  const handleSort = (column: SchoolSortColumn) => {
+    setState(prev => {
+      if (prev.sortColumn === column) {
+        return { ...prev, sortDirection: prev.sortDirection === 'asc' ? 'desc' : 'asc', page: 1 }
+      } else {
+        return { ...prev, sortColumn: column, sortDirection: 'asc', page: 1 }
+      }
+    })
+  }
+
+  const handleAddClick = () => {
+    setIsAdding(true)
+    setNewSchool('')
+    setNewUniversityId('')
+    setNewType('degree_granting')
+  }
+
+  const handleCancelAdd = () => {
+    setIsAdding(false)
+    setNewSchool('')
+    setNewUniversityId('')
+    setNewType('degree_granting')
+  }
+
+  const handleDelete = (schoolId: string, name: string) => {
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return
+    deleteSchool.mutate(schoolId, {
+      onSuccess: () => {
+        toast.showSuccess('School deleted')
+        setPinnedSchoolIds((prev) => prev.filter((id) => id !== schoolId))
+      },
+      onError: () => {
+        toast.showError('Failed to delete school')
+      },
+    })
+  }
+
+  const handleSaveNew = () => {
+    if (newSchool.trim()) {
+      createSchool.mutate(
+        {
+          school: newSchool.trim(),
+          university_id: newUniversityId || null,
+          type: newType,
+        },
+        {
+          onSuccess: (school) => {
+            setIsAdding(false)
+            setNewSchool('')
+            setNewUniversityId('')
+            setNewType('degree_granting')
+            setPinnedSchoolIds((prev) => [...prev, school.id])
+            toast.showSuccess('School added')
+          },
+          onError: (error: { code?: string; message?: string }) => {
+            const message = error?.message?.toLowerCase() || ''
+            if (error?.code === '23505' || message.includes('duplicate') || message.includes('unique')) {
+              toast.showError('School already exists for this university')
+              return
+            }
+            toast.showError('Failed to add school')
+          },
+        }
+      )
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveNew()
+    } else if (e.key === 'Escape') {
+      handleCancelAdd()
+    }
+  }
+
+  const sortedSchools = useMemo(() => {
+    const filtered = schools.filter((s) =>
+      s.school.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.university?.university.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+
+    const pinnedSet = new Set(pinnedSchoolIds)
+    const pinned = pinnedSchoolIds
+      .map((id) => filtered.find((school) => school.id === id))
+      .filter((school): school is typeof filtered[number] => Boolean(school))
+
+    const temps = filtered.filter((school) => school.id.startsWith('temp-') && !pinnedSet.has(school.id))
+
+    const rest = filtered.filter((school) => !pinnedSet.has(school.id) && !school.id.startsWith('temp-'))
+
+    const sortedRest = [...rest].sort((a, b) => {
+      let aVal: string | number | boolean | null
+      let bVal: string | number | boolean | null
+
+      switch (sortColumn) {
+        case 'school':
+          aVal = a.school
+          bVal = b.school
+          break
+        case 'university':
+          aVal = a.university?.university || ''
+          bVal = b.university?.university || ''
+          break
+        case 'type':
+          aVal = a.type
+          bVal = b.type
+          break
+        default:
+          return 0
+      }
+
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
+
+    return [...pinned, ...temps, ...sortedRest]
+  }, [schools, searchQuery, sortColumn, sortDirection, pinnedSchoolIds])
+
+  const startIndex = (page - 1) * SCHOOLS_PER_PAGE
+  const totalPages = Math.ceil(sortedSchools.length / SCHOOLS_PER_PAGE)
+  const paginatedSchools = sortedSchools.slice(startIndex, startIndex + SCHOOLS_PER_PAGE)
+
+  useEffect(() => {
+    if (totalPages > 0 && page > totalPages) {
+      setPage(totalPages)
+    }
+  }, [page, totalPages])
+
+  const handleStartEdit = (s: typeof schools[number]) => {
+    setEditingSchool({
+      id: s.id,
+      school: s.school,
+      university_id: s.university_id || null,
+      type: s.type,
+      originalSchool: s.school,
+      originalUniversityId: s.university_id || null,
+      originalType: s.type,
+    })
+  }
+
+  const handleCancelEdit = () => {
+    setEditingSchool(null)
+  }
+
+  const handleSaveEdit = () => {
+    if (!editingSchool) return
+
+    const trimmedName = editingSchool.school.trim()
+    if (!trimmedName) {
+      toast.showError('School name cannot be empty.')
+      return
+    }
+
+    const hasChanges =
+      trimmedName !== editingSchool.originalSchool ||
+      (editingSchool.university_id || null) !== editingSchool.originalUniversityId ||
+      editingSchool.type !== editingSchool.originalType
+
+    if (!hasChanges) {
+      setEditingSchool(null)
+      return
+    }
+
+    updateSchool.mutate(
+      {
+        id: editingSchool.id,
+        school: trimmedName,
+        university_id: editingSchool.university_id || null,
+        type: editingSchool.type,
+      },
+      {
+        onSuccess: () => {
+          toast.showSuccess('School updated.')
+          setEditingSchool(null)
+        },
+        onError: () => {
+          toast.showError('Failed to update school.')
+        },
+      }
+    )
+  }
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleSaveEdit()
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      handleCancelEdit()
+    }
+  }
+
+  const formatSchoolType = (type: SchoolType) => {
+    return SCHOOL_TYPE_OPTIONS.find(o => o.value === type)?.label || type
+  }
+
+  return (
+    <div className="university-admin">
+      <div className="admin-section university-tab-content">
+        <div className="admin-toolbar">
+          <p className="admin-description">
+            {sortedSchools.length} of {schools.length} schools
+          </p>
+          <SearchInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search schools..."
+            className="admin-search-input"
+          />
+        </div>
+
+        {isLoading && <div className="admin-placeholder">Loading schools...</div>}
+
+        {error && (
+          <div className="admin-placeholder" style={{ color: 'var(--color-error)' }}>
+            Failed to load schools.
+          </div>
+        )}
+
+        {!isLoading && !error && (sortedSchools.length > 0 || isAdding) && (
+          <div className="university-table-wrapper">
+            <table className="university-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th className="sortable" onClick={() => handleSort('school')}>
+                    School {sortColumn === 'school' && (sortDirection === 'asc' ? '▲' : '▼')}
+                  </th>
+                  <th className="sortable" onClick={() => handleSort('university')}>
+                    University {sortColumn === 'university' && (sortDirection === 'asc' ? '▲' : '▼')}
+                  </th>
+                  <th className="sortable" onClick={() => handleSort('type')}>
+                    Type {sortColumn === 'type' && (sortDirection === 'asc' ? '▲' : '▼')}
+                  </th>
+                  <th className="table-header-action-cell">
+                    {!isAdding && (
+                      <button
+                        className="admin-delete-btn table-header-action"
+                        onClick={handleAddClick}
+                        title="Add school"
+                        type="button"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    )}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {isAdding && (
+                  <tr className="adding-row">
+                    <td>-</td>
+                    <td>
+                      <input
+                        ref={schoolInputRef}
+                        type="text"
+                        value={newSchool}
+                        onChange={(e) => setNewSchool(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="School name"
+                        className="inline-input"
+                      />
+                    </td>
+                    <td>
+                      <select
+                        value={newUniversityId}
+                        onChange={(e) => setNewUniversityId(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        className="inline-input"
+                      >
+                        <option value="">Select university</option>
+                        {universities.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.university}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      <select
+                        value={newType}
+                        onChange={(e) => setNewType(e.target.value as SchoolType)}
+                        onKeyDown={handleKeyDown}
+                        className="inline-input"
+                      >
+                        {SCHOOL_TYPE_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      <button className="admin-delete-btn" onClick={handleCancelAdd} title="Cancel">
+                        <X size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                )}
+                {paginatedSchools.map((s, index) => {
+                  const isEditing = editingSchool?.id === s.id
+                  const editingValue = isEditing ? editingSchool : null
+                  return (
+                    <tr key={s.id} className={isEditing ? 'editing-row' : ''}>
+                      <td>{startIndex + index + 1}</td>
+                      <td
+                        className={!isEditing ? 'editable-cell' : ''}
+                        onDoubleClick={() => !isEditing && handleStartEdit(s)}
+                      >
+                        {isEditing && editingValue ? (
+                          <input
+                            ref={editSchoolInputRef}
+                            type="text"
+                            value={editingValue.school}
+                            onChange={(e) =>
+                              setEditingSchool({ ...editingValue, school: e.target.value })
+                            }
+                            onKeyDown={handleEditKeyDown}
+                            className="inline-input"
+                          />
+                        ) : (
+                          s.school
+                        )}
+                      </td>
+                      <td
+                        className={!isEditing ? 'editable-cell' : ''}
+                        onDoubleClick={() => !isEditing && handleStartEdit(s)}
+                      >
+                        {isEditing && editingValue ? (
+                          <select
+                            value={editingValue.university_id || ''}
+                            onChange={(e) =>
+                              setEditingSchool({
+                                ...editingValue,
+                                university_id: e.target.value || null,
+                              })
+                            }
+                            onKeyDown={handleEditKeyDown}
+                            className="inline-input"
+                          >
+                            <option value="">Select university</option>
+                            {universities.map((u) => (
+                              <option key={u.id} value={u.id}>
+                                {u.university}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          s.university?.university || '-'
+                        )}
+                      </td>
+                      <td
+                        className={!isEditing ? 'editable-cell' : ''}
+                        onDoubleClick={() => !isEditing && handleStartEdit(s)}
+                      >
+                        {isEditing && editingValue ? (
+                          <select
+                            value={editingValue.type}
+                            onChange={(e) =>
+                              setEditingSchool({ ...editingValue, type: e.target.value as SchoolType })
+                            }
+                            onKeyDown={handleEditKeyDown}
+                            className="inline-input"
+                          >
+                            {SCHOOL_TYPE_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          formatSchoolType(s.type)
+                        )}
+                      </td>
+                      <td>
+                        {isEditing ? (
+                          <button className="admin-delete-btn" onClick={handleCancelEdit} title="Cancel">
+                            <X size={16} />
+                          </button>
+                        ) : (
+                          <button
+                            className="admin-delete-btn"
+                            onClick={() => handleDelete(s.id, s.school)}
+                            title="Delete"
+                          >
+                            <X size={16} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            {totalPages > 1 && (
+              <div className="admin-pagination">
+                <button
+                  className="btn-secondary btn-small"
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
+                >
+                  Previous
+                </button>
+                <span className="page-info">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  className="btn-secondary btn-small"
+                  onClick={() => setPage(page + 1)}
+                  disabled={page >= totalPages}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!isLoading && !error && sortedSchools.length === 0 && !isAdding && (
+          <div className="admin-placeholder">
+            {searchQuery ? 'No schools match your search.' : 'No schools found.'}
           </div>
         )}
       </div>
