@@ -41,6 +41,18 @@ export interface School {
   url: string | null
   type: SchoolType
   updated_at: string
+  department_count?: number
+}
+
+// Department type from pt_department table
+export interface Department {
+  id: string
+  department: string
+  school_id: string | null
+  school: School | null
+  url: string | null
+  status: string | null
+  created_at: string
 }
 
 // Query keys
@@ -50,6 +62,7 @@ export const placementKeys = {
   universities: () => [...placementKeys.all, 'universities'] as const,
   countries: () => [...placementKeys.all, 'countries'] as const,
   schoolsByUniversity: (universityId: string) => [...placementKeys.all, 'schools', universityId] as const,
+  departmentsBySchool: (schoolId: string) => [...placementKeys.all, 'departments', schoolId] as const,
   search: (params: PlacementSearchParams) => [...placementKeys.all, 'search', params] as const,
   reverseSearch: (params: ReverseSearchParams) => [...placementKeys.all, 'reverse', params] as const,
   programsForUniversity: (university: string) => [...placementKeys.all, 'programs', university] as const,
@@ -411,13 +424,17 @@ export function useSchoolsByUniversity(universityId: string | null) {
         .from('pt_school')
         .select(`
           *,
-          university:pt_university(id, university, url, country_id, us_news_2025_rank, updated_at)
+          university:pt_university(id, university, url, country_id, us_news_2025_rank, updated_at),
+          pt_department(count)
         `)
         .eq('university_id', universityId)
         .order('school', { ascending: true })
 
       if (error) throw error
-      return data || []
+      return (data || []).map((s: Record<string, unknown>) => ({
+        ...s,
+        department_count: (s.pt_department as Array<{ count: number }> | null)?.[0]?.count || 0,
+      })) as School[]
     },
     enabled: !!universityId,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -572,6 +589,185 @@ export function useUpdateSchool(universityId: string | null) {
       if (context?.previousSchools && universityId) {
         const queryKey = placementKeys.schoolsByUniversity(universityId)
         queryClient.setQueryData(queryKey, context.previousSchools)
+      }
+    },
+  })
+}
+
+// Fetch departments for a specific school
+export function useDepartmentsBySchool(schoolId: string | null) {
+  return useQuery({
+    queryKey: placementKeys.departmentsBySchool(schoolId || ''),
+    queryFn: async (): Promise<Department[]> => {
+      if (!schoolId) return []
+      const { data, error } = await supabase
+        .from('pt_department')
+        .select(`
+          *,
+          school:pt_school(id, school, url, type, university_id)
+        `)
+        .eq('school_id', schoolId)
+        .order('department', { ascending: true })
+
+      if (error) throw error
+      return data || []
+    },
+    enabled: !!schoolId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+}
+
+// Create a new department
+export function useCreateDepartment(schoolId: string | null) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (newDepartment: {
+      department: string
+      school_id: string
+      url?: string | null
+    }): Promise<Department> => {
+      const { data, error } = await supabase
+        .from('pt_department')
+        .insert([newDepartment])
+        .select(`
+          *,
+          school:pt_school(id, school, url, type, university_id)
+        `)
+        .single()
+
+      if (error) throw error
+      return data
+    },
+    onMutate: async (newDepartment) => {
+      if (!schoolId) return { previousDepartments: null }
+      const queryKey = placementKeys.departmentsBySchool(schoolId)
+      await queryClient.cancelQueries({ queryKey })
+      const previousDepartments = queryClient.getQueryData<Department[]>(queryKey)
+
+      const tempId = `temp-${Date.now()}`
+      const optimisticDepartment: Department = {
+        id: tempId,
+        department: newDepartment.department,
+        school_id: newDepartment.school_id,
+        school: null,
+        url: newDepartment.url || null,
+        status: null,
+        created_at: new Date().toISOString(),
+      }
+
+      queryClient.setQueryData<Department[]>(queryKey, (current) => {
+        if (!current) return [optimisticDepartment]
+        return [optimisticDepartment, ...current]
+      })
+
+      return { previousDepartments }
+    },
+    onSuccess: (newDepartment) => {
+      if (!schoolId) return
+      const queryKey = placementKeys.departmentsBySchool(schoolId)
+      queryClient.setQueryData<Department[]>(queryKey, (current) => {
+        if (!current) return [newDepartment]
+        return current.map((d) => (d.id.startsWith('temp-') ? newDepartment : d))
+      })
+      // Also invalidate schools to update department count
+      queryClient.invalidateQueries({ queryKey: ['placements', 'schools'] })
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousDepartments && schoolId) {
+        const queryKey = placementKeys.departmentsBySchool(schoolId)
+        queryClient.setQueryData(queryKey, context.previousDepartments)
+      }
+    },
+  })
+}
+
+// Delete a department
+export function useDeleteDepartment(schoolId: string | null) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (departmentId: string): Promise<void> => {
+      const { error } = await supabase
+        .from('pt_department')
+        .delete()
+        .eq('id', departmentId)
+
+      if (error) throw error
+    },
+    onSuccess: (_, departmentId) => {
+      if (!schoolId) return
+      const queryKey = placementKeys.departmentsBySchool(schoolId)
+      queryClient.setQueryData<Department[]>(queryKey, (current) => {
+        if (!current) return current
+        return current.filter((department) => department.id !== departmentId)
+      })
+      // Also invalidate schools to update department count
+      queryClient.invalidateQueries({ queryKey: ['placements', 'schools'] })
+    },
+  })
+}
+
+// Update a department
+export function useUpdateDepartment(schoolId: string | null) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (updates: {
+      id: string
+      department: string
+      url?: string | null
+    }): Promise<Department> => {
+      const { data, error } = await supabase
+        .from('pt_department')
+        .update({
+          department: updates.department,
+          url: updates.url,
+        })
+        .eq('id', updates.id)
+        .select(`
+          *,
+          school:pt_school(id, school, url, type, university_id)
+        `)
+        .single()
+
+      if (error) throw error
+      return data
+    },
+    onMutate: async (updates) => {
+      if (!schoolId) return { previousDepartments: null }
+      const queryKey = placementKeys.departmentsBySchool(schoolId)
+      await queryClient.cancelQueries({ queryKey })
+      const previousDepartments = queryClient.getQueryData<Department[]>(queryKey)
+
+      queryClient.setQueryData<Department[]>(queryKey, (current) => {
+        if (!current) return current
+        return current.map((d) => {
+          if (d.id === updates.id) {
+            return {
+              ...d,
+              department: updates.department,
+              url: updates.url ?? d.url,
+            }
+          }
+          return d
+        })
+      })
+
+      return { previousDepartments }
+    },
+    onSuccess: (updatedDepartment) => {
+      if (!schoolId) return
+      const queryKey = placementKeys.departmentsBySchool(schoolId)
+      queryClient.setQueryData<Department[]>(queryKey, (current) => {
+        if (!current) return current
+        return current.map((d) => (d.id === updatedDepartment.id ? updatedDepartment : d))
+      })
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousDepartments && schoolId) {
+        const queryKey = placementKeys.departmentsBySchool(schoolId)
+        queryClient.setQueryData(queryKey, context.previousDepartments)
       }
     },
   })
