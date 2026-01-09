@@ -3635,6 +3635,25 @@ CREATE TRIGGER enforce_lowercase_department_trigger
   FOR EACH ROW
   EXECUTE FUNCTION enforce_lowercase_department();
 
+CREATE OR REPLACE FUNCTION pt_program_lowercase()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.program := LOWER(NEW.program);
+  IF NEW.degree IS NOT NULL THEN
+    NEW.degree := LOWER(NEW.degree);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS pt_program_lowercase_trigger ON pt_program;
+CREATE TRIGGER pt_program_lowercase_trigger
+  BEFORE INSERT OR UPDATE ON pt_program
+  FOR EACH ROW
+  EXECUTE FUNCTION pt_program_lowercase();
+
 -- Auto-update updated_at on pt_school
 CREATE OR REPLACE FUNCTION update_pt_school_updated_at()
 RETURNS TRIGGER
@@ -3741,7 +3760,6 @@ CREATE TABLE IF NOT EXISTS pt_program (
   scraped_timestamp TIMESTAMPTZ,
   current_extracted_records_count INTEGER,
   schools TEXT[],
-  created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ
 );
 
