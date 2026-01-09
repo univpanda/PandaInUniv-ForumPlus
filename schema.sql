@@ -3765,6 +3765,18 @@ CREATE TABLE IF NOT EXISTS pt_program (
 
 CREATE INDEX IF NOT EXISTS idx_pt_program_university ON pt_program(university_id);
 
+-- Program-Department junction table (many-to-many: a program can have multiple departments, a department can have multiple programs)
+CREATE TABLE IF NOT EXISTS pt_program_department (
+  id TEXT PRIMARY KEY DEFAULT 'pd_' || gen_random_uuid(),
+  program_id TEXT NOT NULL REFERENCES pt_program(id) ON DELETE CASCADE,
+  department_id TEXT NOT NULL REFERENCES pt_department(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(program_id, department_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pt_program_department_program ON pt_program_department(program_id);
+CREATE INDEX IF NOT EXISTS idx_pt_program_department_department ON pt_program_department(department_id);
+
 -- Program-University junction table
 CREATE TABLE IF NOT EXISTS pt_program_university (
   id TEXT PRIMARY KEY,
@@ -3808,6 +3820,7 @@ ALTER TABLE pt_department ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pt_queue ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pt_univ_program_combined ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pt_program ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pt_program_department ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pt_program_university ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pt_faculty ENABLE ROW LEVEL SECURITY;
 
@@ -3818,6 +3831,7 @@ CREATE POLICY "Allow read access to pt_placement" ON pt_placement FOR SELECT USI
 CREATE POLICY "Allow read access to pt_department" ON pt_department FOR SELECT USING (true);
 CREATE POLICY "Allow read access to pt_univ_program_combined" ON pt_univ_program_combined FOR SELECT USING (true);
 CREATE POLICY "Allow read access to pt_program" ON pt_program FOR SELECT USING (true);
+CREATE POLICY "Allow read access to pt_program_department" ON pt_program_department FOR SELECT USING (true);
 CREATE POLICY "Allow read access to pt_program_university" ON pt_program_university FOR SELECT USING (true);
 CREATE POLICY "Allow read access to pt_faculty" ON pt_faculty FOR SELECT USING (true);
 
@@ -3827,6 +3841,7 @@ CREATE POLICY "Admin write access to pt_school" ON pt_school FOR ALL USING (publ
 CREATE POLICY "Admin write access to pt_placement" ON pt_placement FOR ALL USING (public.check_is_admin());
 CREATE POLICY "Admin write access to pt_department" ON pt_department FOR ALL USING (public.check_is_admin());
 CREATE POLICY "Admin write access to pt_program" ON pt_program FOR ALL USING (public.check_is_admin());
+CREATE POLICY "Admin write access to pt_program_department" ON pt_program_department FOR ALL USING (public.check_is_admin());
 CREATE POLICY "Admin write access to pt_faculty" ON pt_faculty FOR ALL USING (public.check_is_admin());
 
 -- =============================================================================
