@@ -4,7 +4,8 @@ import {
   usePlacementFilters,
   usePlacementSearch,
   useReverseSearch,
-  useUniversitiesForProgram,
+  useProgramsForYearRange,
+  useUniversitiesForProgramYearRange,
 } from '../hooks/usePlacementQueries'
 import { LoadingSpinner } from '../components/ui'
 import type { PlacementSubTab, Placement, PlacementFilters } from '../types'
@@ -13,20 +14,21 @@ interface PlacementsProps {
   isActive?: boolean
 }
 
-const MIN_YEAR = 2016
+const MIN_YEAR = 2023
 const CURRENT_YEAR = new Date().getFullYear()
+const MAX_YEAR = CURRENT_YEAR - 1
 
 export function Placements({ isActive = true }: PlacementsProps) {
   const { data: filters, isLoading: filtersLoading } = usePlacementFilters()
   const degree = 'PhD'
-  const [fromYear, setFromYear] = useState<number>(CURRENT_YEAR - 1)
-  const [toYear, setToYear] = useState<number>(CURRENT_YEAR)
+  const [fromYear, setFromYear] = useState<number>(MAX_YEAR)
+  const [toYear, setToYear] = useState<number>(MAX_YEAR)
   const [subTab, setSubTab] = useState<PlacementSubTab>('search')
 
-  // Generate year options from 2016 to current year (descending)
+  // Generate year options from 2023 to (current year - 1) (descending)
   const yearOptions = useMemo(() => {
     const years: number[] = []
-    for (let y = CURRENT_YEAR; y >= MIN_YEAR; y--) {
+    for (let y = MAX_YEAR; y >= MIN_YEAR; y--) {
       years.push(y)
     }
     return years
@@ -154,8 +156,18 @@ function SearchTab({
   const [page, setPage] = useState(0)
   const pageSize = 50
 
-  // Get universities for selected program
-  const { data: filteredUniversities } = useUniversitiesForProgram(program)
+  // Get programs with placements for year range (no university filter)
+  const { data: filteredPrograms } = useProgramsForYearRange(
+    commonFilters.fromYear,
+    commonFilters.toYear
+  )
+
+  // Get universities with placements for selected program and year range
+  const { data: filteredUniversities } = useUniversitiesForProgramYearRange(
+    program,
+    commonFilters.fromYear,
+    commonFilters.toYear
+  )
 
   const searchParams = useMemo(() => ({
     degree: commonFilters.degree,
@@ -188,7 +200,10 @@ function SearchTab({
     setPage(0)
   }, [])
 
-  const universityOptions = program ? (filteredUniversities || []) : (filters?.universities || [])
+  // Program options: only show programs with placements for year range
+  const programOptions = filteredPrograms || []
+  // University options: only show universities with placements for selected program + year range
+  const universityOptions = program ? (filteredUniversities || []) : []
   const totalPages = Math.ceil((searchResult?.totalCount || 0) / pageSize)
 
   return (
@@ -197,7 +212,7 @@ function SearchTab({
         <div className="filter-row">
           <FilterSelect
             value={program}
-            options={filters?.programs || []}
+            options={programOptions}
             onChange={(val) => {
               setProgram(val)
               setUniversity(null) // Reset university when program changes
@@ -211,6 +226,7 @@ function SearchTab({
             onChange={setUniversity}
             placeholder="Select university"
             searchPlaceholder="Select university"
+            disabled={!program}
           />
         </div>
         <div className="filter-actions">
@@ -271,9 +287,23 @@ function CompareTab({
   const [entry2, setEntry2] = useState<CompareEntry>({ program: null, university: null })
   const [searchTriggered, setSearchTriggered] = useState(false)
 
-  // Get filtered universities for each entry's program
-  const { data: filteredUniversities1 } = useUniversitiesForProgram(entry1.program)
-  const { data: filteredUniversities2 } = useUniversitiesForProgram(entry2.program)
+  // Get programs with placements for year range
+  const { data: filteredPrograms } = useProgramsForYearRange(
+    commonFilters.fromYear,
+    commonFilters.toYear
+  )
+
+  // Get universities for each entry's program and year range
+  const { data: filteredUniversities1 } = useUniversitiesForProgramYearRange(
+    entry1.program,
+    commonFilters.fromYear,
+    commonFilters.toYear
+  )
+  const { data: filteredUniversities2 } = useUniversitiesForProgramYearRange(
+    entry2.program,
+    commonFilters.fromYear,
+    commonFilters.toYear
+  )
 
   // Search for each entry
   const search1 = usePlacementSearch(
@@ -311,9 +341,12 @@ function CompareTab({
     setSearchTriggered(false)
   }, [])
 
-  // Get university options, filtering out duplicates when same program is selected
+  // Program options: only show programs with placements for year range
+  const programOptions = filteredPrograms || []
+
+  // Get university options for each entry, filtering out duplicates when same program is selected
   const getUniversityOptions1 = () => {
-    const options = filteredUniversities1 || filters?.universities || []
+    const options = entry1.program ? (filteredUniversities1 || []) : []
     // If same program, exclude the university selected in entry2
     if (entry1.program === entry2.program && entry2.university) {
       return options.filter(u => u !== entry2.university)
@@ -322,7 +355,7 @@ function CompareTab({
   }
 
   const getUniversityOptions2 = () => {
-    const options = filteredUniversities2 || filters?.universities || []
+    const options = entry2.program ? (filteredUniversities2 || []) : []
     // If same program, exclude the university selected in entry1
     if (entry1.program === entry2.program && entry1.university) {
       return options.filter(u => u !== entry1.university)
@@ -341,7 +374,7 @@ function CompareTab({
             <div className="compare-select-row">
               <FilterSelect
                 value={entry1.program}
-                options={filters?.programs || []}
+                options={programOptions}
                 onChange={(val) => setEntry1({ program: val, university: null })}
                 placeholder="Select a program"
                 searchPlaceholder="Select a program"
@@ -352,12 +385,13 @@ function CompareTab({
                 onChange={(val) => setEntry1(prev => ({ ...prev, university: val }))}
                 placeholder="Select a university"
                 searchPlaceholder="Select a university"
+                disabled={!entry1.program}
               />
             </div>
             <div className="compare-select-row">
               <FilterSelect
                 value={entry2.program}
-                options={filters?.programs || []}
+                options={programOptions}
                 onChange={(val) => setEntry2({ program: val, university: null })}
                 placeholder="Select a program"
                 searchPlaceholder="Select a program"
@@ -368,6 +402,7 @@ function CompareTab({
                 onChange={(val) => setEntry2(prev => ({ ...prev, university: val }))}
                 placeholder="Select a university"
                 searchPlaceholder="Select a university"
+                disabled={!entry2.program}
               />
             </div>
           </div>

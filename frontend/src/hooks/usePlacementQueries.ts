@@ -67,6 +67,9 @@ export const placementKeys = {
   reverseSearch: (params: ReverseSearchParams) => [...placementKeys.all, 'reverse', params] as const,
   programsForUniversity: (university: string) => [...placementKeys.all, 'programs', university] as const,
   universitiesForProgram: (program: string) => [...placementKeys.all, 'universities', program] as const,
+  programsWithPlacements: (university: string, fromYear: number | null, toYear: number | null) => [...placementKeys.all, 'programsWithPlacements', university, fromYear, toYear] as const,
+  programsForYearRange: (fromYear: number | null, toYear: number | null) => [...placementKeys.all, 'programsForYearRange', fromYear, toYear] as const,
+  universitiesForProgramYearRange: (program: string, fromYear: number | null, toYear: number | null) => [...placementKeys.all, 'universitiesForProgramYearRange', program, fromYear, toYear] as const,
 }
 
 // Fetch placement filters (degrees, programs, universities, years)
@@ -924,5 +927,93 @@ export function useUniversitiesForProgram(program: string | null) {
     },
     enabled: !!program,
     staleTime: 5 * 60 * 1000,
+  })
+}
+
+// Get programs with placements for a specific university and year range
+export function useProgramsWithPlacements(
+  university: string | null,
+  fromYear: number | null,
+  toYear: number | null
+) {
+  return useQuery({
+    queryKey: placementKeys.programsWithPlacements(university || '', fromYear, toYear),
+    networkMode: 'always',
+    queryFn: async (): Promise<string[]> => {
+      if (!university) return []
+      const { data, error } = await withTimeout(
+        supabasePublic.rpc('get_programs_with_placements', {
+          p_university: university,
+          p_from_year: fromYear,
+          p_to_year: toYear,
+        }),
+        15000,
+        'Request timeout: programs lookup took too long'
+      )
+      if (error) throw error
+      return (data || []).filter(Boolean).sort()
+    },
+    enabled: !!university,
+    staleTime: 30 * 1000,
+  })
+}
+
+// Get programs with placements for a year range (no university filter)
+export function useProgramsForYearRange(
+  fromYear: number | null,
+  toYear: number | null
+) {
+  return useQuery({
+    queryKey: placementKeys.programsForYearRange(fromYear, toYear),
+    networkMode: 'always',
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await withTimeout(
+        supabasePublic.rpc('get_programs_for_year_range', {
+          p_from_year: fromYear,
+          p_to_year: toYear,
+        }),
+        15000,
+        'Request timeout: programs lookup took too long'
+      )
+      if (error) throw error
+      // Handle both array of strings and array of objects with program key
+      const programs = (data || []).map((item: string | { program: string }) =>
+        typeof item === 'string' ? item : item.program
+      )
+      return programs.filter(Boolean).sort()
+    },
+    staleTime: 30 * 1000,
+  })
+}
+
+// Get universities with placements for a program and year range
+export function useUniversitiesForProgramYearRange(
+  program: string | null,
+  fromYear: number | null,
+  toYear: number | null
+) {
+  return useQuery({
+    queryKey: placementKeys.universitiesForProgramYearRange(program || '', fromYear, toYear),
+    networkMode: 'always',
+    queryFn: async (): Promise<string[]> => {
+      if (!program) return []
+      const { data, error } = await withTimeout(
+        supabasePublic.rpc('get_universities_for_program_year_range', {
+          p_program: program,
+          p_from_year: fromYear,
+          p_to_year: toYear,
+        }),
+        15000,
+        'Request timeout: universities lookup took too long'
+      )
+      if (error) throw error
+      // Handle both array of strings and array of objects with university key
+      const universities = (data || []).map((item: string | { university: string }) =>
+        typeof item === 'string' ? item : item.university
+      )
+      return universities.filter(Boolean).sort()
+    },
+    enabled: !!program,
+    staleTime: 30 * 1000,
   })
 }

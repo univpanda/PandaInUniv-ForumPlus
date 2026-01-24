@@ -3545,37 +3545,45 @@ CREATE TRIGGER trigger_enforce_lowercase_country
   FOR EACH ROW
   EXECUTE FUNCTION enforce_lowercase_country();
 
--- University table
-CREATE TABLE IF NOT EXISTS pt_university (
+-- Institution table (universities, companies, research orgs, etc.)
+CREATE TABLE IF NOT EXISTS pt_institution (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  university TEXT NOT NULL,
-  url TEXT,
-  country_id TEXT REFERENCES pt_country(id),
+  name TEXT NOT NULL,
+  url TEXT NOT NULL,
+  country_id TEXT NOT NULL REFERENCES pt_country(id),
   us_news_2025_rank INTEGER,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ,
+  type TEXT NOT NULL DEFAULT 'university',
+  parent_institution_id TEXT REFERENCES pt_institution(id)
 );
 
--- Enforce lowercase university names and normalize whitespace
-CREATE OR REPLACE FUNCTION enforce_lowercase_university()
+-- Index for efficient parent lookups
+CREATE INDEX IF NOT EXISTS idx_institution_parent ON pt_institution(parent_institution_id) WHERE parent_institution_id IS NOT NULL;
+
+COMMENT ON COLUMN pt_institution.parent_institution_id IS 'Parent institution ID for hierarchical relationships (e.g., lab -> university, department -> university)';
+
+-- Enforce lowercase type (but NOT name - names preserve original case)
+CREATE OR REPLACE FUNCTION enforce_lowercase_institution()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  -- Lowercase, trim, and collapse multiple spaces to single space
-  NEW.university := LOWER(TRIM(REGEXP_REPLACE(NEW.university, '\s+', ' ', 'g')));
+  NEW.type := LOWER(NEW.type);
   RETURN NEW;
 END;
 $$;
 
-DROP TRIGGER IF EXISTS enforce_lowercase_university_trigger ON pt_university;
-CREATE TRIGGER enforce_lowercase_university_trigger
-  BEFORE INSERT OR UPDATE ON pt_university
+DROP TRIGGER IF EXISTS enforce_lowercase_institution_trigger ON pt_institution;
+CREATE TRIGGER enforce_lowercase_institution_trigger
+  BEFORE INSERT OR UPDATE ON pt_institution
   FOR EACH ROW
-  EXECUTE FUNCTION enforce_lowercase_university();
+  EXECUTE FUNCTION enforce_lowercase_institution();
 
--- Unique index to prevent duplicates (case-insensitive university name per country)
-DROP INDEX IF EXISTS idx_pt_university_name_unique;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_pt_university_name_country_unique ON pt_university (LOWER(university), country_id);
+-- Unique index to prevent duplicates (case-insensitive name per country)
+CREATE UNIQUE INDEX IF NOT EXISTS pt_institution_name_country_unique ON pt_institution (LOWER(name), country_id);
+
+-- Trigram index for fast name search
+CREATE INDEX IF NOT EXISTS idx_institution_name_trgm ON pt_institution USING gin (LOWER(name) gin_trgm_ops);
 
 -- School type enum
 DO $$ BEGIN
@@ -3584,19 +3592,20 @@ EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
 
--- School table (schools within universities)
+-- School table (schools within institutions)
 CREATE TABLE IF NOT EXISTS pt_school (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   school TEXT NOT NULL,
-  university_id TEXT REFERENCES pt_university(id),
+  institution_id TEXT REFERENCES pt_institution(id),
   url TEXT,
+  faculty_url TEXT,
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   type school_type DEFAULT 'degree_granting'
 );
 
-CREATE INDEX IF NOT EXISTS idx_pt_school_university ON pt_school(university_id);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_pt_school_name_unique ON pt_school (university_id, LOWER(school));
-CREATE UNIQUE INDEX IF NOT EXISTS idx_pt_school_university_name_unique ON pt_school (university_id, LOWER(school));
+CREATE INDEX IF NOT EXISTS idx_pt_school_institution ON pt_school(institution_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pt_school_name_unique ON pt_school (institution_id, LOWER(school));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pt_school_institution_name_unique ON pt_school (institution_id, LOWER(school));
 
 CREATE INDEX IF NOT EXISTS idx_pt_department_school ON pt_department(school_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_pt_department_name_unique ON pt_department (school_id, LOWER(department));
@@ -3676,7 +3685,7 @@ CREATE TABLE IF NOT EXISTS pt_department (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   department TEXT NOT NULL,
   school_id TEXT REFERENCES pt_school(id) ON DELETE CASCADE,
-  university_id TEXT REFERENCES pt_university(id),
+  institution_id TEXT REFERENCES pt_institution(id),
   status TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -3813,7 +3822,7 @@ CREATE INDEX IF NOT EXISTS idx_pt_placement_year ON pt_placement(year);
 CREATE INDEX IF NOT EXISTS idx_pt_placement_univ ON pt_placement(placement_univ);
 
 -- RLS Policies for placement tables (read-only for authenticated users)
-ALTER TABLE pt_university ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pt_institution ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pt_school ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pt_placement ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pt_department ENABLE ROW LEVEL SECURITY;
@@ -3825,7 +3834,7 @@ ALTER TABLE pt_program_university ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pt_faculty ENABLE ROW LEVEL SECURITY;
 
 -- Allow read access to all users (including anonymous for public search)
-CREATE POLICY "Allow read access to pt_university" ON pt_university FOR SELECT USING (true);
+CREATE POLICY "Allow read access to pt_institution" ON pt_institution FOR SELECT USING (true);
 CREATE POLICY "Allow read access to pt_school" ON pt_school FOR SELECT USING (true);
 CREATE POLICY "Allow read access to pt_placement" ON pt_placement FOR SELECT USING (true);
 CREATE POLICY "Allow read access to pt_department" ON pt_department FOR SELECT USING (true);
@@ -3836,13 +3845,97 @@ CREATE POLICY "Allow read access to pt_program_university" ON pt_program_univers
 CREATE POLICY "Allow read access to pt_faculty" ON pt_faculty FOR SELECT USING (true);
 
 -- Admin-only write access
-CREATE POLICY "Admin write access to pt_university" ON pt_university FOR ALL USING (public.check_is_admin());
+CREATE POLICY "Admin write access to pt_institution" ON pt_institution FOR ALL USING (public.check_is_admin());
 CREATE POLICY "Admin write access to pt_school" ON pt_school FOR ALL USING (public.check_is_admin());
 CREATE POLICY "Admin write access to pt_placement" ON pt_placement FOR ALL USING (public.check_is_admin());
 CREATE POLICY "Admin write access to pt_department" ON pt_department FOR ALL USING (public.check_is_admin());
 CREATE POLICY "Admin write access to pt_program" ON pt_program FOR ALL USING (public.check_is_admin());
 CREATE POLICY "Admin write access to pt_program_department" ON pt_program_department FOR ALL USING (public.check_is_admin());
 CREATE POLICY "Admin write access to pt_faculty" ON pt_faculty FOR ALL USING (public.check_is_admin());
+
+-- People table (faculty, researchers, PhD graduates)
+CREATE TABLE IF NOT EXISTS pt_people (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  name TEXT,
+  phd_program_id TEXT REFERENCES pt_academic_programs(id),
+  phd_year INTEGER,
+  phd_advisor TEXT,
+  phd_dissertation_title TEXT,
+  phd_thesis_committee TEXT,
+  linkedin_url TEXT,
+  google_scholar_url TEXT,
+  email TEXT,
+  profile_url TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pt_people_name ON pt_people(name);
+CREATE INDEX IF NOT EXISTS idx_pt_people_program ON pt_people(phd_program_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pt_people_name_program ON pt_people (LOWER(name), phd_program_id);
+
+-- Enforce lowercase names
+CREATE OR REPLACE FUNCTION enforce_lowercase_pt_people_name()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.name := LOWER(TRIM(REGEXP_REPLACE(NEW.name, '\s+', ' ', 'g')));
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trigger_lowercase_pt_people_name ON pt_people;
+CREATE TRIGGER trigger_lowercase_pt_people_name
+  BEFORE INSERT OR UPDATE ON pt_people
+  FOR EACH ROW
+  EXECUTE FUNCTION enforce_lowercase_pt_people_name();
+
+-- Career table (tracks positions held by people)
+CREATE TABLE IF NOT EXISTS pt_career (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  person_id TEXT REFERENCES pt_people(id) ON DELETE CASCADE,
+  year INTEGER,
+  designation TEXT,
+  institution_id TEXT REFERENCES pt_institution(id),
+  school_id TEXT,
+  department_id TEXT,
+  source_url TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pt_career_person ON pt_career(person_id);
+CREATE INDEX IF NOT EXISTS idx_pt_career_institution ON pt_career(institution_id);
+CREATE INDEX IF NOT EXISTS idx_pt_career_year ON pt_career(year);
+
+-- RLS for pt_people and pt_career
+ALTER TABLE pt_people ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pt_career ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow read access to pt_people" ON pt_people FOR SELECT USING (true);
+CREATE POLICY "Allow read access to pt_career" ON pt_career FOR SELECT USING (true);
+CREATE POLICY "Admin write access to pt_people" ON pt_people FOR ALL USING (public.check_is_admin());
+CREATE POLICY "Admin write access to pt_career" ON pt_career FOR ALL USING (public.check_is_admin());
+
+-- Education table (non-PhD degrees: M.A., B.A., M.S., B.S., J.D., etc.)
+-- PhD info stays in pt_people table
+CREATE TABLE IF NOT EXISTS pt_education (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  person_id TEXT REFERENCES pt_people(id) ON DELETE CASCADE,
+  degree TEXT,           -- 'M.A.', 'B.A.', 'M.S.', 'B.S.', 'J.D.', etc.
+  field TEXT,            -- 'Philosophy', 'Computer Science'
+  institution_id TEXT REFERENCES pt_institution(id),
+  institution_name TEXT, -- fallback if not in pt_institution
+  year INTEGER,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pt_education_person ON pt_education(person_id);
+CREATE INDEX IF NOT EXISTS idx_pt_education_institution ON pt_education(institution_id);
+CREATE INDEX IF NOT EXISTS idx_pt_education_year ON pt_education(year);
+
+ALTER TABLE pt_education ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow read access to pt_education" ON pt_education FOR SELECT USING (true);
+CREATE POLICY "Admin write access to pt_education" ON pt_education FOR ALL USING (public.check_is_admin());
 
 -- =============================================================================
 -- PLACEMENT TRACKER RPC FUNCTIONS
