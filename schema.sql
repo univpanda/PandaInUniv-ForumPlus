@@ -1610,20 +1610,20 @@ BEGIN
   SELECT json_build_object(
     'degrees', json_build_array('PhD'),
     'programs', (
-      SELECT json_agg(DISTINCT e.field ORDER BY e.field) 
-      FROM pt_faculty_education e 
-      WHERE e.field IS NOT NULL AND e.field != '' AND e.degree = 'PhD'
+      SELECT json_agg(DISTINCT INITCAP(e.field) ORDER BY INITCAP(e.field))
+      FROM pt_faculty_education e
+      WHERE e.field IS NOT NULL AND e.field != '' AND LOWER(e.degree) = 'phd'
     ),
     'universities', (
-      SELECT json_agg(DISTINCT i.name ORDER BY i.name) 
-      FROM pt_faculty_education e 
-      JOIN pt_institute i ON e.institution_id = i.id 
-      WHERE e.degree = 'PhD' AND i.name IS NOT NULL AND i.name != ''
+      SELECT json_agg(DISTINCT INITCAP(i.english_name) ORDER BY INITCAP(i.english_name))
+      FROM pt_faculty_education e
+      JOIN pt_institute i ON e.institution_id = i.id
+      WHERE LOWER(e.degree) = 'phd' AND i.english_name IS NOT NULL AND i.english_name != ''
     ),
     'years', (
-      SELECT json_agg(DISTINCT c.year ORDER BY c.year DESC) 
-      FROM pt_faculty_career c 
-      JOIN pt_faculty_education e ON c.faculty_id = e.faculty_id AND e.degree = 'PhD'
+      SELECT json_agg(DISTINCT c.year ORDER BY c.year DESC)
+      FROM pt_faculty_career c
+      JOIN pt_faculty_education e ON c.faculty_id = e.faculty_id AND LOWER(e.degree) = 'phd'
       WHERE c.year IS NOT NULL AND c.year >= COALESCE(e.year, 1900)
     )
   ) INTO result;
@@ -1916,11 +1916,11 @@ CREATE FUNCTION public.get_programs_for_university(p_university text) RETURNS js
     AS $$
 BEGIN
   RETURN (
-    SELECT json_agg(DISTINCT e.field ORDER BY e.field)
+    SELECT json_agg(DISTINCT INITCAP(e.field) ORDER BY INITCAP(e.field))
     FROM pt_faculty_education e
     JOIN pt_institute i ON e.institution_id = i.id
-    WHERE e.degree = 'PhD'
-      AND UPPER(i.name) = UPPER(p_university)
+    WHERE LOWER(e.degree) = 'phd'
+      AND LOWER(i.english_name) = LOWER(p_university)
       AND e.field IS NOT NULL
       AND e.field != ''
   );
@@ -1960,14 +1960,14 @@ CREATE FUNCTION public.get_programs_with_placements(p_university text, p_from_ye
 BEGIN
   RETURN (
     WITH phd_grads AS (
-      SELECT 
+      SELECT
         e.faculty_id,
         e.field as program,
         e.year as phd_year
       FROM pt_faculty_education e
       JOIN pt_institute i ON e.institution_id = i.id
-      WHERE e.degree = 'PhD'
-        AND UPPER(i.name) = UPPER(p_university)
+      WHERE LOWER(e.degree) = 'phd'
+        AND LOWER(i.english_name) = LOWER(p_university)
     ),
     first_career AS (
       SELECT DISTINCT ON (c.faculty_id)
@@ -1980,7 +1980,7 @@ BEGIN
       ORDER BY c.faculty_id, c.year ASC
     ),
     programs_with_data AS (
-      SELECT DISTINCT g.program
+      SELECT DISTINCT INITCAP(g.program) as program
       FROM phd_grads g
       JOIN first_career fc ON fc.faculty_id = g.faculty_id
       WHERE g.program IS NOT NULL AND g.program != ''
@@ -2312,13 +2312,13 @@ CREATE FUNCTION public.get_universities_for_program(p_program text) RETURNS json
     AS $$
 BEGIN
   RETURN (
-    SELECT json_agg(DISTINCT i.name ORDER BY i.name)
+    SELECT json_agg(DISTINCT INITCAP(i.english_name) ORDER BY INITCAP(i.english_name))
     FROM pt_faculty_education e
     JOIN pt_institute i ON e.institution_id = i.id
-    WHERE e.degree = 'PhD'
-      AND UPPER(e.field) = UPPER(p_program)
-      AND i.name IS NOT NULL
-      AND i.name != ''
+    WHERE LOWER(e.degree) = 'phd'
+      AND LOWER(e.field) = LOWER(p_program)
+      AND i.english_name IS NOT NULL
+      AND i.english_name != ''
   );
 END;
 $$;
@@ -2333,7 +2333,7 @@ CREATE FUNCTION public.get_universities_for_program_year_range(p_program text, p
     AS $$
 BEGIN
   RETURN QUERY
-  SELECT DISTINCT i.name
+  SELECT DISTINCT INITCAP(i.english_name) as university
   FROM pt_faculty_education e
   JOIN pt_faculty_career c ON c.faculty_id = e.faculty_id
   JOIN pt_institute i ON e.institution_id = i.id
@@ -2342,7 +2342,7 @@ BEGIN
     AND (c.designation IS NOT NULL OR c.institution_id IS NOT NULL)
     AND (p_from_year IS NULL OR e.year >= p_from_year)
     AND (p_to_year IS NULL OR e.year <= p_to_year)
-  ORDER BY i.name;
+  ORDER BY INITCAP(i.english_name);
 END;
 $$;
 
@@ -3075,11 +3075,11 @@ BEGIN
   WITH phd_grads AS (
     SELECT
       f.id as faculty_id,
-      f.name,
-      e.field as program,
+      INITCAP(f.name) as name,
+      INITCAP(e.field) as program,
       e.degree,
       e.year as phd_year,
-      i.name as phd_university
+      INITCAP(i.english_name) as phd_university
     FROM pt_faculty f
     JOIN pt_faculty_education e ON e.faculty_id = f.id AND LOWER(e.degree) = 'phd'
     LEFT JOIN pt_institute i ON e.institution_id = i.id
@@ -3091,14 +3091,27 @@ BEGIN
   first_career AS (
     SELECT DISTINCT ON (c.faculty_id)
       c.faculty_id,
-      COALESCE(pi.name, c.institution_name) as placement_univ,
-      c.designation as role,
+      -- Priority: 1) school_id -> parent university, 2) institution matches school -> parent, 3) institution directly
+      INITCAP(COALESCE(
+        school_univ.english_name,
+        matched_univ.english_name,
+        pi.english_name,
+        c.institution_name
+      )) as placement_univ,
+      INITCAP(c.designation) as role,
       c.year as placement_year
     FROM pt_faculty_career c
     JOIN phd_grads g ON c.faculty_id = g.faculty_id
     LEFT JOIN pt_institute pi ON c.institution_id = pi.id
+    LEFT JOIN pt_school sc ON c.school_id = sc.id
+    LEFT JOIN pt_institute school_univ ON sc.institution_id = school_univ.id
+    LEFT JOIN pt_school matched_school ON LOWER(pi.english_name) = LOWER(matched_school.school)
+    LEFT JOIN pt_institute matched_univ ON matched_school.institution_id = matched_univ.id
     WHERE (c.institution_name IS NOT NULL OR c.institution_id IS NOT NULL OR c.designation IS NOT NULL)
-      AND (LOWER(COALESCE(pi.name, c.institution_name)) LIKE '%' || LOWER(p_placement_univ) || '%')
+      AND (
+        LOWER(COALESCE(school_univ.english_name, matched_univ.english_name, pi.english_name, c.institution_name))
+        LIKE '%' || LOWER(p_placement_univ) || '%'
+      )
     ORDER BY c.faculty_id, c.year ASC NULLS LAST
   ),
   filtered AS (
@@ -3148,29 +3161,39 @@ BEGIN
   WITH phd_grads AS (
     SELECT
       f.id as faculty_id,
-      f.name,
-      e.field as program,
+      INITCAP(f.name) as name,
+      INITCAP(e.field) as program,
       e.degree,
       e.year as phd_year,
-      i.name as phd_university
+      INITCAP(i.english_name) as phd_university
     FROM pt_faculty f
     JOIN pt_faculty_education e ON e.faculty_id = f.id AND LOWER(e.degree) = 'phd'
     LEFT JOIN pt_institute i ON e.institution_id = i.id
     WHERE
       (p_program IS NULL OR LOWER(e.field) = LOWER(p_program))
-      AND (p_university IS NULL OR LOWER(i.name) = LOWER(p_university))
+      AND (p_university IS NULL OR LOWER(i.english_name) = LOWER(p_university))
       AND (p_from_year IS NULL OR e.year >= p_from_year)
       AND (p_to_year IS NULL OR e.year <= p_to_year)
   ),
   first_career AS (
     SELECT DISTINCT ON (c.faculty_id)
       c.faculty_id,
-      COALESCE(pi.name, c.institution_name) as placement_univ,
-      c.designation as role,
+      -- Priority: 1) school_id -> parent university, 2) institution matches school -> parent, 3) institution directly
+      INITCAP(COALESCE(
+        school_univ.english_name,
+        matched_univ.english_name,
+        pi.english_name,
+        c.institution_name
+      )) as placement_univ,
+      INITCAP(c.designation) as role,
       c.year as placement_year
     FROM pt_faculty_career c
     JOIN phd_grads g ON c.faculty_id = g.faculty_id
     LEFT JOIN pt_institute pi ON c.institution_id = pi.id
+    LEFT JOIN pt_school sc ON c.school_id = sc.id
+    LEFT JOIN pt_institute school_univ ON sc.institution_id = school_univ.id
+    LEFT JOIN pt_school matched_school ON LOWER(pi.english_name) = LOWER(matched_school.school)
+    LEFT JOIN pt_institute matched_univ ON matched_school.institution_id = matched_univ.id
     WHERE (c.institution_name IS NOT NULL OR c.institution_id IS NOT NULL OR c.designation IS NOT NULL)
     ORDER BY c.faculty_id, c.year ASC NULLS LAST
   ),

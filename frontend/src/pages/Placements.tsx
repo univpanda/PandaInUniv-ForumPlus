@@ -659,6 +659,7 @@ function PlacementTable({ placements, showUniversity = false }: PlacementTablePr
             <th>Year</th>
             <th>Name</th>
             <th>Placement</th>
+            <th>Designation</th>
           </tr>
         </thead>
         <tbody>
@@ -669,6 +670,7 @@ function PlacementTable({ placements, showUniversity = false }: PlacementTablePr
               <td>{p.year || '-'}</td>
               <td>{p.name || '-'}</td>
               <td>{p.placementUniv || '-'}</td>
+              <td>{p.role || '-'}</td>
             </tr>
           ))}
         </tbody>
