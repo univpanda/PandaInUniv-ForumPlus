@@ -10,6 +10,7 @@ interface NewThreadFormProps {
   onTitleChange: (title: string) => void
   onContentChange: (content: string) => void
   onSubmit: () => void
+  onCancel: () => void
   // Poll props
   isPollEnabled: boolean
   onPollToggle: (enabled: boolean) => void
@@ -26,6 +27,7 @@ export function NewThreadForm({
   onTitleChange,
   onContentChange,
   onSubmit,
+  onCancel,
   isPollEnabled,
   onPollToggle,
   pollOptions,
@@ -83,6 +85,14 @@ export function NewThreadForm({
       />
 
       <div className="form-actions">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={submitting}
+          className="cancel-btn"
+        >
+          Cancel
+        </button>
         <button
           onClick={onSubmit}
           disabled={!canSubmit}

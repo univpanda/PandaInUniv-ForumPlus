@@ -495,12 +495,22 @@
   color: var(--placement-text-secondary);
 }
 
-.placement-card-university {
+.placement-card-meta {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--placement-border);
   font-size: 0.75rem;
   color: var(--placement-text-muted);
-  margin-top: 0.375rem;
-  padding-top: 0.375rem;
-  border-top: 1px solid var(--placement-border);
+}
+
+.placement-card-program,
+.placement-card-university {
+  background: var(--color-bg-light);
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
 }
 
 /* Compare Tab */

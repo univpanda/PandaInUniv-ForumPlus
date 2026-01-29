@@ -1,13 +1,12 @@
 interface FooterProps {
-  showTerms: boolean
   onShowTerms: () => void
 }
 
-export function Footer({ showTerms, onShowTerms }: FooterProps) {
+export function Footer({ onShowTerms }: FooterProps) {
   const currentYear = new Date().getFullYear()
 
   return (
-    <footer className={`footer ${showTerms ? 'hidden' : ''}`}>
+    <footer className="footer">
       <div className="footer-content">
         <div className="footer-left">
           © {currentYear} PandaInUniv

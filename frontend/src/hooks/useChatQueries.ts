@@ -145,17 +145,17 @@ export {
 export function useIgnoredUsers(userId: string | null) {
   return useQuery({
     queryKey: chatKeys.ignoredUsers(userId || ''),
-    queryFn: async (): Promise<Set<string>> => {
-      if (!userId) return new Set()
+    queryFn: async (): Promise<string[]> => {
+      if (!userId) return []
 
       const { data, error } = await supabase.rpc('get_ignored_users')
 
       if (error) {
         console.error('Failed to fetch ignored users:', error)
-        return new Set()
+        return []
       }
 
-      return new Set((data || []).map((row: { ignored_user_id: string }) => row.ignored_user_id))
+      return (data || []).map((row: { ignored_user_id: string }) => row.ignored_user_id)
     },
     enabled: !!userId,
     staleTime: STALE_TIME.MEDIUM,
@@ -204,16 +204,17 @@ export function useToggleIgnore(currentUserId: string | null) {
     },
     onSuccess: (isNowIgnored, targetUserId) => {
       // Update the ignored users set
-      queryClient.setQueryData<Set<string>>(
+      queryClient.setQueryData<string[]>(
         chatKeys.ignoredUsers(currentUserId || ''),
         (old) => {
-          const newSet = new Set(old || [])
+          const current = Array.isArray(old) ? old : []
+          const newSet = new Set(current)
           if (isNowIgnored) {
             newSet.add(targetUserId)
           } else {
             newSet.delete(targetUserId)
           }
-          return newSet
+          return Array.from(newSet)
         }
       )
       // Update the specific user check
@@ -221,7 +222,10 @@ export function useToggleIgnore(currentUserId: string | null) {
         chatKeys.isUserIgnored(currentUserId || '', targetUserId),
         isNowIgnored
       )
-      // Invalidate conversations to refresh the list
+      // Invalidate both ignored users and conversations to refresh the list
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.ignoredUsers(currentUserId || ''),
+      })
       queryClient.invalidateQueries({
         queryKey: chatKeys.conversations(currentUserId || ''),
       })

@@ -687,7 +687,10 @@ function PlacementTable({ placements, showUniversity = false }: PlacementTablePr
             </div>
             <div className="placement-card-placement">{p.placementUniv || '-'}</div>
             {p.role && <div className="placement-card-role">{p.role}</div>}
-            {showUniversity && <div className="placement-card-university">{p.university}</div>}
+            <div className="placement-card-meta">
+              {p.program && <span className="placement-card-program">{p.program}</span>}
+              {p.university && <span className="placement-card-university">{p.university}</span>}
+            </div>
           </div>
         ))}
       </div>

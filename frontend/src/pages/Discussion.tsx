@@ -360,9 +360,10 @@ export function Discussion({
                   type="button"
                   className="take-bite-btn"
                   onClick={() => threadForm.setShowNewThread(true)}
+                  title="Take a bite"
                 >
                   <PenLine size={16} />
-                  Take a bite
+                  <span>Take a bite</span>
                 </button>
               )}
             </div>
@@ -374,6 +375,7 @@ export function Discussion({
                 onTitleChange={threadForm.setNewThreadTitle}
                 onContentChange={threadForm.setNewThreadContent}
                 onSubmit={threadForm.createThread}
+                onCancel={() => threadForm.setShowNewThread(false)}
                 isPollEnabled={threadForm.isPollEnabled}
                 onPollToggle={threadForm.setIsPollEnabled}
                 pollOptions={threadForm.pollOptions}

@@ -90,6 +90,11 @@ export function useChatConversations({
   // Get ignored users
   const { data: ignoredUsers } = useIgnoredUsers(userId)
 
+  const ignoredUsersSet = useMemo(
+    () => new Set(ignoredUsers || []),
+    [ignoredUsers]
+  )
+
   const allConversations = useMemo(
     () => conversationsQuery.data ?? [],
     [conversationsQuery.data]
@@ -161,20 +166,20 @@ export function useChatConversations({
 
   // Split conversations into ignored and non-ignored
   const { nonIgnoredConversations, ignoredConversations } = useMemo(() => {
-    if (!ignoredUsers || ignoredUsers.size === 0) {
+    if (!ignoredUsersSet || ignoredUsersSet.size === 0) {
       return { nonIgnoredConversations: allConversations, ignoredConversations: [] }
     }
     const nonIgnored: typeof allConversations = []
     const ignored: typeof allConversations = []
     for (const conv of allConversations) {
-      if (ignoredUsers.has(conv.conversation_partner_id)) {
+      if (ignoredUsersSet.has(conv.conversation_partner_id)) {
         ignored.push(conv)
       } else {
         nonIgnored.push(conv)
       }
     }
     return { nonIgnoredConversations: nonIgnored, ignoredConversations: ignored }
-  }, [allConversations, ignoredUsers])
+  }, [allConversations, ignoredUsersSet])
 
   // Select base list based on active tab
   const baseConversations = activeTab === 'ignored' ? ignoredConversations : nonIgnoredConversations

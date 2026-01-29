@@ -228,26 +228,35 @@ function AppContent() {
     setShowTerms(false)
   }, [])
 
+  const handleTabClick = (tab: Tab, handler?: () => void) => {
+    setShowTerms(false)
+    if (handler) {
+      handler()
+    } else {
+      setActiveTab(tab)
+    }
+  }
+
   const tabsNav = (className: string) => (
-    <nav className={`header-tabs-nav ${className} ${showTerms ? 'hidden' : ''}`}>
+    <nav className={`header-tabs-nav ${className}`}>
       <button
-        className={`header-tab ${activeTab === 'placements' ? 'active' : ''}`}
-        onClick={() => setActiveTab('placements')}
+        className={`header-tab ${activeTab === 'placements' && !showTerms ? 'active' : ''}`}
+        onClick={() => handleTabClick('placements')}
       >
         <GraduationCap size={18} />
         <span className="header-tab-label">Placements</span>
       </button>
       <button
-        className={`header-tab ${activeTab === 'discussion' ? 'active' : ''}`}
-        onClick={handleDiscussionClick}
+        className={`header-tab ${activeTab === 'discussion' && !showTerms ? 'active' : ''}`}
+        onClick={() => handleTabClick('discussion', handleDiscussionClick)}
       >
         <TreePine size={18} />
         <span className="header-tab-label">Grove</span>
       </button>
       {user && (
         <button
-          className={`header-tab ${activeTab === 'notifications' ? 'active' : ''}`}
-          onClick={handleNotificationsClick}
+          className={`header-tab ${activeTab === 'notifications' && !showTerms ? 'active' : ''}`}
+          onClick={() => handleTabClick('notifications', handleNotificationsClick)}
         >
           <Bell size={18} />
           <span className="header-tab-label">Alerts</span>
@@ -256,8 +265,8 @@ function AppContent() {
       )}
       {user && (
         <button
-          className={`header-tab ${activeTab === 'chat' ? 'active' : ''}`}
-          onClick={handleChatClick}
+          className={`header-tab ${activeTab === 'chat' && !showTerms ? 'active' : ''}`}
+          onClick={() => handleTabClick('chat', handleChatClick)}
         >
           <MessagesSquare size={18} />
           <span className="header-tab-label">Den</span>
@@ -266,8 +275,8 @@ function AppContent() {
       )}
       {user && (
         <button
-          className={`header-tab ${activeTab === 'profile' ? 'active' : ''}`}
-          onClick={() => setActiveTab('profile')}
+          className={`header-tab ${activeTab === 'profile' && !showTerms ? 'active' : ''}`}
+          onClick={() => handleTabClick('profile')}
         >
           <User size={18} />
           <span className="header-tab-label">Profile</span>
@@ -275,8 +284,8 @@ function AppContent() {
       )}
       {isAdmin && (
         <button
-          className={`header-tab ${activeTab === 'admin' ? 'active' : ''}`}
-          onClick={() => setActiveTab('admin')}
+          className={`header-tab ${activeTab === 'admin' && !showTerms ? 'active' : ''}`}
+          onClick={() => handleTabClick('admin')}
         >
           <Settings size={18} />
           <span className="header-tab-label">Admin</span>
@@ -287,10 +296,7 @@ function AppContent() {
 
   return (
     <div className="app">
-      <Header
-        onLogoClick={showTerms ? () => setShowTerms(false) : undefined}
-        tabs={showTerms ? null : tabsNav('header-tabs-primary')}
-      />
+      <Header tabs={tabsNav('header-tabs-primary')} />
 
       {/* Auth error banner */}
       {authError && (
@@ -373,7 +379,7 @@ function AppContent() {
         </div>
       </div>
 
-      <Footer showTerms={showTerms} onShowTerms={() => setShowTerms(true)} />
+      <Footer onShowTerms={() => setShowTerms(true)} />
     </div>
   )
 }

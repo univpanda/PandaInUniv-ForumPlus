@@ -55,7 +55,6 @@ export const Pagination = memo(function Pagination({
     <div className={`pagination ${compact ? 'compact' : ''}`}>
       {!compact && (
         <div className="pagination-info">
-          Showing{' '}
           <strong>
             {startItem}-{endItem}
           </strong>{' '}

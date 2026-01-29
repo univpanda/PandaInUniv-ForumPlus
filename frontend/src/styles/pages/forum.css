@@ -2033,12 +2033,32 @@
     gap: 1rem;
   }
 
+  /* Toolbar: keep everything in one row */
+  .discussion-toolbar-row {
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    justify-content: flex-start;
+  }
+
   .discussion-utilities {
+    flex: 1;
+    min-width: 0;
     flex-direction: row;
     align-items: center;
     flex-wrap: nowrap;
     overflow: visible;
-    justify-content: center;
+    justify-content: flex-start;
+  }
+
+  /* Take a bite button: icon only on mobile */
+  .take-bite-btn {
+    padding: 0.5rem;
+    gap: 0;
+    flex-shrink: 0;
+  }
+
+  .take-bite-btn span {
+    display: none;
   }
 
   .discussion-utility-actions {
