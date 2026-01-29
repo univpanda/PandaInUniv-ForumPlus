@@ -759,26 +759,6 @@
     min-width: 80px;
   }
 
-  /* Ensure filter select dropdowns don't overflow on mobile */
-  .common-filters .filter-select-trigger {
-    min-height: 52px;
-    font-size: 1rem;
-    padding: 1rem;
-  }
-
-  .common-filters .filter-select-dropdown {
-    max-width: 100%;
-    left: 0;
-    right: 0;
-  }
-
-  /* Better label styling for mobile common filters */
-  .common-filters .filter-group label {
-    font-size: 0.75rem;
-    margin-bottom: 0.5rem;
-    font-weight: 700;
-  }
-
   .placements-container .placements-tabs {
     flex-wrap: wrap;
     gap: 0.5rem;

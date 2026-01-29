@@ -17,8 +17,12 @@
 }
 
 @keyframes fetching-shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 /* ===== Forum Styles ===== */
@@ -225,7 +229,9 @@
 
 .discussion-utility-search .search-box {
   width: clamp(220px, 26vw, 340px);
-  transition: width 0.2s ease, opacity 0.2s ease;
+  transition:
+    width 0.2s ease,
+    opacity 0.2s ease;
 }
 
 .discussion-utility-search .search-box:focus-within,
@@ -315,7 +321,6 @@
   border-right: 6px solid transparent;
   border-bottom: 6px solid #1e293b;
 }
-
 
 .discussion-header h2 {
   font-size: 1.5rem;
@@ -556,7 +561,6 @@
   gap: 1rem;
 }
 
-
 /* Author Posts List */
 .author-posts-list {
   display: flex;
@@ -619,7 +623,6 @@
   border-color: var(--color-primary-light);
   box-shadow: var(--shadow-md);
 }
-
 
 /* Post highlight animation (from flagged view navigation) */
 .post-card.highlight {
@@ -841,7 +844,9 @@
   border-radius: var(--radius-xs);
   display: flex;
   align-items: center;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .share-btn:hover {
@@ -1480,8 +1485,14 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .format-btn {
@@ -2161,7 +2172,9 @@
     justify-content: center;
     gap: 0;
     overflow: hidden;
-    transition: width 0.2s ease, padding 0.2s ease;
+    transition:
+      width 0.2s ease,
+      padding 0.2s ease;
   }
 
   .discussion-utility-search .search-box input,
