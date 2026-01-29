@@ -69,7 +69,9 @@
   font-weight: 500;
   color: var(--placement-text-secondary);
   cursor: pointer;
-  transition: color 0.2s ease, border-color 0.2s ease;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -441,7 +443,6 @@
   text-transform: uppercase;
 }
 
-
 .placement-table tbody tr:hover {
   background: var(--placement-primary-light);
 }
@@ -724,14 +725,58 @@
     padding: 1rem;
   }
 
-  .filter-row {
+  /* Common filters (PhD, Start Year, End Year) stack vertically on mobile */
+  .common-filters .filter-row {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  /* Common filters take full width on mobile */
+  .common-filters .filter-group {
+    flex: none;
+    width: 100%;
+    min-width: unset;
+  }
+
+  /* Add better visual separation for common filters on mobile */
+  .common-filters {
+    margin-bottom: 2rem;
+  }
+
+  /* Other filter rows in tabs remain horizontal with wrap */
+  .placement-search .filter-row,
+  .placement-compare .filter-row,
+  .placement-reverse .filter-row {
     flex-wrap: wrap;
     gap: 0.5rem;
   }
 
-  .filter-group {
+  /* Other filter groups maintain responsive behavior */
+  .placement-search .filter-group,
+  .placement-compare .filter-group,
+  .placement-reverse .filter-group {
     flex: 1 1 auto;
     min-width: 80px;
+  }
+
+  /* Ensure filter select dropdowns don't overflow on mobile */
+  .common-filters .filter-select-trigger {
+    min-height: 52px;
+    font-size: 1rem;
+    padding: 1rem;
+  }
+
+  .common-filters .filter-select-dropdown {
+    max-width: 100%;
+    left: 0;
+    right: 0;
+  }
+
+  /* Better label styling for mobile common filters */
+  .common-filters .filter-group label {
+    font-size: 0.75rem;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
   }
 
   .placements-container .placements-tabs {

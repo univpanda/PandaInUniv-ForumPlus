@@ -69,7 +69,7 @@ export function Placements({ isActive = true }: PlacementsProps) {
   return (
     <div className="placements-container">
       {/* Common filters */}
-      <div className="placement-filters">
+      <div className="placement-filters common-filters">
         <div className="filter-row">
           <FilterSelect
             value={degree}
