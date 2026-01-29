@@ -14,9 +14,9 @@ interface PlacementsProps {
   isActive?: boolean
 }
 
-const MIN_YEAR = 2023
 const CURRENT_YEAR = new Date().getFullYear()
 const MAX_YEAR = CURRENT_YEAR - 1
+const MIN_YEAR = CURRENT_YEAR - 3
 
 export function Placements({ isActive = true }: PlacementsProps) {
   const { data: filters, isLoading: filtersLoading } = usePlacementFilters()
@@ -217,8 +217,8 @@ function SearchTab({
               setProgram(val)
               setUniversity(null) // Reset university when program changes
             }}
-            placeholder="Select program"
-            searchPlaceholder="Select program"
+            placeholder="Select discipline"
+            searchPlaceholder="Select discipline"
           />
           <FilterSelect
             value={university}
@@ -376,15 +376,15 @@ function CompareTab({
                 value={entry1.program}
                 options={programOptions}
                 onChange={(val) => setEntry1({ program: val, university: null })}
-                placeholder="Select a program"
-                searchPlaceholder="Select a program"
+                placeholder="Select discipline"
+                searchPlaceholder="Select discipline"
               />
               <FilterSelect
                 value={entry1.university}
                 options={getUniversityOptions1()}
                 onChange={(val) => setEntry1(prev => ({ ...prev, university: val }))}
-                placeholder="Select a university"
-                searchPlaceholder="Select a university"
+                placeholder="Select university"
+                searchPlaceholder="Select university"
                 disabled={!entry1.program}
               />
             </div>
@@ -393,15 +393,15 @@ function CompareTab({
                 value={entry2.program}
                 options={programOptions}
                 onChange={(val) => setEntry2({ program: val, university: null })}
-                placeholder="Select a program"
-                searchPlaceholder="Select a program"
+                placeholder="Select discipline"
+                searchPlaceholder="Select discipline"
               />
               <FilterSelect
                 value={entry2.university}
                 options={getUniversityOptions2()}
                 onChange={(val) => setEntry2(prev => ({ ...prev, university: val }))}
-                placeholder="Select a university"
-                searchPlaceholder="Select a university"
+                placeholder="Select university"
+                searchPlaceholder="Select university"
                 disabled={!entry2.program}
               />
             </div>
@@ -429,8 +429,8 @@ function CompareTab({
           ) : (
             <ComparisonTable
               results={[
-                { label: `${entry1.program} - ${entry1.university}`, placements: search1.data?.placements || [] },
-                { label: `${entry2.program} - ${entry2.university}`, placements: search2.data?.placements || [] },
+                { label: `${search1.data?.placements?.[0]?.program || entry1.program} - ${entry1.university}`, placements: search1.data?.placements || [] },
+                { label: `${search2.data?.placements?.[0]?.program || entry2.program} - ${entry2.university}`, placements: search2.data?.placements || [] },
               ]}
             />
           )}
@@ -491,25 +491,23 @@ function ReverseSearchTab({
     <div className="placement-reverse">
       <div className="placement-filters">
         <div className="filter-row">
+          <FilterSelect
+            value={program}
+            options={filters?.programs || []}
+            onChange={setProgram}
+            placeholder="Select discipline"
+            searchPlaceholder="Select discipline"
+          />
           <div className="filter-group">
             <input
               type="text"
               value={placementUniv}
               onChange={(e) => setPlacementUniv(e.target.value)}
-              placeholder="Enter an institution to find PhD graduates placed there (e.g., Harvard, Google)"
+              placeholder="Enter placement institution (e.g., Harvard, Google)"
               className="filter-input"
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             />
           </div>
-        </div>
-        <div className="filter-row">
-          <FilterSelect
-            value={program}
-            options={filters?.programs || []}
-            onChange={setProgram}
-            placeholder="Select program"
-            searchPlaceholder="Select program"
-          />
         </div>
         <div className="filter-actions">
           <button
@@ -650,32 +648,50 @@ function PlacementTable({ placements, showUniversity = false }: PlacementTablePr
   }
 
   return (
-    <div className="placement-table-wrapper">
-      <table className="placement-table">
-        <thead>
-          <tr>
-            {showUniversity && <th>University</th>}
-            <th>Program</th>
-            <th>Year</th>
-            <th>Name</th>
-            <th>Placement</th>
-            <th>Designation</th>
-          </tr>
-        </thead>
-        <tbody>
-          {placements.map(p => (
-            <tr key={p.id}>
-              {showUniversity && <td>{p.university || '-'}</td>}
-              <td>{p.program || '-'}</td>
-              <td>{p.year || '-'}</td>
-              <td>{p.name || '-'}</td>
-              <td>{p.placementUniv || '-'}</td>
-              <td>{p.role || '-'}</td>
+    <>
+      {/* Desktop table view */}
+      <div className="placement-table-wrapper placement-desktop">
+        <table className="placement-table">
+          <thead>
+            <tr>
+              {showUniversity && <th>University</th>}
+              <th className="col-program">Program</th>
+              <th>Year</th>
+              <th>Name</th>
+              <th>Placement</th>
+              <th>Designation</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {placements.map(p => (
+              <tr key={p.id}>
+                {showUniversity && <td>{p.university || '-'}</td>}
+                <td className="col-program">{p.program || '-'}</td>
+                <td>{p.year || '-'}</td>
+                <td>{p.name || '-'}</td>
+                <td>{p.placementUniv || '-'}</td>
+                <td>{p.role || '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile card view */}
+      <div className="placement-cards placement-mobile">
+        {placements.map(p => (
+          <div key={p.id} className="placement-card">
+            <div className="placement-card-header">
+              <span className="placement-card-name">{p.name || '-'}</span>
+              <span className="placement-card-year">{p.year || '-'}</span>
+            </div>
+            <div className="placement-card-placement">{p.placementUniv || '-'}</div>
+            {p.role && <div className="placement-card-role">{p.role}</div>}
+            {showUniversity && <div className="placement-card-university">{p.university}</div>}
+          </div>
+        ))}
+      </div>
+    </>
   )
 }
 

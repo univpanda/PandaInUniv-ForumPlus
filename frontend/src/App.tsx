@@ -229,57 +229,57 @@ function AppContent() {
   }, [])
 
   const tabsNav = (className: string) => (
-    <nav className={`side-tabs ${className} ${showTerms ? 'hidden' : ''}`}>
+    <nav className={`header-tabs-nav ${className} ${showTerms ? 'hidden' : ''}`}>
       <button
-        className={`side-tab ${activeTab === 'placements' ? 'active' : ''}`}
+        className={`header-tab ${activeTab === 'placements' ? 'active' : ''}`}
         onClick={() => setActiveTab('placements')}
       >
         <GraduationCap size={18} />
-        <span className="side-tab-label">Placements</span>
+        <span className="header-tab-label">Placements</span>
       </button>
       <button
-        className={`side-tab ${activeTab === 'discussion' ? 'active' : ''}`}
+        className={`header-tab ${activeTab === 'discussion' ? 'active' : ''}`}
         onClick={handleDiscussionClick}
       >
         <TreePine size={18} />
-        <span className="side-tab-label">Grove</span>
+        <span className="header-tab-label">Grove</span>
       </button>
       {user && (
         <button
-          className={`side-tab ${activeTab === 'notifications' ? 'active' : ''}`}
+          className={`header-tab ${activeTab === 'notifications' ? 'active' : ''}`}
           onClick={handleNotificationsClick}
         >
           <Bell size={18} />
-          <span className="side-tab-label">Alerts</span>
-          {notificationCount > 0 && <span className="side-tab-badge">{notificationCount}</span>}
+          <span className="header-tab-label">Alerts</span>
+          {notificationCount > 0 && <span className="header-tab-badge">{notificationCount}</span>}
         </button>
       )}
       {user && (
         <button
-          className={`side-tab ${activeTab === 'chat' ? 'active' : ''}`}
+          className={`header-tab ${activeTab === 'chat' ? 'active' : ''}`}
           onClick={handleChatClick}
         >
           <MessagesSquare size={18} />
-          <span className="side-tab-label">Den</span>
-          {chatUnread > 0 && <span className="side-tab-badge">{chatUnread}</span>}
+          <span className="header-tab-label">Den</span>
+          {chatUnread > 0 && <span className="header-tab-badge">{chatUnread}</span>}
         </button>
       )}
       {user && (
         <button
-          className={`side-tab ${activeTab === 'profile' ? 'active' : ''}`}
+          className={`header-tab ${activeTab === 'profile' ? 'active' : ''}`}
           onClick={() => setActiveTab('profile')}
         >
           <User size={18} />
-          <span className="side-tab-label">Profile</span>
+          <span className="header-tab-label">Profile</span>
         </button>
       )}
       {isAdmin && (
         <button
-          className={`side-tab ${activeTab === 'admin' ? 'active' : ''}`}
+          className={`header-tab ${activeTab === 'admin' ? 'active' : ''}`}
           onClick={() => setActiveTab('admin')}
         >
           <Settings size={18} />
-          <span className="side-tab-label">Admin</span>
+          <span className="header-tab-label">Admin</span>
         </button>
       )}
     </nav>
@@ -287,7 +287,10 @@ function AppContent() {
 
   return (
     <div className="app">
-      <Header />
+      <Header
+        onLogoClick={showTerms ? () => setShowTerms(false) : undefined}
+        tabs={showTerms ? null : tabsNav('header-tabs-primary')}
+      />
 
       {/* Auth error banner */}
       {authError && (
@@ -300,8 +303,6 @@ function AppContent() {
       )}
 
       <div className="app-body">
-        {tabsNav('side-tabs-desktop')}
-
         <div className="app-content">
           {/* Only mount tabs when they've been visited - prioritizes active tab's network requests */}
           {shouldMountTab('discussion') && (

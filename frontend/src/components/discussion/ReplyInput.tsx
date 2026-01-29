@@ -78,6 +78,7 @@ export const ReplyInput = memo(function ReplyInput({
         heading: false,
         blockquote: false,
         horizontalRule: false,
+        link: false,
       }),
       Link.configure({
         openOnClick: false,

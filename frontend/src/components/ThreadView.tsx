@@ -69,7 +69,7 @@ export function ThreadView() {
           value={replyContent}
           onChange={onReplyContentChange}
           onSubmit={() => onAddReply(thread.id, originalPost?.id ?? null)}
-          placeholder="Write a reply..."
+          placeholder="Write a reply... (Shift + Enter to submit)"
           submitting={submitting}
         />
       )}
@@ -112,7 +112,7 @@ export function ThreadView() {
                 value={inlineReplyContent}
                 onChange={onInlineReplyContentChange}
                 onSubmit={() => onAddReply(thread.id, post.id, true)}
-                placeholder={`Reply to ${post.author_name}...`}
+                placeholder={`Reply to ${post.author_name}... (Shift + Enter to submit)`}
                 submitting={submitting}
                 size="small"
                 autoFocus
@@ -140,7 +140,7 @@ export function ThreadView() {
           value={replyContent}
           onChange={onReplyContentChange}
           onSubmit={() => onAddReply(thread.id, originalPost?.id ?? null)}
-          placeholder="Write a reply..."
+          placeholder="Write a reply... (Shift + Enter to submit)"
           submitting={submitting}
         />
       )}

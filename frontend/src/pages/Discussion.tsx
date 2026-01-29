@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { LogIn, EyeOff } from 'lucide-react'
+import { LogIn, EyeOff, ChevronDown, PenLine } from 'lucide-react'
+import { SearchInput } from '../components/ui'
+import { getSearchHelpText } from '../utils/search'
+import type { SortBy } from '../hooks/useDiscussionFilters'
 import { useDiscussionPage } from '../hooks/useDiscussionPage'
 import { DiscussionProvider } from '../contexts/DiscussionContext'
 import { ThreadView } from '../components/ThreadView'
@@ -229,6 +232,11 @@ export function Discussion({
 
   const newThreadComposerRef = useRef<HTMLDivElement | null>(null)
 
+  const searchHelpText = useMemo(
+    () => getSearchHelpText(!!auth.user, auth.isAdmin),
+    [auth.user, auth.isAdmin]
+  )
+
   useClickOutside(
     newThreadComposerRef,
     () => {
@@ -292,31 +300,73 @@ export function Discussion({
           view={nav.view}
           threadTitle={nav.selectedThread?.title}
           onGoToThreadFromTitle={nav.goToThreadFromTitle}
-          onGoToList={nav.goToList}
-          sortBy={sort.sortBy}
-          onSortChange={sort.handleSortChange}
-          searchQuery={search.searchQuery}
-          onSearchQueryChange={search.setSearchQuery}
-          isAdmin={auth.isAdmin}
-          user={auth.user}
-          pageSizeInput={data.pageSizeControl.pageSizeInput}
-          onPageSizeInputChange={data.pageSizeControl.setPageSizeInput}
-          onPageSizeBlur={data.pageSizeControl.handlePageSizeBlur}
         />
 
         {/* New Thread Composer */}
-        {auth.user && nav.view === 'list' && (
-          <div className="new-thread-composer" ref={newThreadComposerRef}>
-            {!threadForm.showNewThread && (
-              <button
-                type="button"
-                className="new-thread-collapsed"
-                onClick={() => threadForm.setShowNewThread(true)}
-              >
-                Take a bite...
-              </button>
-            )}
-            {threadForm.showNewThread && (
+        {nav.view === 'list' && (
+          <div className="discussion-toolbar-wrap" ref={newThreadComposerRef}>
+            <div className="discussion-toolbar-row">
+              <div className={`discussion-utilities ${search.searchQuery ? 'search-expanded' : ''}`}>
+                <div className="discussion-utility discussion-utility-sort">
+                  <div className="sort-options sort-select-container">
+                    <select
+                      className="sort-select"
+                      value={sort.sortBy}
+                      onChange={(e) => sort.handleSortChange(e.target.value as SortBy)}
+                      aria-label="Sort threads"
+                    >
+                      <option value="popular">Popular</option>
+                      <option value="recent">Recent</option>
+                      <option value="new">New</option>
+                    </select>
+                    <ChevronDown className="sort-select-icon" size={16} aria-hidden="true" />
+                  </div>
+                </div>
+                <div className="discussion-utility discussion-utility-search">
+                  <SearchInput
+                    value={search.searchQuery}
+                    onChange={search.setSearchQuery}
+                    placeholder="Forage for discussions..."
+                    className={`header-search ${search.searchQuery ? 'has-value' : ''}`}
+                    iconSize={16}
+                    showHelp
+                    helpText={searchHelpText}
+                    helpPlacement="outside"
+                  />
+                </div>
+                <div className="discussion-utility discussion-utility-actions">
+                  {auth.isAdmin && (
+                    <input
+                      type="number"
+                      min="1"
+                      max="500"
+                      className="page-size-input"
+                      value={data.pageSizeControl.pageSizeInput}
+                      onChange={(e) => data.pageSizeControl.setPageSizeInput(e.target.value)}
+                      onBlur={data.pageSizeControl.handlePageSizeBlur}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          data.pageSizeControl.handlePageSizeBlur()
+                          e.currentTarget.blur()
+                        }
+                      }}
+                      title="Items per page"
+                    />
+                  )}
+                </div>
+              </div>
+              {auth.user && !threadForm.showNewThread && (
+                <button
+                  type="button"
+                  className="take-bite-btn"
+                  onClick={() => threadForm.setShowNewThread(true)}
+                >
+                  <PenLine size={16} />
+                  Take a bite
+                </button>
+              )}
+            </div>
+            {auth.user && threadForm.showNewThread && (
               <NewThreadForm
                 title={threadForm.newThreadTitle}
                 content={threadForm.newThreadContent}

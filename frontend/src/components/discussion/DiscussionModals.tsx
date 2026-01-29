@@ -141,6 +141,11 @@ export const DeleteModal = memo(function DeleteModal({
   onConfirm,
   onClose,
 }: DeleteModalProps) {
+  const hasReplies = (post.reply_count ?? 0) > 0
+  const deleteMessage = hasReplies
+    ? 'Are you sure you want to delete this post? The post will be marked as deleted but replies will remain visible.'
+    : 'Are you sure you want to delete this post? The post will be marked as deleted.'
+
   return (
     <Modal
       title={post.is_deleted ? 'Restore Post' : 'Delete Post'}
@@ -164,7 +169,7 @@ export const DeleteModal = memo(function DeleteModal({
       <p>
         {post.is_deleted
           ? 'Are you sure you want to restore this post? It will become visible to all users again.'
-          : 'Are you sure you want to delete this post? The post will be marked as deleted but replies will remain visible.'}
+          : deleteMessage}
       </p>
     </Modal>
   )

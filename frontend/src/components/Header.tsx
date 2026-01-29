@@ -1,21 +1,38 @@
 import { memo } from 'react'
 import { AuthButton } from './AuthButton'
+import pandaLogo from '../assets/png/pandalogo.jpg'
 
 export type Tab = 'discussion' | 'chat' | 'users' | 'profile' | 'notifications' | 'placements' | 'admin'
 
-export const Header = memo(function Header() {
+interface HeaderProps {
+  onLogoClick?: () => void
+  tabs?: React.ReactNode
+}
+
+export const Header = memo(function Header({ onLogoClick, tabs }: HeaderProps) {
+  const logoContent = (
+    <img src={pandaLogo} alt="PandaInUniv" className="logo-image" />
+  )
+
   return (
     <header className="header">
       <div className="header-content">
         <div className="logo header-logo">
           <div className="logo-text">
-            <h1>
-              <span className="logo-full">PandaInUniv</span>
-              <span className="logo-short" aria-hidden="true">P</span>
-            </h1>
+            {onLogoClick ? (
+              <button className="logo-button" onClick={onLogoClick}>
+                {logoContent}
+              </button>
+            ) : (
+              <h1>{logoContent}</h1>
+            )}
           </div>
         </div>
-        <div className="header-utilities" id="header-utilities" />
+        {tabs && (
+          <div className="header-tabs">
+            <div className="header-tabs-pill">{tabs}</div>
+          </div>
+        )}
         <div className="header-right">
           <AuthButton />
         </div>

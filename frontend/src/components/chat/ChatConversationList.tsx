@@ -54,7 +54,7 @@ export function ChatConversationList({
         <SearchInput
           value={searchQuery}
           onChange={onSearchChange}
-          placeholder={activeTab === 'ignored' ? 'Forage shushed...' : 'Forage whispers...'}
+          placeholder={activeTab === 'ignored' ? 'Forage for shushed...' : 'Forage for whispers...'}
           className="chat-search"
           showHelp
         />

@@ -169,21 +169,19 @@ export const PostCardActions = memo(function PostCardActions({
       />
 
       {/* Bookmark button - thread bookmark for original, post bookmark for replies */}
-      {variant === 'original' && threadId && onBookmarkToggle && (
+      {user && variant === 'original' && threadId && onBookmarkToggle && (
         <BookmarkButton
           isBookmarked={isBookmarked}
           onClick={(e) => onBookmarkToggle(threadId, e)}
           title={isBookmarked ? 'Remove bookmark' : 'Bookmark thread'}
-          disabled={!user}
           size={14}
         />
       )}
-      {variant !== 'original' && onPostBookmarkToggle && (
+      {user && variant !== 'original' && onPostBookmarkToggle && (
         <BookmarkButton
           isBookmarked={isPostBookmarked}
           onClick={(e) => onPostBookmarkToggle(post.id, e)}
           title={isPostBookmarked ? 'Remove bookmark' : 'Bookmark post'}
-          disabled={!user}
           size={14}
         />
       )}

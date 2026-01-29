@@ -14,6 +14,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 // Public client: avoids any persisted session or auto-refresh for signed-out flows.
 export const supabasePublic = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
+    storageKey: 'sb-public-auth-token',
     persistSession: false,
     autoRefreshToken: false,
     detectSessionInUrl: false,

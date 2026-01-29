@@ -1,5 +1,6 @@
-import { memo, useState, useRef, useEffect } from 'react'
+import { memo, useState, useRef, useCallback } from 'react'
 import { MessagesSquare } from 'lucide-react'
+import { useClickOutside } from '../hooks/useClickOutside'
 
 interface UserNameHoverProps {
   userId: string
@@ -8,6 +9,7 @@ interface UserNameHoverProps {
   avatarPath?: string | null
   currentUserId: string | null
   className?: string
+  children?: React.ReactNode
 }
 
 // Custom event type for starting a chat
@@ -18,39 +20,29 @@ export interface StartChatEvent {
   avatarPath?: string | null
 }
 
-export const UserNameHover = memo(function UserNameHover({
-  userId,
-  username,
-  avatar,
-  avatarPath,
-  currentUserId,
-  className = '',
-}: UserNameHoverProps) {
+export const UserNameHover = memo(function UserNameHover(props: UserNameHoverProps) {
+  const {
+    userId,
+    username,
+    avatar,
+    avatarPath,
+    currentUserId,
+    className = '',
+    children,
+  } = props
   const displayName = username ?? 'Private Panda'
   const [showPopup, setShowPopup] = useState(false)
   const containerRef = useRef<HTMLSpanElement>(null)
-  const timeoutRef = useRef<number | null>(null)
 
   // Don't show chat option for own username or when not logged in
   const canChat = currentUserId && currentUserId !== userId
+  const isInteractive = !!currentUserId
 
-  const handleMouseEnter = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-    }
-    timeoutRef.current = window.setTimeout(() => {
-      setShowPopup(true)
-    }, 150) // Small delay to prevent accidental triggers
-  }
-
-  const handleMouseLeave = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-    }
-    timeoutRef.current = window.setTimeout(() => {
-      setShowPopup(false)
-    }, 150) // Small delay to allow moving to popup
-  }
+  const handleTogglePopup = useCallback((event: React.MouseEvent) => {
+    event.stopPropagation()
+    if (!isInteractive) return
+    setShowPopup((prev) => !prev)
+  }, [isInteractive])
 
   const handleChatClick = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -64,30 +56,25 @@ export const UserNameHover = memo(function UserNameHover({
     setShowPopup(false)
   }
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
-    }
-  }, [])
+  useClickOutside(containerRef, () => setShowPopup(false), showPopup)
 
   return (
     <span
       ref={containerRef}
-      className="username-hover-container"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      className={`username-hover-container${isInteractive ? '' : ' is-disabled'}`}
+      onClick={handleTogglePopup}
     >
-      <span className={`username-text ${className}`}>{displayName}</span>
-      {showPopup && (
+      {children ? (
+        <span className="username-trigger">
+          {children}
+        </span>
+      ) : (
+        <span className={`username-text ${className}`}>{displayName}</span>
+      )}
+      {isInteractive && showPopup && (
         <div
           className="username-popup"
-          onMouseEnter={() => {
-            if (timeoutRef.current) clearTimeout(timeoutRef.current)
-          }}
-          onMouseLeave={handleMouseLeave}
+          onClick={(e) => e.stopPropagation()}
         >
           {canChat ? (
             <button className="username-popup-btn" onClick={handleChatClick}>

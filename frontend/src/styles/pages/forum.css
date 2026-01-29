@@ -149,12 +149,27 @@
   margin-bottom: 1.5rem;
 }
 
+.discussion-toolbar-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.discussion-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .discussion-utilities {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.75rem;
   width: 100%;
+  flex: 1 1 520px;
 }
 
 .discussion-utility {
@@ -168,9 +183,30 @@
 }
 
 .discussion-utility-actions {
-  position: absolute;
-  right: 0;
+  position: relative;
+  right: auto;
   gap: 0.5rem;
+}
+
+.take-bite-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: white;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+
+.take-bite-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-xs);
 }
 
 .discussion-container .search-box,
@@ -217,6 +253,17 @@
 .discussion-container .search-box input::placeholder,
 .discussion-utilities .search-box input::placeholder {
   color: var(--color-text-light);
+}
+
+.search-input-with-help {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.search-input-with-help .search-box {
+  flex: 1;
 }
 
 .search-help-wrapper {
@@ -1641,6 +1688,17 @@
   gap: 0.5rem;
   min-width: 0;
   overflow: visible;
+}
+
+.username-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.username-hover-container.is-disabled .username-trigger {
+  cursor: default;
 }
 
 .avatar-small {

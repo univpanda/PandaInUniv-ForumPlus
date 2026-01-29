@@ -2364,7 +2364,18 @@ BEGIN
     RAISE EXCEPTION 'Permission denied';
   END IF;
 
-  RETURN (SELECT COUNT(*) FROM feedback_messages WHERE recipient_id = p_user_id AND is_read = FALSE);
+  RETURN (
+    SELECT COUNT(*)
+    FROM feedback_messages fm
+    WHERE fm.recipient_id = p_user_id
+      AND fm.is_read = FALSE
+      AND NOT EXISTS (
+        SELECT 1
+        FROM ignored_users iu
+        WHERE iu.user_id = auth.uid()
+          AND iu.ignored_user_id = fm.user_id
+      )
+  );
 END;
 $$;
 
@@ -2445,6 +2456,12 @@ BEGIN
     FROM feedback_messages fm
     WHERE fm.recipient_id = p_user_id
       AND fm.is_read = FALSE
+      AND NOT EXISTS (
+        SELECT 1
+        FROM ignored_users iu
+        WHERE iu.user_id = auth.uid()
+          AND iu.ignored_user_id = fm.user_id
+      )
     GROUP BY fm.user_id
   )
   SELECT

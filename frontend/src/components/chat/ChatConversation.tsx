@@ -67,14 +67,19 @@ export function ChatConversation({
             </div>
             <span className="chat-partner-name">{partnerName}</span>
           </button>
-          <button
-            className={`chat-ignore-btn ${isIgnored ? 'ignored' : ''}`}
-            onClick={handleToggleIgnore}
-            disabled={toggleIgnore.isPending}
-            title={isIgnored ? 'Unignore user' : 'Ignore user'}
-          >
-            {isIgnored ? <UserCheck size={18} /> : <UserX size={18} />}
-          </button>
+          <div className="chat-tooltip-wrapper">
+            <button
+              className={`chat-ignore-btn ${isIgnored ? 'ignored' : ''}`}
+              onClick={handleToggleIgnore}
+              disabled={toggleIgnore.isPending}
+              aria-label={isIgnored ? 'Unshush user' : 'Shush user'}
+            >
+              {isIgnored ? <UserCheck size={18} /> : <UserX size={18} />}
+            </button>
+            <span className="chat-tooltip">
+              {isIgnored ? 'Unshush user' : 'Shush user'}
+            </span>
+          </div>
         </div>
         {partnerStats?.isPrivate ? (
           <div className="chat-partner-private">
@@ -138,7 +143,7 @@ export function ChatConversation({
         onChange={onMessageChange}
         onSend={onSend}
         sending={sending}
-        placeholder={`Message ${partnerName}...`}
+        placeholder={`Message ${partnerName}... (Shift + Enter to submit)`}
         autoFocus
       />
     </div>

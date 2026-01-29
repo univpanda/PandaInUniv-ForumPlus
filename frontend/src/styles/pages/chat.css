@@ -357,6 +357,35 @@
   color: var(--color-primary);
 }
 
+.chat-tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.chat-tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--color-text);
+  color: #e2e8f0;
+  padding: 0.35rem 0.55rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  white-space: nowrap;
+  box-shadow: var(--shadow-sm);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.chat-tooltip-wrapper:hover .chat-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .chat-ignore-btn {
   display: flex;
   align-items: center;
@@ -601,6 +630,10 @@
   transition: var(--transition-color);
 }
 
+.username-hover-container.is-disabled .username-text {
+  cursor: default;
+}
+
 /* Apply author-name text styles to inner element */
 .username-hover-container .username-text.author-name {
   font-weight: 500;
@@ -613,6 +646,10 @@
 
 .username-hover-container:hover .username-text {
   color: var(--color-primary);
+}
+
+.username-hover-container.is-disabled:hover .username-text {
+  color: inherit;
 }
 
 .username-popup {

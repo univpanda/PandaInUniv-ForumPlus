@@ -54,7 +54,7 @@ export function RepliesView() {
           value={replyContent}
           onChange={onReplyContentChange}
           onSubmit={() => onAddReply(thread.id, selectedPost.id)}
-          placeholder={`Reply to ${selectedPost.author_name}...`}
+          placeholder={`Reply to ${selectedPost.author_name}... (Shift + Enter to submit)`}
           submitting={submitting}
         />
       )}

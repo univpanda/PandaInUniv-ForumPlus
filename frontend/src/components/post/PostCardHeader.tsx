@@ -37,19 +37,20 @@ export const PostCardHeader = memo(function PostCardHeader({
   return (
     <div className="post-header">
       <div className="post-author">
-        <img
-          src={getAvatarUrl(post.author_avatar, authorName, post.author_avatar_path)}
-          alt=""
-          className="avatar-small"
-        />
         <UserNameHover
           userId={post.author_id}
           username={post.author_name ?? 'Private Panda'}
           avatar={post.author_avatar}
           avatarPath={post.author_avatar_path}
           currentUserId={user?.id || null}
-          className="author-name"
-        />
+        >
+          <img
+            src={getAvatarUrl(post.author_avatar, authorName, post.author_avatar_path)}
+            alt=""
+            className="avatar-small"
+          />
+          <span className="author-name">{authorName}</span>
+        </UserNameHover>
         <span className="post-date">
           {isOriginal ? formatDateTimeAbsolute(post.created_at) : formatDate(post.created_at)}
         </span>

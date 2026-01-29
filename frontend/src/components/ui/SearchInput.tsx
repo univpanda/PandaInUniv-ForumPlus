@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Search, X, Info } from 'lucide-react'
 import { SEARCH_HELP_TEXT } from '../../utils/search'
 
@@ -11,6 +11,7 @@ interface SearchInputProps {
   iconSize?: number
   showHelp?: boolean
   helpText?: string
+  helpPlacement?: 'inside' | 'outside'
 }
 
 export function SearchInput({
@@ -22,14 +23,84 @@ export function SearchInput({
   iconSize = 20,
   showHelp = false,
   helpText = SEARCH_HELP_TEXT,
+  helpPlacement = 'inside',
 }: SearchInputProps) {
   const [showTooltip, setShowTooltip] = useState(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const tooltipTimeoutRef = useRef<number | null>(null)
 
-  return (
+  useEffect(() => {
+    if (!showTooltip) {
+      if (tooltipTimeoutRef.current) {
+        window.clearTimeout(tooltipTimeoutRef.current)
+        tooltipTimeoutRef.current = null
+      }
+      return
+    }
+  }, [showTooltip])
+
+  const help = showHelp && (
+    <div
+      className="search-help-wrapper"
+      onMouseEnter={() => {
+        if (tooltipTimeoutRef.current) {
+          window.clearTimeout(tooltipTimeoutRef.current)
+          tooltipTimeoutRef.current = null
+        }
+        setShowTooltip(true)
+      }}
+      onMouseLeave={() => {
+        if (tooltipTimeoutRef.current) {
+          window.clearTimeout(tooltipTimeoutRef.current)
+        }
+        tooltipTimeoutRef.current = window.setTimeout(() => {
+          setShowTooltip(false)
+          tooltipTimeoutRef.current = null
+        }, 1000)
+      }}
+    >
+      <button
+        className="search-help-btn"
+        onClick={(event) => {
+          event.stopPropagation()
+          setShowTooltip((prev) => !prev)
+        }}
+        onMouseDown={(event) => event.preventDefault()}
+        onFocus={() => setShowTooltip(true)}
+        onBlur={() => {
+          if (tooltipTimeoutRef.current) {
+            window.clearTimeout(tooltipTimeoutRef.current)
+          }
+          tooltipTimeoutRef.current = window.setTimeout(() => {
+            setShowTooltip(false)
+            tooltipTimeoutRef.current = null
+          }, 1000)
+        }}
+        aria-label="Search help"
+        type="button"
+      >
+        <Info size={14} />
+      </button>
+      {showTooltip && (
+        <div className="search-help-tooltip" onClick={(event) => event.stopPropagation()}>
+          {helpText.split('\n').map((line, i) => (
+            <div key={i}>{line}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  const searchBox = (
     <div
       className={`search-box ${className}`}
-      onClick={() => inputRef.current?.focus()}
+      onClick={(event) => {
+        const target = event.target as HTMLElement | null
+        if (target?.closest('.search-help-wrapper') || target?.closest('.clear-search')) {
+          return
+        }
+        inputRef.current?.focus()
+      }}
     >
       <Search size={iconSize} aria-hidden="true" />
       <input
@@ -52,26 +123,18 @@ export function SearchInput({
           <X size={14} aria-hidden="true" />
         </button>
       )}
-      {showHelp && (
-        <div className="search-help-wrapper">
-          <button
-            className="search-help-btn"
-            onClick={() => setShowTooltip(!showTooltip)}
-            onBlur={() => setTimeout(() => setShowTooltip(false), 150)}
-            aria-label="Search help"
-            type="button"
-          >
-            <Info size={14} />
-          </button>
-          {showTooltip && (
-            <div className="search-help-tooltip">
-              {helpText.split('\n').map((line, i) => (
-                <div key={i}>{line}</div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {helpPlacement === 'inside' ? help : null}
     </div>
   )
+
+  if (helpPlacement === 'outside' && help) {
+    return (
+      <div className="search-input-with-help">
+        {searchBox}
+        {help}
+      </div>
+    )
+  }
+
+  return searchBox
 }

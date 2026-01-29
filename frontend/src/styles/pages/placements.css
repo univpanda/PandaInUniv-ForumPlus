@@ -450,6 +450,59 @@
   border-bottom: none;
 }
 
+/* Mobile card view - hidden by default, shown on mobile */
+.placement-mobile.placement-cards {
+  display: none;
+}
+
+.placement-card {
+  background: var(--placement-bg);
+  border: 1px solid var(--placement-border);
+  border-radius: 10px;
+  padding: 0.875rem 1rem;
+}
+
+.placement-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.375rem;
+}
+
+.placement-card-name {
+  font-weight: 600;
+  color: var(--placement-text);
+  font-size: 0.9rem;
+}
+
+.placement-card-year {
+  font-size: 0.8rem;
+  color: var(--placement-text-secondary);
+  background: var(--color-bg-light);
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+}
+
+.placement-card-placement {
+  color: var(--placement-primary);
+  font-weight: 500;
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+}
+
+.placement-card-role {
+  font-size: 0.8rem;
+  color: var(--placement-text-secondary);
+}
+
+.placement-card-university {
+  font-size: 0.75rem;
+  color: var(--placement-text-muted);
+  margin-top: 0.375rem;
+  padding-top: 0.375rem;
+  border-top: 1px solid var(--placement-border);
+}
+
 /* Compare Tab */
 .compare-universities {
   display: flex;
@@ -662,12 +715,13 @@
   }
 
   .filter-row {
-    flex-direction: column;
-    gap: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
   .filter-group {
-    min-width: 100%;
+    flex: 1 1 auto;
+    min-width: 80px;
   }
 
   .placements-container .placements-tabs {
@@ -705,11 +759,23 @@
   }
 
   .compare-select-row {
-    flex-direction: column;
+    flex-wrap: wrap;
   }
 
-  .compare-select-row .btn-icon {
-    align-self: flex-end;
+  .compare-select-row .filter-group {
+    flex: 1 1 45%;
+    min-width: 120px;
+  }
+
+  /* Show card view, hide table view on mobile */
+  .placement-desktop {
+    display: none;
+  }
+
+  .placement-mobile.placement-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
   }
 }
 
