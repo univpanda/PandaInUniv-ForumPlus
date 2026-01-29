@@ -66,7 +66,12 @@ const TAB_STORAGE_KEY = 'activeTab'
 const getStoredTab = (): Tab => {
   try {
     const stored = localStorage.getItem(TAB_STORAGE_KEY)
-    if (stored && ['discussion', 'chat', 'users', 'profile', 'notifications', 'placements', 'admin'].includes(stored)) {
+    if (
+      stored &&
+      ['discussion', 'chat', 'users', 'profile', 'notifications', 'placements', 'admin'].includes(
+        stored
+      )
+    ) {
       return stored as Tab
     }
   } catch {
@@ -260,7 +265,9 @@ function AppContent() {
         >
           <Bell size={18} />
           <span className="header-tab-label">Alerts</span>
-          {notificationCount > 0 && <span className="header-tab-badge">{notificationCount}</span>}
+          {notificationCount && notificationCount > 0 && (
+            <span className="header-tab-badge">{notificationCount}</span>
+          )}
         </button>
       )}
       {user && (
@@ -270,7 +277,7 @@ function AppContent() {
         >
           <MessagesSquare size={18} />
           <span className="header-tab-label">Den</span>
-          {chatUnread > 0 && <span className="header-tab-badge">{chatUnread}</span>}
+          {chatUnread && chatUnread > 0 && <span className="header-tab-badge">{chatUnread}</span>}
         </button>
       )}
       {user && (
@@ -312,7 +319,9 @@ function AppContent() {
         <div className="app-content">
           {/* Only mount tabs when they've been visited - prioritizes active tab's network requests */}
           {shouldMountTab('discussion') && (
-            <div className={`tab-content ${effectiveTab !== 'discussion' || showTerms ? 'hidden' : ''}`}>
+            <div
+              className={`tab-content ${effectiveTab !== 'discussion' || showTerms ? 'hidden' : ''}`}
+            >
               <ErrorBoundary fallbackMessage="Failed to load grove. Please try again.">
                 <Discussion
                   resetToList={discussionResetKey > 0 ? discussionResetKey : undefined}
@@ -339,7 +348,9 @@ function AppContent() {
           )}
 
           {user && shouldMountTab('profile') && (
-            <div className={`tab-content ${effectiveTab !== 'profile' || showTerms ? 'hidden' : ''}`}>
+            <div
+              className={`tab-content ${effectiveTab !== 'profile' || showTerms ? 'hidden' : ''}`}
+            >
               <ErrorBoundary fallbackMessage="Failed to load profile. Please try again.">
                 <Profile />
               </ErrorBoundary>
@@ -347,7 +358,9 @@ function AppContent() {
           )}
 
           {user && shouldMountTab('notifications') && (
-            <div className={`tab-content ${effectiveTab !== 'notifications' || showTerms ? 'hidden' : ''}`}>
+            <div
+              className={`tab-content ${effectiveTab !== 'notifications' || showTerms ? 'hidden' : ''}`}
+            >
               <ErrorBoundary fallbackMessage="Failed to load notifications. Please try again.">
                 <Notifications onNavigateToPost={handleNavigateToPost} />
               </ErrorBoundary>
@@ -355,7 +368,9 @@ function AppContent() {
           )}
 
           {shouldMountTab('placements') && (
-            <div className={`tab-content ${effectiveTab !== 'placements' || showTerms ? 'hidden' : ''}`}>
+            <div
+              className={`tab-content ${effectiveTab !== 'placements' || showTerms ? 'hidden' : ''}`}
+            >
               <ErrorBoundary fallbackMessage="Failed to load placements. Please try again.">
                 <Placements isActive={effectiveTab === 'placements' && !showTerms} />
               </ErrorBoundary>
@@ -375,7 +390,6 @@ function AppContent() {
               <Terms onBack={() => setShowTerms(false)} />
             </div>
           )}
-
         </div>
       </div>
 

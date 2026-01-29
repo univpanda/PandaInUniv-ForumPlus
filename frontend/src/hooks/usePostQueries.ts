@@ -1,9 +1,14 @@
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { supabase, supabasePublic } from '../lib/supabase'
 import { STALE_TIME, PAGE_SIZE } from '../utils/constants'
-import { getCachedThreadView, invalidateThreadCache, invalidateThreadsCache, isCacheEnabled } from '../lib/cacheApi'
+import {
+  getCachedThreadView,
+  invalidateThreadCache,
+  invalidateThreadsCache,
+  isCacheEnabled,
+} from '../lib/cacheApi'
 import { extractPaginatedResponse } from '../utils/queryHelpers'
-import { withTimeout } from '../utils/timeout'
+
 import { forumKeys } from './forumQueryKeys'
 import { profileKeys } from './useUserProfile'
 import { useAuth } from './useAuth'
@@ -18,13 +23,9 @@ export function usePostById(postId: number, enabled: boolean = true) {
     queryKey: ['forum', 'post', postId],
     networkMode: 'always',
     queryFn: async (): Promise<Post | null> => {
-      const { data, error } = await withTimeout(
-        client.rpc('get_post_by_id', {
-          p_post_id: postId,
-        }),
-        15000,
-        'Request timeout: post lookup took too long'
-      )
+      const { data, error } = await client.rpc('get_post_by_id', {
+        p_post_id: postId,
+      })
       if (error) throw error
       const rows = (data ?? []) as Post[]
       return rows[0] ?? null
@@ -50,17 +51,13 @@ export function usePaginatedPosts(
     queryKey: forumKeys.paginatedPosts(threadId, parentId, page, sort),
     networkMode: 'always',
     queryFn: async (): Promise<GetPaginatedPostsResponse> => {
-      const { data, error } = await withTimeout(
-        client.rpc('get_paginated_thread_posts', {
-          p_thread_id: threadId,
-          p_parent_id: parentId,
-          p_limit: pageSize,
-          p_offset: (page - 1) * pageSize,
-          p_sort: sort,
-        }),
-        15000,
-        'Request timeout: thread posts took too long'
-      )
+      const { data, error } = await client.rpc('get_paginated_thread_posts', {
+        p_thread_id: threadId,
+        p_parent_id: parentId,
+        p_limit: pageSize,
+        p_offset: (page - 1) * pageSize,
+        p_sort: sort,
+      })
       if (error) throw error
       const { items: posts, totalCount } = extractPaginatedResponse<Post>(data)
       return { posts, totalCount }
@@ -96,28 +93,19 @@ export function useThreadView(
       let rows: Array<Post & { is_op: boolean; total_count: number }> = []
 
       if (!isAdmin && isCacheEnabled()) {
-        const cached = await getCachedThreadView(
-          threadId,
-          pageSize,
-          (page - 1) * pageSize,
-          sort
-        )
+        const cached = await getCachedThreadView(threadId, pageSize, (page - 1) * pageSize, sort)
         if (cached) {
           rows = cached as Array<Post & { is_op: boolean; total_count: number }>
         }
       }
 
       if (rows.length === 0) {
-        const { data, error } = await withTimeout(
-          client.rpc('get_thread_view', {
-            p_thread_id: threadId,
-            p_limit: pageSize,
-            p_offset: (page - 1) * pageSize,
-            p_sort: sort,
-          }),
-          15000,
-          'Request timeout: thread view took too long'
-        )
+        const { data, error } = await client.rpc('get_thread_view', {
+          p_thread_id: threadId,
+          p_limit: pageSize,
+          p_offset: (page - 1) * pageSize,
+          p_sort: sort,
+        })
         if (error) throw error
         rows = (data ?? []) as Array<Post & { is_op: boolean; total_count: number }>
       }
@@ -134,9 +122,16 @@ export function useThreadView(
               number,
               { vote_type: number | null; is_bookmarked: boolean }
             >(
-              (data as Array<{ post_id: number; vote_type: number | null; is_bookmarked: boolean }> | null)?.map(
-                (row) => [row.post_id, { vote_type: row.vote_type ?? null, is_bookmarked: row.is_bookmarked }]
-              ) || []
+              (
+                data as Array<{
+                  post_id: number
+                  vote_type: number | null
+                  is_bookmarked: boolean
+                }> | null
+              )?.map((row) => [
+                row.post_id,
+                { vote_type: row.vote_type ?? null, is_bookmarked: row.is_bookmarked },
+              ]) || []
             )
 
             rows = rows.map((row) => {
@@ -281,18 +276,12 @@ function prependOptimisticReplyToThreadView(
 }
 
 // Helper to find all threadView queries for a thread
-function findThreadViewQueries(
-  queryClient: ReturnType<typeof useQueryClient>,
-  threadId: number
-) {
+function findThreadViewQueries(queryClient: ReturnType<typeof useQueryClient>, threadId: number) {
   return queryClient.getQueryCache().findAll({
     predicate: (query) => {
       const key = query.queryKey
       return (
-        key[0] === 'forum' &&
-        key[1] === 'posts' &&
-        key[2] === threadId &&
-        key[3] === 'threadView'
+        key[0] === 'forum' && key[1] === 'posts' && key[2] === threadId && key[3] === 'threadView'
       )
     },
   })
@@ -322,7 +311,12 @@ export function useAddReply() {
       const previousData = new Map<string, unknown>()
 
       // Optimistically update paginatedPosts cache
-      const paginatedKey = forumKeys.paginatedPosts(variables.threadId, variables.parentId, variables.page, variables.sort)
+      const paginatedKey = forumKeys.paginatedPosts(
+        variables.threadId,
+        variables.parentId,
+        variables.page,
+        variables.sort
+      )
       const oldPaginated = queryClient.getQueryData<GetPaginatedPostsResponse>(paginatedKey)
       if (oldPaginated) {
         previousData.set(JSON.stringify(paginatedKey), oldPaginated)
@@ -366,7 +360,12 @@ export function useAddReply() {
 
     onSuccess: (realPostId, variables) => {
       // Replace optimistic ID with real ID in paginatedPosts cache
-      const paginatedKey = forumKeys.paginatedPosts(variables.threadId, variables.parentId, variables.page, variables.sort)
+      const paginatedKey = forumKeys.paginatedPosts(
+        variables.threadId,
+        variables.parentId,
+        variables.page,
+        variables.sort
+      )
       queryClient.setQueryData<GetPaginatedPostsResponse>(paginatedKey, (old) => {
         if (!old) return old
         return {
@@ -407,7 +406,9 @@ export function useAddReply() {
 
       // Update reply_count in paginated and legacy caches (for sub-replies)
       if (variables.parentId !== null) {
-        const updateParentReplyCount = (oldData: GetPaginatedPostsResponse | Post[] | undefined) => {
+        const updateParentReplyCount = (
+          oldData: GetPaginatedPostsResponse | Post[] | undefined
+        ) => {
           if (!oldData) return oldData
 
           // Paginated format: { posts: Post[], totalCount: number }
@@ -415,9 +416,7 @@ export function useAddReply() {
             return {
               ...oldData,
               posts: oldData.posts.map((p) =>
-                p.id === variables.parentId
-                  ? { ...p, reply_count: p.reply_count + 1 }
-                  : p
+                p.id === variables.parentId ? { ...p, reply_count: p.reply_count + 1 } : p
               ),
             }
           }
@@ -425,9 +424,7 @@ export function useAddReply() {
           // Legacy format: Post[]
           if (Array.isArray(oldData)) {
             return oldData.map((p) =>
-              p.id === variables.parentId
-                ? { ...p, reply_count: p.reply_count + 1 }
-                : p
+              p.id === variables.parentId ? { ...p, reply_count: p.reply_count + 1 } : p
             )
           }
 
@@ -440,7 +437,9 @@ export function useAddReply() {
       }
 
       // Surgically update reply_count in all paginated thread caches
-      const updatePaginatedThreadReplyCount = (oldData: { threads: Thread[]; totalCount: number } | undefined) => {
+      const updatePaginatedThreadReplyCount = (
+        oldData: { threads: Thread[]; totalCount: number } | undefined
+      ) => {
         if (!oldData) return oldData
         return {
           ...oldData,

@@ -18,7 +18,7 @@ import {
   useUpdateSchool,
   useUpdateDepartment,
 } from '../hooks/usePlacementQueries'
-import type { SchoolType, University, School, Department } from '../hooks/usePlacementQueries'
+import type { SchoolType } from '../hooks/usePlacementQueries'
 import { useToast } from '../contexts/ToastContext'
 import { SearchInput } from '../components/ui'
 import { Plus, X } from 'lucide-react'
@@ -215,7 +215,7 @@ interface EditingDepartment {
   originalDepartment: string
 }
 
-function CountryTab({ isActive, state, setState }: CountryTabProps) {
+function CountryTab({ state, setState }: CountryTabProps) {
   const { data: countries = [], isLoading, error } = useCountries()
   const createCountry = useCreateCountry()
   const deleteCountry = useDeleteCountry()
@@ -238,15 +238,15 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
   }, [isAdding])
 
   const setSearchQuery = (query: string) => {
-    setState(prev => ({ ...prev, searchQuery: query, page: 1 }))
+    setState((prev) => ({ ...prev, searchQuery: query, page: 1 }))
   }
 
   const setPage = (newPage: number) => {
-    setState(prev => ({ ...prev, page: newPage }))
+    setState((prev) => ({ ...prev, page: newPage }))
   }
 
   const handleSort = (column: CountrySortColumn) => {
-    setState(prev => {
+    setState((prev) => {
       if (prev.sortColumn === column) {
         return { ...prev, sortDirection: prev.sortDirection === 'asc' ? 'desc' : 'asc', page: 1 }
       } else {
@@ -294,7 +294,11 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
           },
           onError: (error: { code?: string; message?: string }) => {
             const message = error?.message?.toLowerCase() || ''
-            if (error?.code === '23505' || message.includes('duplicate') || message.includes('unique')) {
+            if (
+              error?.code === '23505' ||
+              message.includes('duplicate') ||
+              message.includes('unique')
+            ) {
               toast.showError('Country already exists')
               return
             }
@@ -331,8 +335,10 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
   const handleSaveEdit = () => {
     if (!editingCountry) return
 
-    const nameChanged = editingCountry.name.trim().toLowerCase() !== editingCountry.originalName.toLowerCase()
-    const codeChanged = editingCountry.code.trim().toUpperCase() !== editingCountry.originalCode.toUpperCase()
+    const nameChanged =
+      editingCountry.name.trim().toLowerCase() !== editingCountry.originalName.toLowerCase()
+    const codeChanged =
+      editingCountry.code.trim().toUpperCase() !== editingCountry.originalCode.toUpperCase()
 
     // No changes, just cancel
     if (!nameChanged && !codeChanged) {
@@ -358,7 +364,11 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
         },
         onError: (error: { code?: string; message?: string }) => {
           const message = error?.message?.toLowerCase() || ''
-          if (error?.code === '23505' || message.includes('duplicate') || message.includes('unique')) {
+          if (
+            error?.code === '23505' ||
+            message.includes('duplicate') ||
+            message.includes('unique')
+          ) {
             toast.showError('Country name or code already exists')
             return
           }
@@ -378,25 +388,30 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
 
   // Focus the edit input when editing starts
   useEffect(() => {
-    if (editingCountry && editNameInputRef.current) {
+    if (editNameInputRef.current && editingCountry?.id) {
       editNameInputRef.current.focus()
     }
-  }, [editingCountry?.id])
+  }, [editingCountry])
 
   const sortedCountries = useMemo(() => {
-    const filtered = countries.filter((c) =>
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.code.toLowerCase().includes(searchQuery.toLowerCase())
+    const filtered = countries.filter(
+      (c) =>
+        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.code.toLowerCase().includes(searchQuery.toLowerCase())
     )
 
     const pinnedSet = new Set(pinnedCountryIds)
     const pinned = pinnedCountryIds
       .map((id) => filtered.find((country) => country.id === id))
-      .filter((country): country is typeof filtered[number] => Boolean(country))
+      .filter((country): country is (typeof filtered)[number] => Boolean(country))
 
-    const temps = filtered.filter((country) => country.id.startsWith('temp-') && !pinnedSet.has(country.id))
+    const temps = filtered.filter(
+      (country) => country.id.startsWith('temp-') && !pinnedSet.has(country.id)
+    )
 
-    const rest = filtered.filter((country) => !pinnedSet.has(country.id) && !country.id.startsWith('temp-'))
+    const rest = filtered.filter(
+      (country) => !pinnedSet.has(country.id) && !country.id.startsWith('temp-')
+    )
 
     const sortedRest = [...rest].sort((a, b) => {
       let aVal: string | number
@@ -468,7 +483,8 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
                     Code {sortColumn === 'code' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
                   <th className="sortable" onClick={() => handleSort('university_count')}>
-                    Universities {sortColumn === 'university_count' && (sortDirection === 'asc' ? '▲' : '▼')}
+                    Universities{' '}
+                    {sortColumn === 'university_count' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
                   <th className="table-header-action-cell">
                     {!isAdding && (
@@ -532,7 +548,9 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
                             ref={editNameInputRef}
                             type="text"
                             value={editingCountry.name}
-                            onChange={(e) => setEditingCountry({ ...editingCountry, name: e.target.value })}
+                            onChange={(e) =>
+                              setEditingCountry({ ...editingCountry, name: e.target.value })
+                            }
                             onKeyDown={handleEditKeyDown}
                             onBlur={handleSaveEdit}
                             className="inline-input"
@@ -549,7 +567,12 @@ function CountryTab({ isActive, state, setState }: CountryTabProps) {
                           <input
                             type="text"
                             value={editingCountry.code}
-                            onChange={(e) => setEditingCountry({ ...editingCountry, code: e.target.value.toUpperCase() })}
+                            onChange={(e) =>
+                              setEditingCountry({
+                                ...editingCountry,
+                                code: e.target.value.toUpperCase(),
+                              })
+                            }
                             onKeyDown={handleEditKeyDown}
                             onBlur={handleSaveEdit}
                             maxLength={3}
@@ -614,7 +637,7 @@ interface UniversityTabProps {
   setState: React.Dispatch<React.SetStateAction<UniversityTabState>>
 }
 
-function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
+function UniversityTab({ state, setState }: UniversityTabProps) {
   const { data: universities = [], isLoading, error } = useUniversities()
   const { data: countries = [] } = useCountries()
   const createUniversity = useCreateUniversity()
@@ -645,15 +668,15 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
   }, [editingUniversity])
 
   const setSearchQuery = (query: string) => {
-    setState(prev => ({ ...prev, searchQuery: query, page: 1 }))
+    setState((prev) => ({ ...prev, searchQuery: query, page: 1 }))
   }
 
   const setPage = (newPage: number) => {
-    setState(prev => ({ ...prev, page: newPage }))
+    setState((prev) => ({ ...prev, page: newPage }))
   }
 
   const handleSort = (column: UniversitySortColumn) => {
-    setState(prev => {
+    setState((prev) => {
       if (prev.sortColumn === column) {
         return { ...prev, sortDirection: prev.sortDirection === 'asc' ? 'desc' : 'asc', page: 1 }
       } else {
@@ -708,7 +731,11 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
           },
           onError: (error: { code?: string; message?: string }) => {
             const message = error?.message?.toLowerCase() || ''
-            if (error?.code === '23505' || message.includes('duplicate') || message.includes('unique')) {
+            if (
+              error?.code === '23505' ||
+              message.includes('duplicate') ||
+              message.includes('unique')
+            ) {
               toast.showError('University already exists in this country')
               return
             }
@@ -735,11 +762,15 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
     const pinnedSet = new Set(pinnedUniversityIds)
     const pinned = pinnedUniversityIds
       .map((id) => filtered.find((university) => university.id === id))
-      .filter((university): university is typeof filtered[number] => Boolean(university))
+      .filter((university): university is (typeof filtered)[number] => Boolean(university))
 
-    const temps = filtered.filter((university) => university.id.startsWith('temp-') && !pinnedSet.has(university.id))
+    const temps = filtered.filter(
+      (university) => university.id.startsWith('temp-') && !pinnedSet.has(university.id)
+    )
 
-    const rest = filtered.filter((university) => !pinnedSet.has(university.id) && !university.id.startsWith('temp-'))
+    const rest = filtered.filter(
+      (university) => !pinnedSet.has(university.id) && !university.id.startsWith('temp-')
+    )
 
     const sortedRest = [...rest].sort((a, b) => {
       let aVal: string | number
@@ -776,23 +807,32 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
 
   const startIndex = (page - 1) * UNIVERSITIES_PER_PAGE
   const totalPages = Math.ceil(sortedUniversities.length / UNIVERSITIES_PER_PAGE)
-  const paginatedUniversities = sortedUniversities.slice(startIndex, startIndex + UNIVERSITIES_PER_PAGE)
+  const paginatedUniversities = sortedUniversities.slice(
+    startIndex,
+    startIndex + UNIVERSITIES_PER_PAGE
+  )
 
   useEffect(() => {
     if (totalPages > 0 && page > totalPages) {
       setPage(totalPages)
     }
-  }, [page, totalPages])
+  }, [page, totalPages, setPage])
 
-  const handleStartEdit = (uni: typeof universities[number]) => {
+  const handleStartEdit = (uni: (typeof universities)[number]) => {
     setEditingUniversity({
       id: uni.id,
       university: uni.university,
       country_id: uni.country_id || null,
-      us_news_2025_rank: uni.us_news_2025_rank !== null && uni.us_news_2025_rank !== undefined ? String(uni.us_news_2025_rank) : '',
+      us_news_2025_rank:
+        uni.us_news_2025_rank !== null && uni.us_news_2025_rank !== undefined
+          ? String(uni.us_news_2025_rank)
+          : '',
       originalUniversity: uni.university,
       originalCountryId: uni.country_id || null,
-      originalRank: uni.us_news_2025_rank !== null && uni.us_news_2025_rank !== undefined ? String(uni.us_news_2025_rank) : '',
+      originalRank:
+        uni.us_news_2025_rank !== null && uni.us_news_2025_rank !== undefined
+          ? String(uni.us_news_2025_rank)
+          : '',
     })
   }
 
@@ -809,9 +849,10 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
       return
     }
 
-    const rankValue = editingUniversity.us_news_2025_rank.trim() === ''
-      ? null
-      : Number(editingUniversity.us_news_2025_rank)
+    const rankValue =
+      editingUniversity.us_news_2025_rank.trim() === ''
+        ? null
+        : Number(editingUniversity.us_news_2025_rank)
 
     if (rankValue !== null && Number.isNaN(rankValue)) {
       toast.showError('Rank must be a valid number.')
@@ -888,13 +929,15 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
                 <tr>
                   <th>#</th>
                   <th className="sortable" onClick={() => handleSort('university')}>
-                    University {sortColumn === 'university' && (sortDirection === 'asc' ? '▲' : '▼')}
+                    University{' '}
+                    {sortColumn === 'university' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
                   <th className="sortable" onClick={() => handleSort('country')}>
                     Country {sortColumn === 'country' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
                   <th className="sortable" onClick={() => handleSort('us_news_2025_rank')}>
-                    US News 2025 {sortColumn === 'us_news_2025_rank' && (sortDirection === 'asc' ? '▲' : '▼')}
+                    US News 2025{' '}
+                    {sortColumn === 'us_news_2025_rank' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
                   <th className="sortable" onClick={() => handleSort('school_count')}>
                     Schools {sortColumn === 'school_count' && (sortDirection === 'asc' ? '▲' : '▼')}
@@ -1026,7 +1069,10 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
                             type="number"
                             value={editingValue.us_news_2025_rank}
                             onChange={(e) =>
-                              setEditingUniversity({ ...editingValue, us_news_2025_rank: e.target.value })
+                              setEditingUniversity({
+                                ...editingValue,
+                                us_news_2025_rank: e.target.value,
+                              })
                             }
                             onKeyDown={handleEditKeyDown}
                             className="inline-input"
@@ -1038,7 +1084,11 @@ function UniversityTab({ isActive, state, setState }: UniversityTabProps) {
                       <td>{uni.school_count || 0}</td>
                       <td>
                         {isEditing ? (
-                          <button className="admin-delete-btn" onClick={handleCancelEdit} title="Cancel">
+                          <button
+                            className="admin-delete-btn"
+                            onClick={handleCancelEdit}
+                            title="Cancel"
+                          >
                             <X size={16} />
                           </button>
                         ) : (
@@ -1103,11 +1153,11 @@ const SCHOOL_TYPE_OPTIONS: { value: SchoolType; label: string }[] = [
   { value: 'administrative', label: 'Administrative' },
 ]
 
-function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
+function SchoolTab({ state, setState }: SchoolTabProps) {
   const { data: universities = [] } = useUniversities()
   const { selectedUniversityId, searchQuery, sortColumn, sortDirection, page } = state
   const { data: schools = [], isLoading, error } = useSchoolsByUniversity(selectedUniversityId)
-  const createSchool = useCreateSchool(selectedUniversityId)
+  const createSchool = useCreateSchool()
   const deleteSchool = useDeleteSchool(selectedUniversityId)
   const updateSchool = useUpdateSchool(selectedUniversityId)
   const toast = useToast()
@@ -1125,11 +1175,11 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
   const filteredUniversities = useMemo(() => {
     if (!universitySearch.trim()) return universities.slice(0, 20)
     const search = universitySearch.toLowerCase()
-    return universities.filter(u => u.university.toLowerCase().includes(search)).slice(0, 20)
+    return universities.filter((u) => u.university.toLowerCase().includes(search)).slice(0, 20)
   }, [universities, universitySearch])
 
   const selectedUniversity = useMemo(() => {
-    return universities.find(u => u.id === selectedUniversityId) || null
+    return universities.find((u) => u.id === selectedUniversityId) || null
   }, [universities, selectedUniversityId])
 
   useEffect(() => {
@@ -1145,22 +1195,22 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
   }, [editingSchool])
 
   const setSelectedUniversityId = (id: string | null) => {
-    setState(prev => ({ ...prev, selectedUniversityId: id, searchQuery: '', page: 1 }))
+    setState((prev) => ({ ...prev, selectedUniversityId: id, searchQuery: '', page: 1 }))
     setPinnedSchoolIds([])
     setIsAdding(false)
     setEditingSchool(null)
   }
 
   const setSearchQuery = (query: string) => {
-    setState(prev => ({ ...prev, searchQuery: query, page: 1 }))
+    setState((prev) => ({ ...prev, searchQuery: query, page: 1 }))
   }
 
   const setPage = (newPage: number) => {
-    setState(prev => ({ ...prev, page: newPage }))
+    setState((prev) => ({ ...prev, page: newPage }))
   }
 
   const handleSort = (column: SchoolSortColumn) => {
-    setState(prev => {
+    setState((prev) => {
       if (prev.sortColumn === column) {
         return { ...prev, sortDirection: prev.sortDirection === 'asc' ? 'desc' : 'asc', page: 1 }
       } else {
@@ -1212,7 +1262,11 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
           },
           onError: (error: { code?: string; message?: string }) => {
             const message = error?.message?.toLowerCase() || ''
-            if (error?.code === '23505' || message.includes('duplicate') || message.includes('unique')) {
+            if (
+              error?.code === '23505' ||
+              message.includes('duplicate') ||
+              message.includes('unique')
+            ) {
               toast.showError('School already exists for this university')
               return
             }
@@ -1239,11 +1293,15 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
     const pinnedSet = new Set(pinnedSchoolIds)
     const pinned = pinnedSchoolIds
       .map((id) => filtered.find((school) => school.id === id))
-      .filter((school): school is typeof filtered[number] => Boolean(school))
+      .filter((school): school is (typeof filtered)[number] => Boolean(school))
 
-    const temps = filtered.filter((school) => school.id.startsWith('temp-') && !pinnedSet.has(school.id))
+    const temps = filtered.filter(
+      (school) => school.id.startsWith('temp-') && !pinnedSet.has(school.id)
+    )
 
-    const rest = filtered.filter((school) => !pinnedSet.has(school.id) && !school.id.startsWith('temp-'))
+    const rest = filtered.filter(
+      (school) => !pinnedSet.has(school.id) && !school.id.startsWith('temp-')
+    )
 
     const sortedRest = [...rest].sort((a, b) => {
       let aVal: string | number
@@ -1282,9 +1340,9 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
     if (totalPages > 0 && page > totalPages) {
       setPage(totalPages)
     }
-  }, [page, totalPages])
+  }, [page, totalPages, setPage])
 
-  const handleStartEdit = (s: typeof schools[number]) => {
+  const handleStartEdit = (s: (typeof schools)[number]) => {
     setEditingSchool({
       id: s.id,
       school: s.school,
@@ -1346,7 +1404,7 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
   }
 
   const formatSchoolType = (type: SchoolType) => {
-    return SCHOOL_TYPE_OPTIONS.find(o => o.value === type)?.label || type
+    return SCHOOL_TYPE_OPTIONS.find((o) => o.value === type)?.label || type
   }
 
   return (
@@ -1397,7 +1455,10 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
 
         {/* University search results */}
         {!selectedUniversityId && universitySearch && filteredUniversities.length > 0 && (
-          <div className="university-table-wrapper" style={{ maxHeight: '300px', overflow: 'auto' }}>
+          <div
+            className="university-table-wrapper"
+            style={{ maxHeight: '300px', overflow: 'auto' }}
+          >
             <table className="university-table">
               <thead>
                 <tr>
@@ -1427,7 +1488,6 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
         {/* Schools list - only show when university is selected */}
         {selectedUniversityId && (
           <>
-
             {isLoading && <div className="admin-placeholder">Loading schools...</div>}
 
             {error && (
@@ -1449,7 +1509,8 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
                         Type {sortColumn === 'type' && (sortDirection === 'asc' ? '▲' : '▼')}
                       </th>
                       <th className="sortable" onClick={() => handleSort('department_count')}>
-                        Depts {sortColumn === 'department_count' && (sortDirection === 'asc' ? '▲' : '▼')}
+                        Depts{' '}
+                        {sortColumn === 'department_count' && (sortDirection === 'asc' ? '▲' : '▼')}
                       </th>
                       <th className="table-header-action-cell">
                         {!isAdding && (
@@ -1496,7 +1557,11 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
                         </td>
                         <td>-</td>
                         <td>
-                          <button className="admin-delete-btn" onClick={handleCancelAdd} title="Cancel">
+                          <button
+                            className="admin-delete-btn"
+                            onClick={handleCancelAdd}
+                            title="Cancel"
+                          >
                             <X size={16} />
                           </button>
                         </td>
@@ -1539,7 +1604,10 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
                               <select
                                 value={editingValue.type}
                                 onChange={(e) =>
-                                  setEditingSchool({ ...editingValue, type: e.target.value as SchoolType })
+                                  setEditingSchool({
+                                    ...editingValue,
+                                    type: e.target.value as SchoolType,
+                                  })
                                 }
                                 onKeyDown={handleEditKeyDown}
                                 className="inline-input"
@@ -1557,7 +1625,11 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
                           <td>{s.department_count || 0}</td>
                           <td>
                             {isEditing ? (
-                              <button className="admin-delete-btn" onClick={handleCancelEdit} title="Cancel">
+                              <button
+                                className="admin-delete-btn"
+                                onClick={handleCancelEdit}
+                                title="Cancel"
+                              >
                                 <X size={16} />
                               </button>
                             ) : (
@@ -1601,16 +1673,16 @@ function SchoolTab({ isActive, state, setState }: SchoolTabProps) {
 
             {!isLoading && !error && sortedSchools.length === 0 && !isAdding && (
               <div className="admin-placeholder">
-                {searchQuery ? 'No schools match your search.' : 'No schools found for this university.'}
+                {searchQuery
+                  ? 'No schools match your search.'
+                  : 'No schools found for this university.'}
               </div>
             )}
           </>
         )}
 
         {!selectedUniversityId && !universitySearch && (
-          <div className="admin-placeholder">
-            Search for a university to view its schools.
-          </div>
+          <div className="admin-placeholder">Search for a university to view its schools.</div>
         )}
       </div>
     </div>
@@ -1623,7 +1695,7 @@ interface DepartmentTabProps {
   setState: React.Dispatch<React.SetStateAction<DepartmentTabState>>
 }
 
-function DepartmentTab({ isActive, state, setState }: DepartmentTabProps) {
+function DepartmentTab({ state, setState }: DepartmentTabProps) {
   const { data: universities = [] } = useUniversities()
   const { selectedSchoolId, searchQuery, sortColumn, sortDirection, page } = state
   const { data: departments = [], isLoading, error } = useDepartmentsBySchool(selectedSchoolId)
@@ -1645,9 +1717,9 @@ function DepartmentTab({ isActive, state, setState }: DepartmentTabProps) {
   // Build a flat list of schools with their university names for searching
   const allSchools = useMemo(() => {
     if (!selectedUniversityId) return []
-    return schools.map(s => ({
+    return schools.map((s) => ({
       ...s,
-      universityName: universities.find(u => u.id === s.university_id)?.university || '',
+      universityName: universities.find((u) => u.id === s.university_id)?.university || '',
     }))
   }, [schools, universities, selectedUniversityId])
 
@@ -1655,22 +1727,22 @@ function DepartmentTab({ isActive, state, setState }: DepartmentTabProps) {
   const filteredSchools = useMemo(() => {
     if (!schoolSearch.trim()) return allSchools.slice(0, 20)
     const search = schoolSearch.toLowerCase()
-    return allSchools.filter(s => s.school.toLowerCase().includes(search)).slice(0, 20)
+    return allSchools.filter((s) => s.school.toLowerCase().includes(search)).slice(0, 20)
   }, [allSchools, schoolSearch])
 
   // Filter universities for university selection dropdown
   const filteredUniversities = useMemo(() => {
     if (!schoolSearch.trim() && !selectedUniversityId) return universities.slice(0, 20)
     const search = schoolSearch.toLowerCase()
-    return universities.filter(u => u.university.toLowerCase().includes(search)).slice(0, 20)
+    return universities.filter((u) => u.university.toLowerCase().includes(search)).slice(0, 20)
   }, [universities, schoolSearch, selectedUniversityId])
 
   const selectedSchool = useMemo(() => {
-    return allSchools.find(s => s.id === selectedSchoolId) || null
+    return allSchools.find((s) => s.id === selectedSchoolId) || null
   }, [allSchools, selectedSchoolId])
 
   const selectedUniversity = useMemo(() => {
-    return universities.find(u => u.id === selectedUniversityId) || null
+    return universities.find((u) => u.id === selectedUniversityId) || null
   }, [universities, selectedUniversityId])
 
   useEffect(() => {
@@ -1686,22 +1758,22 @@ function DepartmentTab({ isActive, state, setState }: DepartmentTabProps) {
   }, [editingDepartment])
 
   const setSelectedSchoolId = (id: string | null) => {
-    setState(prev => ({ ...prev, selectedSchoolId: id, searchQuery: '', page: 1 }))
+    setState((prev) => ({ ...prev, selectedSchoolId: id, searchQuery: '', page: 1 }))
     setPinnedDepartmentIds([])
     setIsAdding(false)
     setEditingDepartment(null)
   }
 
   const setSearchQuery = (query: string) => {
-    setState(prev => ({ ...prev, searchQuery: query, page: 1 }))
+    setState((prev) => ({ ...prev, searchQuery: query, page: 1 }))
   }
 
   const setPage = (newPage: number) => {
-    setState(prev => ({ ...prev, page: newPage }))
+    setState((prev) => ({ ...prev, page: newPage }))
   }
 
   const handleSort = (column: DepartmentSortColumn) => {
-    setState(prev => {
+    setState((prev) => {
       if (prev.sortColumn === column) {
         return { ...prev, sortDirection: prev.sortDirection === 'asc' ? 'desc' : 'asc', page: 1 }
       } else {
@@ -1749,7 +1821,11 @@ function DepartmentTab({ isActive, state, setState }: DepartmentTabProps) {
           },
           onError: (error: { code?: string; message?: string }) => {
             const message = error?.message?.toLowerCase() || ''
-            if (error?.code === '23505' || message.includes('duplicate') || message.includes('unique')) {
+            if (
+              error?.code === '23505' ||
+              message.includes('duplicate') ||
+              message.includes('unique')
+            ) {
               toast.showError('Department already exists for this school')
               return
             }
@@ -1776,11 +1852,15 @@ function DepartmentTab({ isActive, state, setState }: DepartmentTabProps) {
     const pinnedSet = new Set(pinnedDepartmentIds)
     const pinned = pinnedDepartmentIds
       .map((id) => filtered.find((department) => department.id === id))
-      .filter((department): department is typeof filtered[number] => Boolean(department))
+      .filter((department): department is (typeof filtered)[number] => Boolean(department))
 
-    const temps = filtered.filter((department) => department.id.startsWith('temp-') && !pinnedSet.has(department.id))
+    const temps = filtered.filter(
+      (department) => department.id.startsWith('temp-') && !pinnedSet.has(department.id)
+    )
 
-    const rest = filtered.filter((department) => !pinnedSet.has(department.id) && !department.id.startsWith('temp-'))
+    const rest = filtered.filter(
+      (department) => !pinnedSet.has(department.id) && !department.id.startsWith('temp-')
+    )
 
     const sortedRest = [...rest].sort((a, b) => {
       let aVal: string
@@ -1805,15 +1885,18 @@ function DepartmentTab({ isActive, state, setState }: DepartmentTabProps) {
 
   const startIndex = (page - 1) * DEPARTMENTS_PER_PAGE
   const totalPages = Math.ceil(sortedDepartments.length / DEPARTMENTS_PER_PAGE)
-  const paginatedDepartments = sortedDepartments.slice(startIndex, startIndex + DEPARTMENTS_PER_PAGE)
+  const paginatedDepartments = sortedDepartments.slice(
+    startIndex,
+    startIndex + DEPARTMENTS_PER_PAGE
+  )
 
   useEffect(() => {
     if (totalPages > 0 && page > totalPages) {
       setPage(totalPages)
     }
-  }, [page, totalPages])
+  }, [page, totalPages, setPage])
 
-  const handleStartEdit = (d: typeof departments[number]) => {
+  const handleStartEdit = (d: (typeof departments)[number]) => {
     setEditingDepartment({
       id: d.id,
       department: d.department,
@@ -1984,39 +2067,39 @@ function DepartmentTab({ isActive, state, setState }: DepartmentTabProps) {
         )}
 
         {/* School search results - Step 2 */}
-        {selectedUniversityId && !selectedSchoolId && (schoolSearch ? filteredSchools.length > 0 : allSchools.length > 0) && (
-          <div className="university-table-wrapper">
-            <table className="university-table">
-              <thead>
-                <tr>
-                  <th>School</th>
-                  <th>Type</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(schoolSearch ? filteredSchools : allSchools).map((s) => (
-                  <tr
-                    key={s.id}
-                    onClick={() => {
-                      setSelectedSchoolId(s.id)
-                      setSchoolSearch('')
-                    }}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>{s.school}</td>
-                    <td>{s.type}</td>
+        {selectedUniversityId &&
+          !selectedSchoolId &&
+          (schoolSearch ? filteredSchools.length > 0 : allSchools.length > 0) && (
+            <div className="university-table-wrapper">
+              <table className="university-table">
+                <thead>
+                  <tr>
+                    <th>School</th>
+                    <th>Type</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody>
+                  {(schoolSearch ? filteredSchools : allSchools).map((s) => (
+                    <tr
+                      key={s.id}
+                      onClick={() => {
+                        setSelectedSchoolId(s.id)
+                        setSchoolSearch('')
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td>{s.school}</td>
+                      <td>{s.type}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
         {/* No schools message */}
         {selectedUniversityId && !selectedSchoolId && allSchools.length === 0 && (
-          <div className="admin-placeholder">
-            No schools found for this university.
-          </div>
+          <div className="admin-placeholder">No schools found for this university.</div>
         )}
 
         {/* Departments list - only show when school is selected */}
@@ -2037,7 +2120,8 @@ function DepartmentTab({ isActive, state, setState }: DepartmentTabProps) {
                     <tr>
                       <th>#</th>
                       <th className="sortable" onClick={() => handleSort('department')}>
-                        Department {sortColumn === 'department' && (sortDirection === 'asc' ? '▲' : '▼')}
+                        Department{' '}
+                        {sortColumn === 'department' && (sortDirection === 'asc' ? '▲' : '▼')}
                       </th>
                       <th className="table-header-action-cell">
                         {!isAdding && (
@@ -2069,7 +2153,11 @@ function DepartmentTab({ isActive, state, setState }: DepartmentTabProps) {
                           />
                         </td>
                         <td>
-                          <button className="admin-delete-btn" onClick={handleCancelAdd} title="Cancel">
+                          <button
+                            className="admin-delete-btn"
+                            onClick={handleCancelAdd}
+                            title="Cancel"
+                          >
                             <X size={16} />
                           </button>
                         </td>
@@ -2091,7 +2179,10 @@ function DepartmentTab({ isActive, state, setState }: DepartmentTabProps) {
                                 type="text"
                                 value={editingValue.department}
                                 onChange={(e) =>
-                                  setEditingDepartment({ ...editingValue, department: e.target.value })
+                                  setEditingDepartment({
+                                    ...editingValue,
+                                    department: e.target.value,
+                                  })
                                 }
                                 onKeyDown={handleEditKeyDown}
                                 className="inline-input"
@@ -2106,7 +2197,11 @@ function DepartmentTab({ isActive, state, setState }: DepartmentTabProps) {
                           </td>
                           <td>
                             {isEditing ? (
-                              <button className="admin-delete-btn" onClick={handleCancelEdit} title="Cancel">
+                              <button
+                                className="admin-delete-btn"
+                                onClick={handleCancelEdit}
+                                title="Cancel"
+                              >
                                 <X size={16} />
                               </button>
                             ) : (
@@ -2150,7 +2245,9 @@ function DepartmentTab({ isActive, state, setState }: DepartmentTabProps) {
 
             {!isLoading && !error && sortedDepartments.length === 0 && !isAdding && (
               <div className="admin-placeholder">
-                {searchQuery ? 'No departments match your search.' : 'No departments found for this school.'}
+                {searchQuery
+                  ? 'No departments match your search.'
+                  : 'No departments found for this school.'}
               </div>
             )}
           </>

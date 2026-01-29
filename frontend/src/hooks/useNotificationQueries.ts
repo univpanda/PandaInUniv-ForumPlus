@@ -15,7 +15,7 @@ export const notificationKeys = {
  * Hook to fetch notification count for badge
  */
 export function useNotificationCount(userId: string | null) {
-  return useQuery({
+  return useQuery<number, Error>({
     queryKey: notificationKeys.count(userId || ''),
     queryFn: async () => {
       if (!userId) return 0
@@ -25,11 +25,11 @@ export function useNotificationCount(userId: string | null) {
     },
     enabled: !!userId,
     staleTime: STALE_TIME.SHORT,
-    refetchInterval: (dataOrQuery, maybeQuery) => {
+    refetchInterval: (query) => {
       if (typeof document !== 'undefined' && document.hidden) {
         return false
       }
-      return getPollingIntervalSafe(POLL_INTERVAL.NOTIFICATIONS, dataOrQuery, maybeQuery)
+      return getPollingIntervalSafe(POLL_INTERVAL.NOTIFICATIONS, query)
     },
     refetchIntervalInBackground: false,
   })

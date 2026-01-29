@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, supabasePublic } from '../lib/supabase'
-import { withTimeout } from '../utils/timeout'
+
 import type {
   PlacementFilters,
   PlacementSearchParams,
@@ -30,7 +30,11 @@ export interface University {
 }
 
 // School type enum
-export type SchoolType = 'degree_granting' | 'continuing_education' | 'non_degree' | 'administrative'
+export type SchoolType =
+  | 'degree_granting'
+  | 'continuing_education'
+  | 'non_degree'
+  | 'administrative'
 
 // School type from pt_school table
 export interface School {
@@ -61,15 +65,27 @@ export const placementKeys = {
   filters: () => [...placementKeys.all, 'filters'] as const,
   universities: () => [...placementKeys.all, 'universities'] as const,
   countries: () => [...placementKeys.all, 'countries'] as const,
-  schoolsByUniversity: (universityId: string) => [...placementKeys.all, 'schools', universityId] as const,
-  departmentsBySchool: (schoolId: string) => [...placementKeys.all, 'departments', schoolId] as const,
+  schoolsByUniversity: (universityId: string) =>
+    [...placementKeys.all, 'schools', universityId] as const,
+  departmentsBySchool: (schoolId: string) =>
+    [...placementKeys.all, 'departments', schoolId] as const,
   search: (params: PlacementSearchParams) => [...placementKeys.all, 'search', params] as const,
-  reverseSearch: (params: ReverseSearchParams) => [...placementKeys.all, 'reverse', params] as const,
-  programsForUniversity: (university: string) => [...placementKeys.all, 'programs', university] as const,
-  universitiesForProgram: (program: string) => [...placementKeys.all, 'universities', program] as const,
-  programsWithPlacements: (university: string, fromYear: number | null, toYear: number | null) => [...placementKeys.all, 'programsWithPlacements', university, fromYear, toYear] as const,
-  programsForYearRange: (fromYear: number | null, toYear: number | null) => [...placementKeys.all, 'programsForYearRange', fromYear, toYear] as const,
-  universitiesForProgramYearRange: (program: string, fromYear: number | null, toYear: number | null) => [...placementKeys.all, 'universitiesForProgramYearRange', program, fromYear, toYear] as const,
+  reverseSearch: (params: ReverseSearchParams) =>
+    [...placementKeys.all, 'reverse', params] as const,
+  programsForUniversity: (university: string) =>
+    [...placementKeys.all, 'programs', university] as const,
+  universitiesForProgram: (program: string) =>
+    [...placementKeys.all, 'universities', program] as const,
+  programsWithPlacements: (university: string, fromYear: number | null, toYear: number | null) =>
+    [...placementKeys.all, 'programsWithPlacements', university, fromYear, toYear] as const,
+  programsForYearRange: (fromYear: number | null, toYear: number | null) =>
+    [...placementKeys.all, 'programsForYearRange', fromYear, toYear] as const,
+  universitiesForProgramYearRange: (
+    program: string,
+    fromYear: number | null,
+    toYear: number | null
+  ) =>
+    [...placementKeys.all, 'universitiesForProgramYearRange', program, fromYear, toYear] as const,
 }
 
 // Fetch placement filters (degrees, programs, universities, years)
@@ -78,11 +94,7 @@ export function usePlacementFilters() {
     queryKey: placementKeys.filters(),
     networkMode: 'always',
     queryFn: async (): Promise<PlacementFilters> => {
-      const { data, error } = await withTimeout(
-        supabasePublic.rpc('get_placement_filters'),
-        15000,
-        'Request timeout: placement filters took too long'
-      )
+      const { data, error } = await supabasePublic.rpc('get_placement_filters')
       if (error) throw error
 
       return {
@@ -103,11 +115,13 @@ export function useUniversities() {
     queryFn: async (): Promise<University[]> => {
       const { data, error } = await supabase
         .from('pt_university')
-        .select(`
+        .select(
+          `
           *,
           country:pt_country(id, name, code),
           pt_school(count)
-        `)
+        `
+        )
         .order('university', { ascending: true })
 
       if (error) throw error
@@ -137,12 +151,14 @@ export function useCountries() {
         .order('name', { ascending: true })
 
       if (error) throw error
-      return (data || []).map((c: { id: string; name: string; code: string; pt_university: { count: number }[] }) => ({
-        id: c.id,
-        name: c.name,
-        code: c.code,
-        university_count: c.pt_university?.[0]?.count || 0,
-      }))
+      return (data || []).map(
+        (c: { id: string; name: string; code: string; pt_university: { count: number }[] }) => ({
+          id: c.id,
+          name: c.name,
+          code: c.code,
+          university_count: c.pt_university?.[0]?.count || 0,
+        })
+      )
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
@@ -154,11 +170,7 @@ export function useCreateCountry() {
 
   return useMutation({
     mutationFn: async (newCountry: { name: string; code: string }): Promise<Country> => {
-      const { data, error } = await supabase
-        .from('pt_country')
-        .insert(newCountry)
-        .select()
-        .single()
+      const { data, error } = await supabase.from('pt_country').insert(newCountry).select().single()
 
       if (error) throw error
       return data
@@ -178,15 +190,15 @@ export function useCreateCountry() {
           name: newCountry.name.toLowerCase(),
           code: newCountry.code.toUpperCase(),
         }
-        queryClient.setQueryData<Country[]>(
-          placementKeys.countries(),
-          [optimisticCountry, ...previousCountries]
-        )
+        queryClient.setQueryData<Country[]>(placementKeys.countries(), [
+          optimisticCountry,
+          ...previousCountries,
+        ])
       }
 
       return { previousCountries, optimisticId }
     },
-    onSuccess: (createdCountry, newCountry, context) => {
+    onSuccess: (createdCountry, _, context) => {
       if (!context?.optimisticId) return
       queryClient.setQueryData<Country[]>(placementKeys.countries(), (current) => {
         if (!current) return current
@@ -195,7 +207,7 @@ export function useCreateCountry() {
         )
       })
     },
-    onError: (err, newCountry, context) => {
+    onError: (_, __, context) => {
       // Rollback on error
       if (context?.previousCountries) {
         queryClient.setQueryData(placementKeys.countries(), context.previousCountries)
@@ -210,10 +222,7 @@ export function useDeleteCountry() {
 
   return useMutation({
     mutationFn: async (countryId: string): Promise<void> => {
-      const { error } = await supabase
-        .from('pt_country')
-        .delete()
-        .eq('id', countryId)
+      const { error } = await supabase.from('pt_country').delete().eq('id', countryId)
 
       if (error) throw error
     },
@@ -231,7 +240,15 @@ export function useUpdateCountry() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, name, code }: { id: string; name: string; code: string }): Promise<Country> => {
+    mutationFn: async ({
+      id,
+      name,
+      code,
+    }: {
+      id: string
+      name: string
+      code: string
+    }): Promise<Country> => {
       const { data, error } = await supabase
         .from('pt_country')
         .update({ name, code })
@@ -251,14 +268,16 @@ export function useUpdateCountry() {
         queryClient.setQueryData<Country[]>(placementKeys.countries(), (current) => {
           if (!current) return current
           return current.map((country) =>
-            country.id === id ? { ...country, name: name.toLowerCase(), code: code.toUpperCase() } : country
+            country.id === id
+              ? { ...country, name: name.toLowerCase(), code: code.toUpperCase() }
+              : country
           )
         })
       }
 
       return { previousCountries }
     },
-    onError: (err, variables, context) => {
+    onError: (_, __, context) => {
       if (context?.previousCountries) {
         queryClient.setQueryData(placementKeys.countries(), context.previousCountries)
       }
@@ -280,10 +299,12 @@ export function useCreateUniversity() {
       const { data, error } = await supabase
         .from('pt_university')
         .insert(newUniversity)
-        .select(`
+        .select(
+          `
           *,
           country:pt_country(id, name, code)
-        `)
+        `
+        )
         .single()
 
       if (error) throw error
@@ -292,7 +313,9 @@ export function useCreateUniversity() {
     onMutate: async (newUniversity) => {
       await queryClient.cancelQueries({ queryKey: placementKeys.universities() })
 
-      const previousUniversities = queryClient.getQueryData<University[]>(placementKeys.universities())
+      const previousUniversities = queryClient.getQueryData<University[]>(
+        placementKeys.universities()
+      )
       const optimisticId = 'temp-' + Date.now()
 
       if (previousUniversities) {
@@ -305,15 +328,15 @@ export function useCreateUniversity() {
           us_news_2025_rank: newUniversity.us_news_2025_rank || null,
           updated_at: new Date().toISOString(),
         }
-        queryClient.setQueryData<University[]>(
-          placementKeys.universities(),
-          [optimisticUniversity, ...previousUniversities]
-        )
+        queryClient.setQueryData<University[]>(placementKeys.universities(), [
+          optimisticUniversity,
+          ...previousUniversities,
+        ])
       }
 
       return { previousUniversities, optimisticId }
     },
-    onSuccess: (createdUniversity, newUniversity, context) => {
+    onSuccess: (createdUniversity, _, context) => {
       if (!context?.optimisticId) return
       queryClient.setQueryData<University[]>(placementKeys.universities(), (current) => {
         if (!current) return current
@@ -322,7 +345,7 @@ export function useCreateUniversity() {
         )
       })
     },
-    onError: (err, newUniversity, context) => {
+    onError: (_, __, context) => {
       if (context?.previousUniversities) {
         queryClient.setQueryData(placementKeys.universities(), context.previousUniversities)
       }
@@ -336,10 +359,7 @@ export function useDeleteUniversity() {
 
   return useMutation({
     mutationFn: async (universityId: string): Promise<void> => {
-      const { error } = await supabase
-        .from('pt_university')
-        .delete()
-        .eq('id', universityId)
+      const { error } = await supabase.from('pt_university').delete().eq('id', universityId)
 
       if (error) throw error
     },
@@ -371,10 +391,12 @@ export function useUpdateUniversity() {
           us_news_2025_rank: updates.us_news_2025_rank,
         })
         .eq('id', updates.id)
-        .select(`
+        .select(
+          `
           *,
           country:pt_country(id, name, code)
-        `)
+        `
+        )
         .single()
 
       if (error) throw error
@@ -382,7 +404,9 @@ export function useUpdateUniversity() {
     },
     onMutate: async (updates) => {
       await queryClient.cancelQueries({ queryKey: placementKeys.universities() })
-      const previousUniversities = queryClient.getQueryData<University[]>(placementKeys.universities())
+      const previousUniversities = queryClient.getQueryData<University[]>(
+        placementKeys.universities()
+      )
 
       if (previousUniversities) {
         queryClient.setQueryData<University[]>(placementKeys.universities(), (current) => {
@@ -409,7 +433,7 @@ export function useUpdateUniversity() {
         return current.map((uni) => (uni.id === updatedUniversity.id ? updatedUniversity : uni))
       })
     },
-    onError: (err, variables, context) => {
+    onError: (_, __, context) => {
       if (context?.previousUniversities) {
         queryClient.setQueryData(placementKeys.universities(), context.previousUniversities)
       }
@@ -425,11 +449,13 @@ export function useSchoolsByUniversity(universityId: string | null) {
       if (!universityId) return []
       const { data, error } = await supabase
         .from('pt_school')
-        .select(`
+        .select(
+          `
           *,
           university:pt_university(id, university, url, country_id, us_news_2025_rank, updated_at),
           pt_department(count)
-        `)
+        `
+        )
         .eq('university_id', universityId)
         .order('school', { ascending: true })
 
@@ -445,7 +471,7 @@ export function useSchoolsByUniversity(universityId: string | null) {
 }
 
 // Create a new school
-export function useCreateSchool(universityId: string | null) {
+export function useCreateSchool() {
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -458,10 +484,12 @@ export function useCreateSchool(universityId: string | null) {
       const { data, error } = await supabase
         .from('pt_school')
         .insert(newSchool)
-        .select(`
+        .select(
+          `
           *,
           university:pt_university(id, university, url, country_id, us_news_2025_rank, updated_at)
-        `)
+        `
+        )
         .single()
 
       if (error) throw error
@@ -499,7 +527,7 @@ export function useCreateSchool(universityId: string | null) {
         )
       })
     },
-    onError: (err, newSchool, context) => {
+    onError: (_, __, context) => {
       if (context?.previousSchools && context?.universityId) {
         const queryKey = placementKeys.schoolsByUniversity(context.universityId)
         queryClient.setQueryData(queryKey, context.previousSchools)
@@ -514,10 +542,7 @@ export function useDeleteSchool(universityId: string | null) {
 
   return useMutation({
     mutationFn: async (schoolId: string): Promise<void> => {
-      const { error } = await supabase
-        .from('pt_school')
-        .delete()
-        .eq('id', schoolId)
+      const { error } = await supabase.from('pt_school').delete().eq('id', schoolId)
 
       if (error) throw error
     },
@@ -549,10 +574,12 @@ export function useUpdateSchool(universityId: string | null) {
           type: updates.type,
         })
         .eq('id', updates.id)
-        .select(`
+        .select(
+          `
           *,
           university:pt_university(id, university, url, country_id, us_news_2025_rank, updated_at)
-        `)
+        `
+        )
         .single()
 
       if (error) throw error
@@ -588,7 +615,7 @@ export function useUpdateSchool(universityId: string | null) {
         return current.map((s) => (s.id === updatedSchool.id ? updatedSchool : s))
       })
     },
-    onError: (err, variables, context) => {
+    onError: (_, __, context) => {
       if (context?.previousSchools && universityId) {
         const queryKey = placementKeys.schoolsByUniversity(universityId)
         queryClient.setQueryData(queryKey, context.previousSchools)
@@ -605,10 +632,12 @@ export function useDepartmentsBySchool(schoolId: string | null) {
       if (!schoolId) return []
       const { data, error } = await supabase
         .from('pt_department')
-        .select(`
+        .select(
+          `
           *,
           school:pt_school(id, school, url, type, university_id)
-        `)
+        `
+        )
         .eq('school_id', schoolId)
         .order('department', { ascending: true })
 
@@ -633,10 +662,12 @@ export function useCreateDepartment(schoolId: string | null) {
       const { data, error } = await supabase
         .from('pt_department')
         .insert([newDepartment])
-        .select(`
+        .select(
+          `
           *,
           school:pt_school(id, school, url, type, university_id)
-        `)
+        `
+        )
         .single()
 
       if (error) throw error
@@ -676,7 +707,7 @@ export function useCreateDepartment(schoolId: string | null) {
       // Also invalidate schools to update department count
       queryClient.invalidateQueries({ queryKey: ['placements', 'schools'] })
     },
-    onError: (err, variables, context) => {
+    onError: (_, __, context) => {
       if (context?.previousDepartments && schoolId) {
         const queryKey = placementKeys.departmentsBySchool(schoolId)
         queryClient.setQueryData(queryKey, context.previousDepartments)
@@ -691,10 +722,7 @@ export function useDeleteDepartment(schoolId: string | null) {
 
   return useMutation({
     mutationFn: async (departmentId: string): Promise<void> => {
-      const { error } = await supabase
-        .from('pt_department')
-        .delete()
-        .eq('id', departmentId)
+      const { error } = await supabase.from('pt_department').delete().eq('id', departmentId)
 
       if (error) throw error
     },
@@ -728,10 +756,12 @@ export function useUpdateDepartment(schoolId: string | null) {
           url: updates.url,
         })
         .eq('id', updates.id)
-        .select(`
+        .select(
+          `
           *,
           school:pt_school(id, school, url, type, university_id)
-        `)
+        `
+        )
         .single()
 
       if (error) throw error
@@ -767,7 +797,7 @@ export function useUpdateDepartment(schoolId: string | null) {
         return current.map((d) => (d.id === updatedDepartment.id ? updatedDepartment : d))
       })
     },
-    onError: (err, variables, context) => {
+    onError: (_, __, context) => {
       if (context?.previousDepartments && schoolId) {
         const queryKey = placementKeys.departmentsBySchool(schoolId)
         queryClient.setQueryData(queryKey, context.previousDepartments)
@@ -782,30 +812,25 @@ export function usePlacementSearch(params: PlacementSearchParams, enabled: boole
     queryKey: placementKeys.search(params),
     networkMode: 'always',
     queryFn: async (): Promise<PlacementSearchResult> => {
-      const { data, error } = await withTimeout(
-        supabasePublic.rpc('search_placements', {
-          p_degree: params.degree || null,
-          p_program: params.program || null,
-          p_university: params.university || null,
-          p_from_year: params.fromYear || null,
-          p_to_year: params.toYear || null,
-          p_limit: params.limit || 100,
-          p_offset: params.offset || 0,
-        }),
-        15000,
-        'Request timeout: placement search took too long'
-      )
+      const { data, error } = await supabasePublic.rpc('search_placements', {
+        p_degree: params.degree || null,
+        p_program: params.program || null,
+        p_university: params.university || null,
+        p_from_year: params.fromYear || null,
+        p_to_year: params.toYear || null,
+        p_limit: params.limit || 100,
+        p_offset: params.offset || 0,
+      })
 
       if (error) throw error
 
       const placements: Placement[] = (data || []).map((row: Record<string, unknown>) => {
         const rawYear = row.year ?? row.date
-        const parsedYear = typeof rawYear === 'number'
-          ? rawYear
-          : rawYear
-            ? parseInt(String(rawYear), 10)
-            : null
-        const placementUniv = (row.placement_univ ?? row.institution ?? row.placement) as string | null
+        const parsedYear =
+          typeof rawYear === 'number' ? rawYear : rawYear ? parseInt(String(rawYear), 10) : null
+        const placementUniv = (row.placement_univ ?? row.institution ?? row.placement) as
+          | string
+          | null
 
         return {
           id: row.id as string,
@@ -837,30 +862,25 @@ export function useReverseSearch(params: ReverseSearchParams, enabled: boolean =
     queryKey: placementKeys.reverseSearch(params),
     networkMode: 'always',
     queryFn: async (): Promise<PlacementSearchResult> => {
-      const { data, error } = await withTimeout(
-        supabasePublic.rpc('reverse_search_placements', {
-          p_placement_univ: params.placementUniv,
-          p_degree: params.degree || null,
-          p_program: params.program || null,
-          p_from_year: params.fromYear || null,
-          p_to_year: params.toYear || null,
-          p_limit: params.limit || 100,
-          p_offset: params.offset || 0,
-        }),
-        15000,
-        'Request timeout: reverse placement search took too long'
-      )
+      const { data, error } = await supabasePublic.rpc('reverse_search_placements', {
+        p_placement_univ: params.placementUniv,
+        p_degree: params.degree || null,
+        p_program: params.program || null,
+        p_from_year: params.fromYear || null,
+        p_to_year: params.toYear || null,
+        p_limit: params.limit || 50,
+        p_offset: params.offset || 0,
+      })
 
       if (error) throw error
 
       const placements: Placement[] = (data || []).map((row: Record<string, unknown>) => {
         const rawYear = row.year ?? row.date
-        const parsedYear = typeof rawYear === 'number'
-          ? rawYear
-          : rawYear
-            ? parseInt(String(rawYear), 10)
-            : null
-        const placementUniv = (row.placement_univ ?? row.institution ?? row.placement) as string | null
+        const parsedYear =
+          typeof rawYear === 'number' ? rawYear : rawYear ? parseInt(String(rawYear), 10) : null
+        const placementUniv = (row.placement_univ ?? row.institution ?? row.placement) as
+          | string
+          | null
 
         return {
           id: row.id as string,
@@ -893,13 +913,9 @@ export function useProgramsForUniversity(university: string | null) {
     networkMode: 'always',
     queryFn: async (): Promise<string[]> => {
       if (!university) return []
-      const { data, error } = await withTimeout(
-        supabasePublic.rpc('get_programs_for_university', {
-          p_university: university,
-        }),
-        15000,
-        'Request timeout: programs lookup took too long'
-      )
+      const { data, error } = await supabasePublic.rpc('get_programs_for_university', {
+        p_university: university,
+      })
       if (error) throw error
       return (data || []).filter(Boolean).sort()
     },
@@ -915,13 +931,9 @@ export function useUniversitiesForProgram(program: string | null) {
     networkMode: 'always',
     queryFn: async (): Promise<string[]> => {
       if (!program) return []
-      const { data, error } = await withTimeout(
-        supabasePublic.rpc('get_universities_for_program', {
-          p_program: program,
-        }),
-        15000,
-        'Request timeout: universities lookup took too long'
-      )
+      const { data, error } = await supabasePublic.rpc('get_universities_for_program', {
+        p_program: program,
+      })
       if (error) throw error
       return (data || []).filter(Boolean).sort()
     },
@@ -941,15 +953,11 @@ export function useProgramsWithPlacements(
     networkMode: 'always',
     queryFn: async (): Promise<string[]> => {
       if (!university) return []
-      const { data, error } = await withTimeout(
-        supabasePublic.rpc('get_programs_with_placements', {
-          p_university: university,
-          p_from_year: fromYear,
-          p_to_year: toYear,
-        }),
-        15000,
-        'Request timeout: programs lookup took too long'
-      )
+      const { data, error } = await supabasePublic.rpc('get_programs_with_placements', {
+        p_university: university,
+        p_from_year: fromYear,
+        p_to_year: toYear,
+      })
       if (error) throw error
       return (data || []).filter(Boolean).sort()
     },
@@ -959,22 +967,15 @@ export function useProgramsWithPlacements(
 }
 
 // Get programs with placements for a year range (no university filter)
-export function useProgramsForYearRange(
-  fromYear: number | null,
-  toYear: number | null
-) {
+export function useProgramsForYearRange(fromYear: number | null, toYear: number | null) {
   return useQuery({
     queryKey: placementKeys.programsForYearRange(fromYear, toYear),
     networkMode: 'always',
     queryFn: async (): Promise<string[]> => {
-      const { data, error } = await withTimeout(
-        supabasePublic.rpc('get_programs_for_year_range', {
-          p_from_year: fromYear,
-          p_to_year: toYear,
-        }),
-        15000,
-        'Request timeout: programs lookup took too long'
-      )
+      const { data, error } = await supabasePublic.rpc('get_programs_for_year_range', {
+        p_from_year: fromYear,
+        p_to_year: toYear,
+      })
       if (error) throw error
       // Handle both array of strings and array of objects with program key
       const programs = (data || []).map((item: string | { program: string }) =>
@@ -997,15 +998,11 @@ export function useUniversitiesForProgramYearRange(
     networkMode: 'always',
     queryFn: async (): Promise<string[]> => {
       if (!program) return []
-      const { data, error } = await withTimeout(
-        supabasePublic.rpc('get_universities_for_program_year_range', {
-          p_program: program,
-          p_from_year: fromYear,
-          p_to_year: toYear,
-        }),
-        15000,
-        'Request timeout: universities lookup took too long'
-      )
+      const { data, error } = await supabasePublic.rpc('get_universities_for_program_year_range', {
+        p_program: program,
+        p_from_year: fromYear,
+        p_to_year: toYear,
+      })
       if (error) throw error
       // Handle both array of strings and array of objects with university key
       const universities = (data || []).map((item: string | { university: string }) =>

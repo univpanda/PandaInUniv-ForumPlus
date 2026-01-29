@@ -6,7 +6,12 @@ export function Terms({ onBack }: TermsProps) {
   return (
     <div className="terms-page">
       <div className="terms-content">
-        <h1>Terms and Conditions</h1>
+        <div className="terms-header">
+          <button onClick={onBack} className="back-button">
+            ← Back
+          </button>
+          <h1>Terms and Conditions</h1>
+        </div>
         <p className="terms-updated">Last updated: January 2026</p>
 
         <section>
@@ -124,7 +129,9 @@ export function Terms({ onBack }: TermsProps) {
             <li>Users may upvote or downvote posts and replies</li>
             <li>Vote counts are publicly visible on all content</li>
             <li>Your voting activity contributes to community content ranking</li>
-            <li>Abuse of the voting system (e.g., targeted downvoting) may result in account action</li>
+            <li>
+              Abuse of the voting system (e.g., targeted downvoting) may result in account action
+            </li>
           </ul>
         </section>
 

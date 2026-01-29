@@ -2,11 +2,7 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tansta
 import { supabase } from '../lib/supabase'
 import { STALE_TIME, POLL_INTERVAL, PAGE_SIZE } from '../utils/constants'
 import { getPollingIntervalSafe } from '../utils/polling'
-import type {
-  ChatMessage,
-  UserConversation,
-  RawConversationMessage,
-} from '../types'
+import type { ChatMessage, UserConversation, RawConversationMessage } from '../types'
 
 // Query key factory for chat
 export const chatKeys = {
@@ -40,11 +36,11 @@ export function useConversations(userId: string | null, options?: { enabled?: bo
     },
     enabled: !!userId && options?.enabled !== false,
     staleTime: STALE_TIME.MEDIUM,
-    refetchInterval: (dataOrQuery, maybeQuery) => {
+    refetchInterval: (query) => {
       if (typeof document !== 'undefined' && document.hidden) {
         return false
       }
-      return getPollingIntervalSafe(POLL_INTERVAL.NOTIFICATIONS, dataOrQuery, maybeQuery)
+      return getPollingIntervalSafe(POLL_INTERVAL.NOTIFICATIONS, query)
     },
     refetchIntervalInBackground: false,
   })
@@ -107,7 +103,7 @@ export function useConversationMessages(
  * Hook to get total unread message count
  */
 export function useUnreadMessageCount(userId: string | null, options?: { enabled?: boolean }) {
-  return useQuery({
+  return useQuery<number, Error>({
     queryKey: chatKeys.unreadCount(userId || ''),
     queryFn: async () => {
       if (!userId) return 0
@@ -121,11 +117,11 @@ export function useUnreadMessageCount(userId: string | null, options?: { enabled
     },
     enabled: !!userId && options?.enabled !== false,
     staleTime: STALE_TIME.SHORT,
-    refetchInterval: (dataOrQuery, maybeQuery) => {
+    refetchInterval: (query) => {
       if (typeof document !== 'undefined' && document.hidden) {
         return false
       }
-      return getPollingIntervalSafe(POLL_INTERVAL.NOTIFICATIONS, dataOrQuery, maybeQuery)
+      return getPollingIntervalSafe(POLL_INTERVAL.NOTIFICATIONS, query)
     },
     refetchIntervalInBackground: false,
   })
@@ -204,19 +200,16 @@ export function useToggleIgnore(currentUserId: string | null) {
     },
     onSuccess: (isNowIgnored, targetUserId) => {
       // Update the ignored users set
-      queryClient.setQueryData<string[]>(
-        chatKeys.ignoredUsers(currentUserId || ''),
-        (old) => {
-          const current = Array.isArray(old) ? old : []
-          const newSet = new Set(current)
-          if (isNowIgnored) {
-            newSet.add(targetUserId)
-          } else {
-            newSet.delete(targetUserId)
-          }
-          return Array.from(newSet)
+      queryClient.setQueryData<string[]>(chatKeys.ignoredUsers(currentUserId || ''), (old) => {
+        const current = Array.isArray(old) ? old : []
+        const newSet = new Set(current)
+        if (isNowIgnored) {
+          newSet.add(targetUserId)
+        } else {
+          newSet.delete(targetUserId)
         }
-      )
+        return Array.from(newSet)
+      })
       // Update the specific user check
       queryClient.setQueryData(
         chatKeys.isUserIgnored(currentUserId || '', targetUserId),
