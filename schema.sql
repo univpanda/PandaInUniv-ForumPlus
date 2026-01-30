@@ -1,6 +1,10 @@
+-- =============================================================================
 -- PandaInUniv Forum Plus Database Schema
+-- =============================================================================
+-- Version: 1.0.0
 -- Generated: 2025-01-24
--- 
+-- Last Updated: 2025-01-30
+--
 -- This schema file contains the complete database structure including:
 -- - Custom types (enums)
 -- - Tables with constraints
@@ -9,12 +13,54 @@
 -- - Triggers
 -- - Row Level Security (RLS) policies
 --
--- To recreate the database, run this file against a fresh PostgreSQL database
--- with the pg_trgm extension enabled.
+-- =============================================================================
+-- VERSIONING & MIGRATIONS
+-- =============================================================================
 --
--- Prerequisites:
+-- This file represents the FULL schema for fresh database creation.
+-- For incremental updates to existing databases, use migration files in:
+--   /migrations/YYYYMMDD_NNN_description.sql
+--
+-- Migration file naming convention:
+--   YYYYMMDD_NNN_description.sql
+--   Example: 20250130_001_add_avatar_path_column.sql
+--
+-- Each migration should:
+--   1. Be idempotent (safe to run multiple times)
+--   2. Include both UP and DOWN sections (commented)
+--   3. Update the schema_version table
+--
+-- =============================================================================
+-- PREREQUISITES
+-- =============================================================================
 -- CREATE EXTENSION IF NOT EXISTS pg_trgm;
 -- (auth.users table must exist for foreign key references)
+--
+-- =============================================================================
+-- CHANGELOG
+-- =============================================================================
+-- v1.0.0 (2025-01-30) - Initial versioned schema
+--   - Added schema_version table for tracking migrations
+--   - Added version header and migration documentation
+--
+-- =============================================================================
+
+-- Schema version tracking table (created first)
+CREATE TABLE IF NOT EXISTS public.schema_version (
+    version VARCHAR(20) PRIMARY KEY,
+    description TEXT,
+    applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    applied_by TEXT DEFAULT current_user
+);
+
+-- Record current schema version
+INSERT INTO public.schema_version (version, description)
+VALUES ('1.0.0', 'Initial versioned schema')
+ON CONFLICT (version) DO NOTHING;
+
+-- =============================================================================
+-- SCHEMA DEFINITIONS BEGIN
+-- =============================================================================
 
 -- Name: school_type; Type: TYPE; Schema: public; Owner: -
 --
