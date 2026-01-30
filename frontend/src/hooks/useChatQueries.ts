@@ -36,6 +36,7 @@ export function useConversations(userId: string | null, options?: { enabled?: bo
     },
     enabled: !!userId && options?.enabled !== false,
     staleTime: STALE_TIME.MEDIUM,
+    refetchOnWindowFocus: true,
     refetchInterval: (query) => {
       if (typeof document !== 'undefined' && document.hidden) {
         return false
@@ -96,6 +97,7 @@ export function useConversationMessages(
     enabled: !!userId && !!partnerId && options?.enabled !== false,
     staleTime: STALE_TIME.SHORT,
     maxPages: 20, // Limit cached pages to prevent memory bloat
+    refetchOnWindowFocus: true,
   })
 }
 

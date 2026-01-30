@@ -3,6 +3,16 @@
 import type { UserWithStats } from '../types'
 
 const CACHE_API_URL = import.meta.env.VITE_CACHE_API_URL
+const THREAD_CACHE_BYPASS_MS = 60_000
+let threadCacheBypassUntil = 0
+
+function shouldBypassThreadCache(): boolean {
+  return Date.now() < threadCacheBypassUntil
+}
+
+function markThreadCacheBypass(): void {
+  threadCacheBypassUntil = Date.now() + THREAD_CACHE_BYPASS_MS
+}
 
 export interface CachedUserProfile {
   id: string
@@ -193,9 +203,13 @@ export async function invalidateThreadsCache(authToken: string): Promise<boolean
         'Authorization': `Bearer ${authToken}`,
       },
     })
+    if (!response.ok) {
+      markThreadCacheBypass()
+    }
     return response.ok
   } catch (error) {
     console.warn('Thread cache invalidation failed:', error)
+    markThreadCacheBypass()
     return false
   }
 }
@@ -216,9 +230,13 @@ export async function invalidateThreadCache(
         'Authorization': `Bearer ${authToken}`,
       },
     })
+    if (!response.ok) {
+      markThreadCacheBypass()
+    }
     return response.ok
   } catch (error) {
     console.warn('Thread view cache invalidation failed:', error)
+    markThreadCacheBypass()
     return false
   }
 }
@@ -246,6 +264,9 @@ export async function updateLoginMetadata(authToken: string): Promise<boolean> {
 // Get cached thread list for anonymous users
 export async function getCachedThreads(params: CachedThreadsParams): Promise<unknown[] | null> {
   if (!CACHE_API_URL) {
+    return null
+  }
+  if (shouldBypassThreadCache()) {
     return null
   }
 
@@ -289,6 +310,9 @@ export async function getCachedThreadView(
   sort: string
 ): Promise<unknown[] | null> {
   if (!CACHE_API_URL) {
+    return null
+  }
+  if (shouldBypassThreadCache()) {
     return null
   }
 

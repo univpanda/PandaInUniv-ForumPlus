@@ -169,6 +169,7 @@ export function useThreadView(
     enabled,
     staleTime: STALE_TIME.SHORT,
     placeholderData: (prev) => prev,
+    refetchOnWindowFocus: true,
   })
 }
 
