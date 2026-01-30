@@ -82,15 +82,10 @@
   }
 
   .header-tabs-pill {
-    padding: 0.35rem;
-  }
-
-  .header-tabs-nav {
-    gap: 0.5rem;
+    padding: 0.3rem;
   }
 
   .header-tab {
-    padding: 0.4rem 0.6rem;
     font-size: 0.85rem;
   }
 
@@ -126,10 +121,6 @@
 }
 
 @media (max-width: 1200px) {
-  .header-tab {
-    padding: 0.45rem;
-  }
-
   .header-tab-label {
     display: none;
   }
