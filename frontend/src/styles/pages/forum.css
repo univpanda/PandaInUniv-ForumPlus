@@ -1481,18 +1481,21 @@
   align-items: center;
   gap: 0.25rem;
   padding: 0.25rem 0;
-  animation: fadeIn 0.2s ease;
+  max-height: 36px;
+  opacity: 1;
+  transition: opacity 0.15s ease, max-height 0.15s ease, padding 0.15s ease;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.reply-formatting-bar.is-hidden {
+  max-height: 0;
+  opacity: 0;
+  padding: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.reply-formatting-bar.is-visible {
+  overflow: visible;
 }
 
 .format-btn {
@@ -2336,4 +2339,3 @@
   -webkit-box-orient: vertical;
   line-height: 1.5;
 }
-

@@ -185,6 +185,12 @@ export const ReplyInput = memo(function ReplyInput({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isExpanded])
 
+  useEffect(() => {
+    if (!isExpanded) {
+      setShowEmojiPicker(false)
+    }
+  }, [isExpanded])
+
   // Expand when editor is focused
   const handleContainerClick = useCallback(() => {
     setIsExpanded(true)
@@ -201,104 +207,102 @@ export const ReplyInput = memo(function ReplyInput({
     >
       <div className="reply-input-wrapper">
         <EditorContent editor={editor} />
-        {isExpanded && (
-          <div className="reply-formatting-bar">
-            <button
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault() // Prevent losing focus/selection
-              }}
-              onClick={() => {
-                editor.chain().focus().toggleBold().run()
-              }}
-              className={`format-btn ${editor.isActive('bold') ? 'active' : ''}`}
-              title="Bold (Ctrl+B)"
-            >
-              <Bold size={14} />
-            </button>
-            <button
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault()
-              }}
-              onClick={() => {
-                editor.chain().focus().toggleItalic().run()
-              }}
-              className={`format-btn ${editor.isActive('italic') ? 'active' : ''}`}
-              title="Italic (Ctrl+I)"
-            >
-              <Italic size={14} />
-            </button>
-            <div className="emoji-picker-wrapper" ref={emojiPickerRef}>
-              <button
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                }}
-                onClick={() => {
-                  setShowEmojiPicker(!showEmojiPicker)
-                }}
-                className={`format-btn ${showEmojiPicker ? 'active' : ''}`}
-                title="Emoji"
-              >
-                <Smile size={14} />
-              </button>
-              {showEmojiPicker && (
-                <div className="emoji-picker">
-                  {EMOJI_LIST.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      className="emoji-btn"
-                      onClick={() => insertEmoji(emoji)}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+        <div className={`reply-formatting-bar ${isExpanded ? 'is-visible' : 'is-hidden'}`}>
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault() // Prevent losing focus/selection
+            }}
+            onClick={() => {
+              editor.chain().focus().toggleBold().run()
+            }}
+            className={`format-btn ${editor.isActive('bold') ? 'active' : ''}`}
+            title="Bold (Ctrl+B)"
+          >
+            <Bold size={14} />
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault()
+            }}
+            onClick={() => {
+              editor.chain().focus().toggleItalic().run()
+            }}
+            className={`format-btn ${editor.isActive('italic') ? 'active' : ''}`}
+            title="Italic (Ctrl+I)"
+          >
+            <Italic size={14} />
+          </button>
+          <div className="emoji-picker-wrapper" ref={emojiPickerRef}>
             <button
               type="button"
               onMouseDown={(e) => {
                 e.preventDefault()
               }}
               onClick={() => {
-                setLink()
+                setShowEmojiPicker(!showEmojiPicker)
               }}
-              className={`format-btn ${editor.isActive('link') ? 'active' : ''}`}
-              title="Link"
+              className={`format-btn ${showEmojiPicker ? 'active' : ''}`}
+              title="Emoji"
             >
-              <LinkIcon size={14} />
+              <Smile size={14} />
             </button>
-            <button
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault()
-              }}
-              onClick={() => {
-                editor.chain().focus().toggleBulletList().run()
-              }}
-              className={`format-btn ${editor.isActive('bulletList') ? 'active' : ''}`}
-              title="List"
-            >
-              <List size={14} />
-            </button>
-            <button
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault()
-              }}
-              onClick={() => {
-                insertLatex()
-              }}
-              className="format-btn"
-              title="LaTeX formula"
-            >
-              <Sigma size={14} />
-            </button>
+            {showEmojiPicker && (
+              <div className="emoji-picker">
+                {EMOJI_LIST.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    className="emoji-btn"
+                    onClick={() => insertEmoji(emoji)}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault()
+            }}
+            onClick={() => {
+              setLink()
+            }}
+            className={`format-btn ${editor.isActive('link') ? 'active' : ''}`}
+            title="Link"
+          >
+            <LinkIcon size={14} />
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault()
+            }}
+            onClick={() => {
+              editor.chain().focus().toggleBulletList().run()
+            }}
+            className={`format-btn ${editor.isActive('bulletList') ? 'active' : ''}`}
+            title="List"
+          >
+            <List size={14} />
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault()
+            }}
+            onClick={() => {
+              insertLatex()
+            }}
+            className="format-btn"
+            title="LaTeX formula"
+          >
+            <Sigma size={14} />
+          </button>
+        </div>
       </div>
       {isExpanded && (
         <button
