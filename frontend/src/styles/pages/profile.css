@@ -150,12 +150,12 @@
 }
 
 .profile-privacy-toggle.private {
-  border-color: var(--color-warning);
-  background: color-mix(in srgb, var(--color-warning) 5%, var(--color-background));
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-background));
 }
 
 .profile-privacy-toggle.private:hover {
-  background: color-mix(in srgb, var(--color-warning) 10%, var(--color-background));
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-background));
 }
 
 .profile-privacy-info {
