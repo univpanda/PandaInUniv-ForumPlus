@@ -191,7 +191,7 @@
   margin-bottom: 1rem;
 }
 
-.search-box {
+.filters .search-box {
   flex: 1;
   display: flex;
   align-items: center;
@@ -202,17 +202,17 @@
   transition: var(--transition-normal);
 }
 
-.search-box:focus-within {
+.filters .search-box:focus-within {
   border-color: var(--color-primary);
   box-shadow: var(--shadow-focus);
 }
 
-.search-box svg {
+.filters .search-box svg {
   color: var(--color-text-light);
   margin-right: 0.75rem;
 }
 
-.search-box input {
+.filters .search-box input {
   flex: 1;
   border: none;
   outline: none;
@@ -332,8 +332,8 @@
 }
 
 .filter-tag {
-  background: #e0e7ff;
-  color: #4338ca;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-ink);
   padding: 0.25rem 0.75rem;
   border-radius: 20px;
   font-size: 0.8rem;
@@ -350,7 +350,7 @@
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  color: #4338ca;
+  color: var(--color-accent-ink);
   opacity: 0.7;
   transition: opacity 0.15s;
 }

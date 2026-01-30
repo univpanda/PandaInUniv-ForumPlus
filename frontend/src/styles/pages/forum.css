@@ -2134,16 +2134,6 @@
     font-size: 1.1rem;
   }
 
-  .thread-card {
-    padding: 1rem;
-  }
-
-  .reply-card {
-    margin-left: 0;
-  }
-}
-
-@media (max-width: 820px) {
   .header-utilities .header-search {
     width: clamp(160px, 32vw, 220px);
     min-width: 160px;
@@ -2154,6 +2144,22 @@
 
   .header-utilities .header-search input {
     font-size: 0.85rem;
+  }
+
+  .thread-card {
+    padding: 1rem;
+  }
+
+  .reply-card {
+    margin-left: 0;
+  }
+
+  .notifications-container {
+    padding: 1rem;
+  }
+
+  .notification-badges {
+    flex-wrap: wrap;
   }
 }
 
@@ -2331,12 +2337,3 @@
   line-height: 1.5;
 }
 
-@media (max-width: 640px) {
-  .notifications-container {
-    padding: 1rem;
-  }
-
-  .notification-badges {
-    flex-wrap: wrap;
-  }
-}

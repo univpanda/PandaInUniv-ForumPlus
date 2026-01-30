@@ -147,7 +147,7 @@
   background: var(--color-danger-bg-dark);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .user-management {
     padding: 1.5rem 1rem;
   }
@@ -451,7 +451,7 @@ button.engagement-stat.flagged.clickable:hover {
   cursor: not-allowed;
 }
 
-@media (max-width: 1000px) {
+@media (max-width: 1024px) {
   .user-list-header {
     display: none;
   }
