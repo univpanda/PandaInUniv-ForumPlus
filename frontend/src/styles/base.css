@@ -3,6 +3,17 @@
   display: none !important;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Spin animation - shared across components */
 .spin {
   animation: spin 1s linear infinite;
@@ -123,4 +134,3 @@
 .page-size-input[type=number] {
   -moz-appearance: textfield;
 }
-

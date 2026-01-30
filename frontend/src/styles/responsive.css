@@ -76,6 +76,12 @@
     height: 26px;
   }
 
+  .page-btn,
+  .page-number {
+    min-width: 44px;
+    height: 44px;
+  }
+
   .header-tabs {
     max-width: 100%;
     margin: 0 0.5rem;

@@ -9,7 +9,7 @@
   --placement-border: var(--color-border);
   --placement-text: var(--color-text);
   --placement-text-secondary: var(--color-text-secondary);
-  --placement-text-muted: var(--color-text-muted);
+  --placement-text-muted: #5b6b82;
   --placement-bg: var(--color-surface);
   --placement-bg-page: var(--color-background);
 }
