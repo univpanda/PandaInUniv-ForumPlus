@@ -12,6 +12,7 @@ export const forumKeys = {
   paginatedThreads: (
     sortBy: ThreadSortBy,
     page: number,
+    pageSize: number,
     authorUsername?: string | null,
     searchText?: string | null,
     isDeleted?: boolean,
@@ -23,6 +24,8 @@ export const forumKeys = {
       sortBy,
       'page',
       page,
+      'size',
+      pageSize,
       authorUsername ?? null,
       searchText ?? null,
       isDeleted ?? false,
@@ -32,8 +35,24 @@ export const forumKeys = {
   // Posts for a specific thread/parent - this is a prefix for paginatedPosts, enabling targeted invalidation
   posts: (threadId: number, parentId: number | null) =>
     [...forumKeys.all, 'posts', threadId, parentId === null ? 'root' : parentId] as const,
-  paginatedPosts: (threadId: number, parentId: number | null, page: number, sort: string = 'popular') =>
-    [...forumKeys.all, 'posts', threadId, parentId === null ? 'root' : parentId, 'page', page, sort] as const,
+  paginatedPosts: (
+    threadId: number,
+    parentId: number | null,
+    page: number,
+    pageSize: number,
+    sort: string = 'popular'
+  ) =>
+    [
+      ...forumKeys.all,
+      'posts',
+      threadId,
+      parentId === null ? 'root' : parentId,
+      'page',
+      page,
+      'size',
+      pageSize,
+      sort,
+    ] as const,
   // Thread view: OP + paginated replies in single query (uses 'posts' prefix for mutation compatibility)
   threadView: (threadId: number, page: number, sort: string = 'popular') =>
     [...forumKeys.all, 'posts', threadId, 'threadView', page, sort] as const,

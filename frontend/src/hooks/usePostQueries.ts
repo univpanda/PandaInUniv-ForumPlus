@@ -48,7 +48,7 @@ export function usePaginatedPosts(
   const client = session?.access_token ? supabase : supabasePublic
 
   return useQuery({
-    queryKey: forumKeys.paginatedPosts(threadId, parentId, page, sort),
+    queryKey: forumKeys.paginatedPosts(threadId, parentId, page, pageSize, sort),
     networkMode: 'always',
     queryFn: async (): Promise<GetPaginatedPostsResponse> => {
       const { data, error } = await client.rpc('get_paginated_thread_posts', {
@@ -316,6 +316,7 @@ export function useAddReply() {
         variables.threadId,
         variables.parentId,
         variables.page,
+        PAGE_SIZE.POSTS,
         variables.sort
       )
       const oldPaginated = queryClient.getQueryData<GetPaginatedPostsResponse>(paginatedKey)
@@ -365,6 +366,7 @@ export function useAddReply() {
         variables.threadId,
         variables.parentId,
         variables.page,
+        PAGE_SIZE.POSTS,
         variables.sort
       )
       queryClient.setQueryData<GetPaginatedPostsResponse>(paginatedKey, (old) => {

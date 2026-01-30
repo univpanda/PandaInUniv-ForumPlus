@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEditPost, useDeletePost } from './useForumQueries'
 import { forumKeys } from './forumQueryKeys'
 import { canEditContent } from '../utils/format'
+import { PAGE_SIZE } from '../utils/constants'
 import type { Post, Thread, ThreadStub, GetPaginatedPostsResponse } from '../types'
 
 interface ModalState {
@@ -41,7 +42,13 @@ function findRealPostId(
   // Look in paginated posts cache for a post matching author and created_at
   const sorts = ['popular', 'new'] as const
   for (const sort of sorts) {
-    const key = forumKeys.paginatedPosts(optimisticPost.thread_id, optimisticPost.parent_id, 1, sort)
+    const key = forumKeys.paginatedPosts(
+      optimisticPost.thread_id,
+      optimisticPost.parent_id,
+      1,
+      PAGE_SIZE.POSTS,
+      sort
+    )
     const data = queryClient.getQueryData<GetPaginatedPostsResponse>(key)
     if (data?.posts) {
       const realPost = data.posts.find(

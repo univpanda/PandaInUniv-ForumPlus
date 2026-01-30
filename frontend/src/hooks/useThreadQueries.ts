@@ -28,7 +28,15 @@ export function usePaginatedThreads(
   const client = session?.access_token ? supabase : supabasePublic
 
   return useQuery({
-    queryKey: forumKeys.paginatedThreads(sortBy, page, authorUsername, searchText, isDeleted, isFlagged),
+    queryKey: forumKeys.paginatedThreads(
+      sortBy,
+      page,
+      pageSize,
+      authorUsername,
+      searchText,
+      isDeleted,
+      isFlagged
+    ),
     networkMode: 'always',
     queryFn: async (): Promise<GetPaginatedThreadsResponse> => {
       const isCachedEligible = !isAdmin && !isDeleted && !isFlagged && isCacheEnabled()
