@@ -1,15 +1,21 @@
+import { useState } from 'react'
+import { useAuth } from '../hooks/useAuth'
+import { useDeleteOwnAccount } from '../hooks'
+import { ButtonSpinner } from '../components/ui/LoadingSpinner'
+
 interface TermsProps {
   onBack: () => void
 }
 
 export function Terms({ onBack }: TermsProps) {
+  const { user } = useAuth()
+  const deleteAccount = useDeleteOwnAccount()
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
   return (
     <div className="terms-page">
       <div className="terms-content">
         <div className="terms-header">
-          <button onClick={onBack} className="back-button">
-            ← Back
-          </button>
           <h1>Terms and Conditions</h1>
         </div>
         <p className="terms-updated">Last updated: January 2026</p>
@@ -56,6 +62,39 @@ export function Terms({ onBack }: TermsProps) {
             remain on the Platform. Once deleted, an account cannot be recovered. You may create a
             new account using the same email, but it will be treated as a completely new account
             with a new identity.
+            {user && (
+              <span className="delete-account-inline">
+                {!confirmDelete ? (
+                  <button
+                    type="button"
+                    className="delete-account-link"
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    Delete account
+                  </button>
+                ) : (
+                  <>
+                    <span className="delete-confirm-text">Confirm delete?</span>
+                    <button
+                      type="button"
+                      className="delete-confirm-btn cancel"
+                      onClick={() => setConfirmDelete(false)}
+                      disabled={deleteAccount.isPending}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="delete-confirm-btn confirm"
+                      onClick={() => deleteAccount.mutate()}
+                      disabled={deleteAccount.isPending}
+                    >
+                      {deleteAccount.isPending ? <ButtonSpinner size={14} /> : 'Delete'}
+                    </button>
+                  </>
+                )}
+              </span>
+            )}
           </p>
         </section>
 
