@@ -19,7 +19,6 @@ interface ChatConversationProps {
   currentUserId: string
   newMessage: string
   sending: boolean
-  onBack: () => void
   onMessageChange: (value: string) => void
   onSend: () => void
   hasMoreMessages?: boolean
@@ -35,7 +34,6 @@ export function ChatConversation({
   currentUserId,
   newMessage,
   sending,
-  onBack,
   onMessageChange,
   onSend,
   hasMoreMessages,
@@ -62,12 +60,12 @@ export function ChatConversation({
       {/* Header */}
       <div className="chat-conv-header-bar">
         <div className="chat-partner-info">
-          <button className="chat-partner-back" onClick={onBack} title="Back to whispers">
+          <div className="chat-partner-identity">
             <div className="chat-partner-avatar">
               <img src={getAvatarUrl(partner.avatar, partnerName, partner.avatarPath)} alt="" />
             </div>
             <span className="chat-partner-name">{partnerName}</span>
-          </button>
+          </div>
           {canShush && (
             <div className="chat-tooltip-wrapper">
               <button

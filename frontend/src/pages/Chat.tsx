@@ -43,7 +43,6 @@ export function Chat({ initialPartner, onInitialPartnerConsumed, resetToList }: 
     handleSendMessage,
     openConversation,
     startNewChat,
-    backToList,
   } = useChatPageState({ resetToList })
 
   // Sync pageSizeInput with the actual page size from hook
@@ -152,7 +151,6 @@ export function Chat({ initialPartner, onInitialPartnerConsumed, resetToList }: 
           currentUserId={user.id}
           newMessage={newMessage}
           sending={sending}
-          onBack={backToList}
           onMessageChange={setNewMessage}
           onSend={handleSendMessage}
           hasMoreMessages={hasMoreMessages}
