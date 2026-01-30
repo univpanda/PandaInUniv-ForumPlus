@@ -211,7 +211,10 @@ function AppContent() {
   }
 
   const handleChatClick = () => {
-    setChatResetKey((k) => k + 1)
+    // Only reset to list if already on chat tab (acts as "go home")
+    if (activeTab === 'chat') {
+      setChatResetKey((k) => k + 1)
+    }
     setActiveTab('chat')
     // Note: Badge clears automatically when Chat component marks messages as read
   }
