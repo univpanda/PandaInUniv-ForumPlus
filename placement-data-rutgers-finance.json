@@ -1,0 +1,38 @@
+{
+  "source": {
+    "url": "https://www.business.rutgers.edu/phd/alumni",
+    "program_name": "Finance",
+    "degree": "PhD",
+    "institution": "Rutgers University",
+    "institution_id": "6d575bbb-8410-4109-b1d5-6be60efe207b",
+    "program_id": "0da67a66-83f8-44c8-bffe-e4ad521d4995"
+  },
+  "extraction_date": "2026-01-30",
+  "graduates": [
+    {"name": "Zev Hirsch", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "Touro University"}, "advisor": "Yangru Wu, Glenn Shafer"},
+    {"name": "Zonghao Hou", "graduation_year": 2025, "placement": {"position": "Credit Risk Officer", "institution": "State Street Bank"}, "advisor": "Yangru Wu"},
+    {"name": "Yizhang Li", "graduation_year": 2025, "placement": {"position": "Quantitative Researcher", "institution": "Two Sigma Investments"}, "advisor": "Andrea Tamoni"},
+    {"name": "Yi Liu", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "Southwestern University of Finance & Economics"}, "advisor": "Yangru Wu"},
+    {"name": "Banu Mutlu", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "New York Institute of Technology"}, "advisor": "Ben Sopranzetti"},
+    {"name": "Shanren Pan", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "The College of New Jersey"}, "advisor": "Priyank Gandhi, Darius Palia"},
+    {"name": "An Qin", "graduation_year": 2025, "advisor": "Andrea Tamoni, Serdar Dinc"},
+    {"name": "Ruixin Yang", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "Southwestern University of Finance & Economics"}, "advisor": "Zhaodong Zhong"},
+    {"name": "Xingyi Hu", "graduation_year": 2024, "advisor": "Zhaodong Zhong"},
+    {"name": "Rouzhi Wang", "graduation_year": 2023, "placement": {"position": "Assistant Professor", "institution": "Xi'an Jiatong-Liverpool University"}, "advisor": "Darius Palia"},
+    {"name": "Yushan Tang", "graduation_year": 2023, "placement": {"position": "Assistant Professor", "institution": "Nankai University"}, "advisor": "Zhengzhi Li"},
+    {"name": "Yuanyuan Xiao", "graduation_year": 2023, "placement": {"position": "Assistant Professor", "institution": "Nankai University"}, "advisor": "Azi Ben-Rephael"},
+    {"name": "Hengguo Da", "graduation_year": 2022, "placement": {"position": "Faculty", "institution": "Southwestern University"}, "advisor": "Darius Palia"},
+    {"name": "Gunchang Kim", "graduation_year": 2022, "placement": {"position": "Faculty", "institution": "Southwestern University"}, "advisor": "Jin-Mo Kim"},
+    {"name": "Cheng Gao", "graduation_year": 2021, "placement": {"position": "Assistant Professor", "institution": "Soochow University"}, "advisor": "Ben Sopranzetti"},
+    {"name": "Peixuan Yuan", "graduation_year": 2021, "placement": {"position": "Faculty", "institution": "Renmin University of China"}, "advisor": "Yangru Wu"},
+    {"name": "Yankuo Qiao", "graduation_year": 2021, "placement": {"position": "Faculty", "institution": "Oakland University"}, "advisor": "Ivan Brick"},
+    {"name": "Hao Chang", "graduation_year": 2020, "placement": {"position": "Researcher", "institution": "Jacobs Levy Equity Management"}, "advisor": "Yangru Wu, Rong Chen"},
+    {"name": "Bo Zhou", "graduation_year": 2019, "placement": {"position": "Researcher", "institution": "C2FO"}, "advisor": "Ben Sopranzetti"},
+    {"name": "Ge Wu", "graduation_year": 2018, "placement": {"position": "Faculty", "institution": "University of Richmond"}, "advisor": "Darius Palia"},
+    {"name": "Reza Farhadi", "graduation_year": 2018, "placement": {"position": "Faculty", "institution": "Georgia Institute of Technology"}, "advisor": "Virkam Nanda"},
+    {"name": "Yaqing Xiao", "graduation_year": 2018, "placement": {"position": "Faculty", "institution": "Capital University of Economics and Business"}, "advisor": "Yangru Wu"},
+    {"name": "Alex Abakah", "graduation_year": 2017, "placement": {"position": "Faculty", "institution": "St. John Fisher College"}, "advisor": "Simi Kedia"},
+    {"name": "Meera Behera", "graduation_year": 2017, "placement": {"position": "Faculty", "institution": "Seton Hall University"}, "advisor": "Vikram Nanda, Oded Palmon"},
+    {"name": "Xin Cheng", "graduation_year": 2017, "placement": {"position": "Faculty", "institution": "Renmin University of China"}, "advisor": "Simi Kedia"}
+  ]
+}

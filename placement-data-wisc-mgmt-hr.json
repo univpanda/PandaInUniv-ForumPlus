@@ -1,0 +1,32 @@
+{
+  "source": {
+    "url": "https://business.wisc.edu/phd/placements/",
+    "program_name": "Management and Human Resources",
+    "degree": "PhD",
+    "institution": "University of Wisconsin-Madison",
+    "institution_id": "111cc032-e0b1-43e9-8f4a-d9cb0d7d9aa3",
+    "program_id": "37136a0e-c064-4ab0-bf10-f39b089989b2"
+  },
+  "extraction_date": "2026-01-30",
+  "graduates": [
+    {"name": "Yongha Kwon", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "Oberlin College"}},
+    {"name": "Minah Park", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "Oberlin College"}},
+    {"name": "Haifeng Wang", "graduation_year": 2024, "placement": {"position": "Assistant Professor", "institution": "Hong Kong Baptist University"}},
+    {"name": "Yerim Sim", "graduation_year": 2024, "placement": {"position": "Assistant Professor", "institution": "University of Nebraska Kearney"}},
+    {"name": "Pamela Gu", "graduation_year": 2023, "placement": {"position": "Assistant Professor", "institution": "Carroll University"}},
+    {"name": "Bekhzod Khoshimov", "graduation_year": 2023, "placement": {"position": "Assistant Professor", "institution": "NYU Abu Dhabi"}},
+    {"name": "Ji Hyun Kim", "graduation_year": 2022, "placement": {"position": "Assistant Professor", "institution": "National University of Singapore"}},
+    {"name": "Yea Hee Ko", "graduation_year": 2022, "placement": {"position": "Assistant Professor", "institution": "Binghamton University - SUNY"}},
+    {"name": "Andy El-Zayaty", "graduation_year": 2021, "placement": {"position": "Assistant Professor", "institution": "University of California Santa Barbara"}},
+    {"name": "Sangyun Kim", "graduation_year": 2021, "placement": {"position": "Assistant Professor", "institution": "University of Zurich"}},
+    {"name": "Rakoon Piyanontalee", "graduation_year": 2021, "placement": {"position": "Assistant Professor", "institution": "Penn State University"}},
+    {"name": "Bukky Akinsanmi", "graduation_year": 2020, "placement": {"position": "Assistant Professor", "institution": "University of Texas - Austin"}},
+    {"name": "Zhi Cao", "graduation_year": 2020, "placement": {"position": "Assistant Professor", "institution": "University of Nevada - Las Vegas"}},
+    {"name": "Seo-Young Byun", "graduation_year": 2019, "placement": {"position": "Assistant Professor", "institution": "Ball State University"}},
+    {"name": "Shannon Younger", "graduation_year": 2018, "placement": {"position": "Assistant Professor", "institution": "Texas Christian University"}},
+    {"name": "Joe Raffiee-Shira", "graduation_year": 2017, "placement": {"position": "Assistant Professor", "institution": "University of Southern California"}},
+    {"name": "Tiffany Trzebiatowski", "graduation_year": 2017, "placement": {"position": "Assistant Professor", "institution": "University of Massachusetts-Amherst"}},
+    {"name": "Paul Davis", "graduation_year": 2016, "placement": {"position": "Assistant Professor", "institution": "Cornell University"}},
+    {"name": "Jie Feng", "graduation_year": 2016, "placement": {"position": "Assistant Professor", "institution": "Rutgers University"}}
+  ]
+}

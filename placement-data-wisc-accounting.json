@@ -1,0 +1,39 @@
+{
+  "source": {
+    "url": "https://business.wisc.edu/phd/placements/",
+    "program_name": "Accounting",
+    "degree": "PhD",
+    "institution": "University of Wisconsin-Madison",
+    "institution_id": "111cc032-e0b1-43e9-8f4a-d9cb0d7d9aa3",
+    "program_id": "e656a679-e231-4953-bd01-6310fd3c578b"
+  },
+  "extraction_date": "2026-01-30",
+  "graduates": [
+    {"name": "Katie Boylen", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "California State University - Northridge"}},
+    {"name": "Derek Christensen", "graduation_year": 2024, "placement": {"position": "Assistant Professor", "institution": "University of Oregon"}},
+    {"name": "Seung Kyo Ahn", "graduation_year": 2023, "placement": {"position": "Assistant Professor", "institution": "Washington State University"}},
+    {"name": "Julia Ariel-Rohr", "graduation_year": 2023, "placement": {"position": "Assistant Professor", "institution": "DePaul University"}},
+    {"name": "Amanda Carlson", "graduation_year": 2023, "placement": {"position": "Assistant Professor", "institution": "Merrimack College"}},
+    {"name": "Zachary King", "graduation_year": 2022, "placement": {"position": "Assistant Professor", "institution": "Fordham University"}},
+    {"name": "Chunzi Liang", "graduation_year": 2022, "placement": {"position": "Assistant Professor", "institution": "University of Wisconsin - Whitewater"}},
+    {"name": "Linette Rousseau", "graduation_year": 2022, "placement": {"position": "Assistant Professor", "institution": "University of Houston"}},
+    {"name": "David Samuel", "graduation_year": 2022, "placement": {"position": "Assistant Professor", "institution": "Singapore Management University"}},
+    {"name": "In Gyun Baek", "graduation_year": 2021, "placement": {"position": "Assistant Professor", "institution": "National University of Singapore"}},
+    {"name": "Mary Vernon", "graduation_year": 2021, "placement": {"position": "Assistant Professor", "institution": "University of Connecticut"}},
+    {"name": "Benjamin Osswald", "graduation_year": 2020, "placement": {"position": "Assistant Professor", "institution": "University of Illinois"}},
+    {"name": "Clay Partridge", "graduation_year": 2020, "placement": {"position": "Assistant Professor", "institution": "University of California - Davis"}},
+    {"name": "Kimberly Walker", "graduation_year": 2020, "placement": {"position": "Assistant Professor", "institution": "Virginia Tech"}},
+    {"name": "Erika Wheeler", "graduation_year": 2020, "placement": {"position": "Assistant Professor", "institution": "Southern Methodist University"}},
+    {"name": "Dimitri Yatsenko", "graduation_year": 2019, "placement": {"position": "Assistant Professor", "institution": "University of Wisconsin-Whitewater"}},
+    {"name": "Abe Carr", "graduation_year": 2018, "placement": {"position": "Assistant Professor", "institution": "Creighton University"}},
+    {"name": "Zachary Kowaleski", "graduation_year": 2018, "placement": {"position": "Assistant Professor", "institution": "University of Notre Dame"}},
+    {"name": "Eric Condie", "graduation_year": 2017, "placement": {"position": "Assistant Professor", "institution": "Georgia Institute of Technology"}},
+    {"name": "Amy Tegeler", "graduation_year": 2017, "placement": {"position": "Assistant Professor", "institution": "University of Wisconsin - Milwaukee"}},
+    {"name": "Matthew Kaufman", "graduation_year": 2016, "placement": {"position": "Assistant Professor", "institution": "Portland State University"}},
+    {"name": "Kara Obermire", "graduation_year": 2016, "placement": {"position": "Assistant Professor", "institution": "Oregon State University"}},
+    {"name": "Xiao Xiao", "graduation_year": 2016, "placement": {"position": "Assistant Professor", "institution": "Peking University"}},
+    {"name": "Amanda Convery", "graduation_year": 2015, "placement": {"position": "Assistant Professor", "institution": "University of Delaware"}},
+    {"name": "Sean Dennis", "graduation_year": 2015, "placement": {"position": "Assistant Professor", "institution": "University of Kentucky"}},
+    {"name": "Patrick Hurley", "graduation_year": 2015, "placement": {"position": "Assistant Professor", "institution": "Northeastern University"}}
+  ]
+}

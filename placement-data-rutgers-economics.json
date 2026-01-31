@@ -1,0 +1,16 @@
+{
+  "source": {
+    "url": "https://www.business.rutgers.edu/phd/alumni",
+    "program_name": "Economics",
+    "degree": "PhD",
+    "institution": "Rutgers University",
+    "institution_id": "6d575bbb-8410-4109-b1d5-6be60efe207b",
+    "program_id": "eccd2751-0f16-44e0-b73e-70b777ac6d31"
+  },
+  "extraction_date": "2026-01-30",
+  "graduates": [
+    {"name": "Maria Hatalis", "graduation_year": 2024, "placement": {"position": "Lecturer", "institution": "Rutgers University"}, "advisor": "Mariana Spatareanu"},
+    {"name": "Firuz Shukurov", "graduation_year": 2020, "placement": {"position": "Program Officer", "institution": "United Nations Development Program (Timor Leste)"}, "advisor": "Carlos Seiglie"},
+    {"name": "Hyun Gon Kim", "graduation_year": 2017, "placement": {"position": "Faculty", "institution": "Rutgers University-Camden"}, "advisor": "Ajai Gaur"}
+  ]
+}

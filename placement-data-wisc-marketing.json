@@ -1,0 +1,31 @@
+{
+  "source": {
+    "url": "https://business.wisc.edu/phd/placements/",
+    "program_name": "Marketing",
+    "degree": "PhD",
+    "institution": "University of Wisconsin-Madison",
+    "institution_id": "111cc032-e0b1-43e9-8f4a-d9cb0d7d9aa3",
+    "program_id": "430d5c65-5ec8-403f-94f0-7b92d49240f2"
+  },
+  "extraction_date": "2026-01-30",
+  "graduates": [
+    {"name": "Suyeon Jung", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "Colorado State University"}},
+    {"name": "Yutian Liu", "graduation_year": 2025, "placement": {"position": "Data Scientist", "institution": "Google"}},
+    {"name": "Wonsuk Jung", "graduation_year": 2024, "placement": {"position": "Assistant Professor", "institution": "University of Cincinnati"}},
+    {"name": "Sriniketh Vijayaraghavan", "graduation_year": 2024, "placement": {"position": "Assistant Professor", "institution": "Texas A&M"}},
+    {"name": "Nitisha Tomar", "graduation_year": 2024, "placement": {"position": "Assistant Professor", "institution": "Bayes Business School, City University of London"}},
+    {"name": "Jiyeon Hong", "graduation_year": 2022, "placement": {"position": "Assistant Professor", "institution": "George Mason University"}},
+    {"name": "Sean Melessa", "graduation_year": 2022, "placement": {"position": "Assistant Professor", "institution": "Penn State University"}},
+    {"name": "Srinivas Tunuguntla", "graduation_year": 2022, "placement": {"position": "Assistant Professor", "institution": "Duke University"}},
+    {"name": "Kaiyang Wu", "graduation_year": 2022, "placement": {"position": "Assistant Professor", "institution": "University of Nevada Las Vegas"}},
+    {"name": "Anil Isisag", "graduation_year": 2020, "placement": {"position": "Assistant Professor", "institution": "Emlyon Business School"}},
+    {"name": "Zoe Lu", "graduation_year": 2020, "placement": {"position": "Assistant Professor", "institution": "Tulane University"}},
+    {"name": "Rusty Stough", "graduation_year": 2020, "placement": {"position": "Assistant Professor", "institution": "University of Maine"}},
+    {"name": "Ingrid Koch", "graduation_year": 2019, "placement": {"position": "Assistant Professor", "institution": "University of North Carolina"}},
+    {"name": "Ankita Kumar", "graduation_year": 2019, "placement": {"position": "Assistant Professor", "institution": "Bucknell University"}},
+    {"name": "Bowen Ruan", "graduation_year": 2019, "placement": {"position": "Assistant Professor", "institution": "University of Iowa"}},
+    {"name": "Min Tian", "graduation_year": 2019, "placement": {"position": "Assistant Professor", "institution": "Ohio State University"}},
+    {"name": "Meredith Thomas", "graduation_year": 2018, "placement": {"position": "Assistant Professor", "institution": "Florida State University"}},
+    {"name": "Andrea Luangrath", "graduation_year": 2016, "placement": {"position": "Assistant Professor", "institution": "University of Iowa"}}
+  ]
+}

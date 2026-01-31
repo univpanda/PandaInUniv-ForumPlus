@@ -1,0 +1,33 @@
+{
+  "source": {
+    "url": "https://www.business.rutgers.edu/phd/alumni",
+    "program_name": "Supply Chain Management",
+    "degree": "PhD",
+    "institution": "Rutgers University",
+    "institution_id": "6d575bbb-8410-4109-b1d5-6be60efe207b",
+    "program_id": "62a83834-1381-4128-955d-f789e063ddc9"
+  },
+  "extraction_date": "2026-01-30",
+  "graduates": [
+    {"name": "Peng Li", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "Embry-Riddle Aeronautical University"}, "advisor": "Lian Qi, Yao Zhao"},
+    {"name": "Zheng Zeng", "graduation_year": 2025, "placement": {"position": "Lecturer", "institution": "Hong Kong University of Science and Technology"}, "advisor": "Lian Qi, Xiaowei Xu"},
+    {"name": "Aman Goswami", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "California State University - Northridge"}, "advisor": "Lian Qi"},
+    {"name": "Abdulaziz Alshalfan", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "Kuwait University"}, "advisor": "Alok Baveja, Lian Qi"},
+    {"name": "Eunseok Kim", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "Handong Global University"}, "advisor": "Alok Baveja"},
+    {"name": "Minseok Kim", "graduation_year": 2024, "placement": {"position": "Assistant Professor", "institution": "Southern Illinois University - Edwardsville"}, "advisor": "Yao Zhao"},
+    {"name": "Gul Culhan Kumcu", "graduation_year": 2023, "placement": {"position": "Assistant Professor", "institution": "TOBB University of Economics & Technology"}, "advisor": "Weiwei Chen, Mark Rodgers"},
+    {"name": "Nasser Al Monawer", "graduation_year": 2022, "placement": {"position": "Assistant Professor", "institution": "Kuwait University"}, "advisor": "Lian Qi"},
+    {"name": "Mehdi Davoodi", "graduation_year": 2022, "placement": {"position": "Visiting Assistant Professor", "institution": "Lehigh University"}, "advisor": "Michael Katehakis, Jian Yang"},
+    {"name": "Olena Rudna", "graduation_year": 2021, "placement": {"position": "Faculty", "institution": "New Jersey Institute of Technology"}, "advisor": "Yao Zhao"},
+    {"name": "Qiang Li", "graduation_year": 2021, "placement": {"position": "Faculty", "institution": "University of Houston"}, "advisor": "Xiaowei Xu, Meng Li"},
+    {"name": "Maryam Mahdikhani", "graduation_year": 2020, "placement": {"position": "Faculty", "institution": "College of Charleston"}, "advisor": "Yao Zhao"},
+    {"name": "Arim Park", "graduation_year": 2019, "placement": {"position": "Faculty", "institution": "North Carolina A&T University"}, "advisor": "Yao Zhao, Soohyun Cho"},
+    {"name": "Ai-Chih Chang", "graduation_year": 2019, "placement": {"position": "Faculty", "institution": "New Jersey Institute of Technology"}, "advisor": "Benjamin Melamed, Michael Katehakis"},
+    {"name": "Irene Akaab", "graduation_year": 2018, "placement": {"position": "Faculty", "institution": "Accra Technical University"}, "advisor": "Wayne Eastman"},
+    {"name": "Myles Garvey", "graduation_year": 2018, "placement": {"position": "Faculty", "institution": "William Paterson University"}, "advisor": "Sengun Yeniyurt"},
+    {"name": "He Zhang", "graduation_year": 2018, "placement": {"position": "Researcher", "institution": "J.P. Morgan"}, "advisor": "Yao Zhao"},
+    {"name": "Zhe Jian", "graduation_year": 2017, "placement": {"position": "Faculty", "institution": "China Gansu Telecommunication Construction Company"}, "advisor": "Lei Lei, Chen Weiwei"},
+    {"name": "Ju Myung Song", "graduation_year": 2017, "placement": {"position": "Faculty", "institution": "San Jose State University"}, "advisor": "Yao Zhao, Xiaowei Xu"},
+    {"name": "Yijun Wang", "graduation_year": 2017, "placement": {"position": "Researcher", "institution": "Hangzhou LineZone Data Technology"}, "advisor": "Lei Lei, Yao Zhao"}
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "source": {
+    "url": "https://www.business.rutgers.edu/phd/alumni",
+    "program_name": "International Business",
+    "degree": "PhD",
+    "institution": "Rutgers University",
+    "institution_id": "6d575bbb-8410-4109-b1d5-6be60efe207b",
+    "program_id": "94956df8-af37-4fb3-80b3-c2021703bb7c"
+  },
+  "extraction_date": "2026-01-30",
+  "graduates": [
+    {"name": "Wenli Ding", "graduation_year": 2025, "advisor": "John Cantwell"},
+    {"name": "Shyamala Sethuram", "graduation_year": 2023, "placement": {"position": "Assistant Professor", "institution": "CUNY – Baruch College"}, "advisor": "Ajai Gaur"},
+    {"name": "Kyungjoong Kim", "graduation_year": 2022, "placement": {"position": "Assistant Professor", "institution": "Northwest Missouri State University"}, "advisor": "Ajai Gaur"},
+    {"name": "Sarah Edris", "graduation_year": 2020, "placement": {"position": "Faculty", "institution": "University of Maastricht - School of Business and Economics"}, "advisor": "John Cantwell"},
+    {"name": "Nuruzzaman Nuruzzaman", "graduation_year": 2020, "placement": {"position": "Faculty", "institution": "University of Manchester"}, "advisor": "Ajai Gaur"},
+    {"name": "Yuanyuan Li", "graduation_year": 2020, "placement": {"position": "Faculty", "institution": "California State University - Los Angeles"}, "advisor": "John Cantwell"},
+    {"name": "Andres Velez Calle", "graduation_year": 2018, "placement": {"position": "Faculty", "institution": "EAFIT University"}, "advisor": "Farok Contractor"},
+    {"name": "Salma Zaman", "graduation_year": 2018, "placement": {"position": "Faculty", "institution": "Lahore University of Management Sciences"}, "advisor": "John Cantwell"}
+  ]
+}

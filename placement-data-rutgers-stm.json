@@ -1,0 +1,14 @@
+{
+  "source": {
+    "url": "https://www.business.rutgers.edu/phd/alumni",
+    "program_name": "Science Technology Management",
+    "degree": "PhD",
+    "institution": "Rutgers University",
+    "institution_id": "6d575bbb-8410-4109-b1d5-6be60efe207b",
+    "program_id": "deffb861-dde9-45c3-9cf1-07a1c42b7f16"
+  },
+  "extraction_date": "2026-01-30",
+  "graduates": [
+    {"name": "Fernando Sanchez", "graduation_year": 2017, "placement": {"position": "Faculty", "institution": "Universidad del Desarrollo (Chile)"}, "advisor": "Michelle Gittelman"}
+  ]
+}

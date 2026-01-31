@@ -1,0 +1,24 @@
+{
+  "source": {
+    "url": "https://business.wisc.edu/phd/placements/",
+    "program_name": "Finance (Business) and Economics - Joint Degree",
+    "degree": "PhD",
+    "institution": "University of Wisconsin-Madison",
+    "institution_id": "111cc032-e0b1-43e9-8f4a-d9cb0d7d9aa3",
+    "program_id": "3dddb943-2410-48f9-9ca2-9356c901bfc8"
+  },
+  "extraction_date": "2026-01-30",
+  "graduates": [
+    {"name": "Phillip Coyle", "graduation_year": 2025, "placement": {"position": "Postdoctoral Associate", "institution": "Study Center Gertsensee"}},
+    {"name": "Katya Kazakova", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "University of Western Ontario"}},
+    {"name": "Julio Mereb", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "Sao Paulo School of Economics"}},
+    {"name": "Shannon Sledz", "graduation_year": 2025, "placement": {"position": "Economist", "institution": "Joint Committee on Taxation"}},
+    {"name": "Matthew Carl", "graduation_year": 2024, "placement": {"position": "Researcher", "institution": "Dimensional Fund Advisors"}},
+    {"name": "April Meehl", "graduation_year": 2024, "placement": {"position": "Economist", "institution": "US Department of the Treasury Office of Financial Research"}},
+    {"name": "Jason Choi", "graduation_year": 2023, "placement": {"position": "Assistant Professor", "institution": "University of Toronto"}},
+    {"name": "Mark Rempel", "graduation_year": 2022, "placement": {"position": "Assistant Professor", "institution": "University of Toronto - Economics"}},
+    {"name": "Francesco Celentano", "graduation_year": 2021, "placement": {"position": "Assistant Professor", "institution": "HEC Lausanna"}},
+    {"name": "Adam Spencer", "graduation_year": 2018, "placement": {"position": "Assistant Professor", "institution": "University of Nottingham"}},
+    {"name": "Kyle Dempsey", "graduation_year": 2017, "placement": {"position": "Assistant Professor", "institution": "Ohio State University"}}
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "source": {
+    "url": "https://www.business.rutgers.edu/phd/alumni",
+    "program_name": "Information Technology",
+    "degree": "PhD",
+    "institution": "Rutgers University",
+    "institution_id": "6d575bbb-8410-4109-b1d5-6be60efe207b",
+    "program_id": "1e6238ed-0b10-4df0-8679-ca89abfea863"
+  },
+  "extraction_date": "2026-01-30",
+  "graduates": [
+    {"name": "Yuyang Ye", "graduation_year": 2025, "placement": {"position": "Research Scientist", "institution": "TikTok"}, "advisor": "Xiaodong Lin"},
+    {"name": "Nathaniel Hobbs", "graduation_year": 2024, "placement": {"position": "Assistant Professor of Professional Practice", "institution": "Rutgers University"}, "advisor": "Periklis Papakonstantinou, Jaideep Vaidya"},
+    {"name": "Xinyue Wang", "graduation_year": 2024, "placement": {"position": "Lecturer", "institution": "Renmin University"}, "advisor": "Jaideep Vaidya"},
+    {"name": "Shengming Zhang", "graduation_year": 2024, "placement": {"position": "Postdoc", "institution": "Institute of Basic Medical Sciences, Chinese Academy of Medical Sciences"}, "advisor": "Xiaodong Lin"},
+    {"name": "Zixuan Yuan", "graduation_year": 2023, "placement": {"position": "Assistant Professor", "institution": "Hong Kong University of Science & Technology"}, "advisor": "Hui Xiong"},
+    {"name": "Tanay Talukdar", "graduation_year": 2023, "advisor": "Michael Katehakis, Javier Cabrera"},
+    {"name": "Denghui Zhang", "graduation_year": 2023, "placement": {"position": "Assistant Professor", "institution": "Stevens Institute of Technology"}, "advisor": "Hui Xiong"},
+    {"name": "Mingfei Teng", "graduation_year": 2021, "placement": {"position": "Researcher", "institution": "Amazon"}, "advisor": "Hui Xiong"},
+    {"name": "Abeer Elahraf", "graduation_year": 2021, "placement": {"position": "Faculty", "institution": "Rutgers University"}, "advisor": "Jaideep Vaidya, Basit Shariq"},
+    {"name": "Gunjan Batra", "graduation_year": 2021, "placement": {"position": "Faculty", "institution": "Kennesaw State University"}, "advisor": "Vijay Atluri, Jaideep Vaidya"},
+    {"name": "Hafiz Asif", "graduation_year": 2021, "placement": {"position": "Faculty", "institution": "Ecole Polytechnic (Paris)"}, "advisor": "Jaideep Vaidya, Periklis Papakonstantinou"},
+    {"name": "Debopriya Ghosh", "graduation_year": 2020, "placement": {"position": "Senior Biostatistician", "institution": "Johnson & Johnson"}, "advisor": "Michael Katehakis, Javier Cabrera"},
+    {"name": "Qingxin Meng", "graduation_year": 2020, "placement": {"position": "Assistant Professor", "institution": "University of Nottingham - Ningbo"}, "advisor": "Hui Xiong"},
+    {"name": "Farid Razzak", "graduation_year": 2020, "placement": {"position": "Financial Analyst", "institution": "U.S. Securities & Exchange Commission"}, "advisor": "Hui Xiong"},
+    {"name": "Zamil Alzamil", "graduation_year": 2019, "placement": {"position": "Faculty", "institution": "Majmaah University (Saudi Arabia)"}, "advisor": "Miklos Vasarhelyi"},
+    {"name": "Junming Liu", "graduation_year": 2019, "placement": {"position": "Faculty", "institution": "City University of Hong Kong"}, "advisor": "Hui Xiong"},
+    {"name": "Yanchi Liu", "graduation_year": 2019, "placement": {"position": "Researcher", "institution": "NEC Labs America"}, "advisor": "Hui Xiong"},
+    {"name": "Hao Zhong", "graduation_year": 2019, "placement": {"position": "Researcher", "institution": "EZFintel Ltd. (China)"}, "advisor": "Hui Xiong"},
+    {"name": "Ussama Yaqub", "graduation_year": 2018, "placement": {"position": "Faculty", "institution": "Lahore University of Management Sciences"}, "advisor": "Vijay Atluri, Jaideep Vaidya"},
+    {"name": "Constantine Vitt", "graduation_year": 2018, "placement": {"position": "Researcher", "institution": "Honeywell"}, "advisor": "Hui Xiong"},
+    {"name": "Jingyuan Yang", "graduation_year": 2018, "placement": {"position": "Faculty", "institution": "George Mason University"}, "advisor": "Hui Xiong"},
+    {"name": "Zijun Yao", "graduation_year": 2018, "placement": {"position": "Researcher", "institution": "IBM Research"}, "advisor": "Hui Xiong"}
+  ]
+}

@@ -1,0 +1,443 @@
+{
+  "source": {
+    "institution": "Massachusetts Institute of Technology",
+    "institution_id": "b1beefed-af59-4ba2-91f5-baf69aa10eee",
+    "program_id": "1969ab73-85cf-4452-9096-ae61fe4694fe",
+    "program_name": "management",
+    "degree": "PhD"
+  },
+  "graduates": [
+    {
+      "name": "David Kim",
+      "graduation_year": 2025,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Boston College"
+      },
+      "dept": "accounting"
+    },
+    {
+      "name": "Ki-Soon Choi",
+      "graduation_year": 2022,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Boston College"
+      },
+      "dept": "accounting"
+    },
+    {
+      "name": "Natalie Berfeld",
+      "graduation_year": 2021,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Boston College"
+      },
+      "dept": "accounting"
+    },
+    {
+      "name": "Rachel Yoon",
+      "graduation_year": 2023,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Boston University"
+      },
+      "dept": "accounting"
+    },
+    {
+      "name": "Gabriel Voelcker",
+      "graduation_year": 2024,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Dartmouth College"
+      },
+      "dept": "accounting"
+    },
+    {
+      "name": "Brian Baik",
+      "graduation_year": 2022,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Harvard University"
+      },
+      "dept": "accounting"
+    },
+    {
+      "name": "Samuel Anderson",
+      "graduation_year": 2022,
+      "placement": {
+        "position": "Faculty",
+        "institution": "University of Michigan"
+      },
+      "dept": "accounting"
+    },
+    {
+      "name": "Carolyn Fu",
+      "graduation_year": 2022,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Harvard University"
+      },
+      "dept": "economic_sociology"
+    },
+    {
+      "name": "Summer Jackson",
+      "graduation_year": 2021,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Harvard University"
+      },
+      "dept": "economic_sociology"
+    },
+    {
+      "name": "Hagay Volvovsky",
+      "graduation_year": 2023,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Tel Aviv University"
+      },
+      "dept": "economic_sociology"
+    },
+    {
+      "name": "Ethan Poskanzer",
+      "graduation_year": 2022,
+      "placement": {
+        "position": "Faculty",
+        "institution": "University of Colorado"
+      },
+      "dept": "economic_sociology"
+    },
+    {
+      "name": "Allison Cole",
+      "graduation_year": 2023,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Arizona State University"
+      },
+      "dept": "finance"
+    },
+    {
+      "name": "Maya Bidanda",
+      "graduation_year": 2024,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Bentley University"
+      },
+      "dept": "finance"
+    },
+    {
+      "name": "Olivia Kim",
+      "graduation_year": 2022,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Harvard University"
+      },
+      "dept": "finance"
+    },
+    {
+      "name": "Bryan Seegmiller",
+      "graduation_year": 2022,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Northwestern University"
+      },
+      "dept": "finance"
+    },
+    {
+      "name": "Peter Hansen",
+      "graduation_year": 2021,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Purdue University"
+      },
+      "dept": "finance"
+    },
+    {
+      "name": "Tim de Silva",
+      "graduation_year": 2024,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Stanford University"
+      },
+      "dept": "finance"
+    },
+    {
+      "name": "Fiona Paine",
+      "graduation_year": 2025,
+      "placement": {
+        "position": "Faculty",
+        "institution": "M University"
+      },
+      "dept": "finance"
+    },
+    {
+      "name": "Jiaheng Yu",
+      "graduation_year": 2023,
+      "placement": {
+        "position": "Faculty",
+        "institution": "University of Hong Kong"
+      },
+      "dept": "finance"
+    },
+    {
+      "name": "Parinitha Sastry",
+      "graduation_year": 2022,
+      "placement": {
+        "position": "Faculty",
+        "institution": "University of Pennsylvania"
+      },
+      "dept": "finance"
+    },
+    {
+      "name": "Sebastian Steffen",
+      "graduation_year": 2022,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Boston College"
+      },
+      "dept": "information_technology"
+    },
+    {
+      "name": "Emma Wiles",
+      "graduation_year": 2024,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Boston University"
+      },
+      "dept": "information_technology"
+    },
+    {
+      "name": "Alex Moehring",
+      "graduation_year": 2024,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Purdue University"
+      },
+      "dept": "information_technology"
+    },
+    {
+      "name": "David Holtz",
+      "graduation_year": 2021,
+      "placement": {
+        "position": "Faculty",
+        "institution": "University of California, Berkeley"
+      },
+      "dept": "information_technology"
+    },
+    {
+      "name": "Alexander Kowalski",
+      "graduation_year": 2022,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Cornell University"
+      },
+      "dept": "institute_for_work_and_employment_research"
+    },
+    {
+      "name": "George Ward",
+      "graduation_year": 2022,
+      "placement": {
+        "position": "Faculty",
+        "institution": "INSEAD"
+      },
+      "dept": "institute_for_work_and_employment_research"
+    },
+    {
+      "name": "Arrow Minster",
+      "graduation_year": 2024,
+      "placement": {
+        "position": "Faculty",
+        "institution": "San Francisco State University"
+      },
+      "dept": "institute_for_work_and_employment_research"
+    },
+    {
+      "name": "Marat Ibragimov",
+      "graduation_year": 2023,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Emory University"
+      },
+      "dept": "marketing"
+    },
+    {
+      "name": "Jeremy Yang",
+      "graduation_year": 2021,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Harvard University"
+      },
+      "dept": "marketing"
+    },
+    {
+      "name": "Madhav Kumar",
+      "graduation_year": 2022,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Harvard University"
+      },
+      "dept": "marketing"
+    },
+    {
+      "name": "Cameron Martel",
+      "graduation_year": 2025,
+      "placement": {
+        "position": "Faculty",
+        "institution": "John Hopkins University"
+      },
+      "dept": "marketing"
+    },
+    {
+      "name": "Yuting Zhu",
+      "graduation_year": 2022,
+      "placement": {
+        "position": "Faculty",
+        "institution": "National University of Singapore"
+      },
+      "dept": "marketing"
+    },
+    {
+      "name": "Jennifer Allen",
+      "graduation_year": 2024,
+      "placement": {
+        "position": "Faculty",
+        "institution": "New York University"
+      },
+      "dept": "marketing"
+    },
+    {
+      "name": "Jason Du",
+      "graduation_year": 2025,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Rensselaer Polytechnic Institute"
+      },
+      "dept": "marketing"
+    },
+    {
+      "name": "Keyan Li",
+      "graduation_year": 2024,
+      "placement": {
+        "position": "Faculty",
+        "institution": "University of Norte Dame"
+      },
+      "dept": "marketing"
+    },
+    {
+      "name": "Yifei Wang",
+      "graduation_year": 2024,
+      "placement": {
+        "position": "Faculty",
+        "institution": "University of Pittsburgh"
+      },
+      "dept": "marketing"
+    },
+    {
+      "name": "Heather Yang",
+      "graduation_year": 2021,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Bocconi University"
+      },
+      "dept": "organization_studies"
+    },
+    {
+      "name": "Raquel Kessinger",
+      "graduation_year": 2024,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Boston College"
+      },
+      "dept": "organization_studies"
+    },
+    {
+      "name": "Vanessa Conzon",
+      "graduation_year": 2021,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Boston College"
+      },
+      "dept": "organization_studies"
+    },
+    {
+      "name": "Alan Zhang",
+      "graduation_year": 2024,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Columbia University"
+      },
+      "dept": "organization_studies"
+    },
+    {
+      "name": "Jenna Myers",
+      "graduation_year": 2021,
+      "placement": {
+        "position": "Faculty",
+        "institution": "University of Toronto"
+      },
+      "dept": "organization_studies"
+    },
+    {
+      "name": "James Paine",
+      "graduation_year": 2023,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Bucknell University"
+      },
+      "dept": "system_dynamics"
+    },
+    {
+      "name": "Tim Tianyi Li",
+      "graduation_year": 2021,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Chinese University of Hong Kong"
+      },
+      "dept": "system_dynamics"
+    },
+    {
+      "name": "Jose Lopez",
+      "graduation_year": 2024,
+      "placement": {
+        "position": "Faculty",
+        "institution": "M University"
+      },
+      "dept": "system_dynamics"
+    },
+    {
+      "name": "Luca Gius",
+      "graduation_year": 2025,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Bocconi University"
+      },
+      "dept": "technological_innovation_entrepreneurship_&_strategic_management"
+    },
+    {
+      "name": "Soomi Kim",
+      "graduation_year": 2023,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Columbia University"
+      },
+      "dept": "technological_innovation_entrepreneurship_&_strategic_management"
+    },
+    {
+      "name": "Lindsey Raymond",
+      "graduation_year": 2024,
+      "placement": {
+        "position": "Faculty",
+        "institution": "Massachusetts Institute of Technology"
+      },
+      "dept": "technological_innovation_entrepreneurship_&_strategic_management"
+    },
+    {
+      "name": "Jane Wu",
+      "graduation_year": 2022,
+      "placement": {
+        "position": "Faculty",
+        "institution": "University of California, Los Angeles"
+      },
+      "dept": "technological_innovation_entrepreneurship_&_strategic_management"
+    }
+  ]
+}

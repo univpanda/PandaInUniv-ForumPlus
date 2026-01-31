@@ -1,0 +1,14 @@
+{
+  "source": {
+    "url": "https://www.business.rutgers.edu/phd/alumni",
+    "program_name": "Individualized Major",
+    "degree": "PhD",
+    "institution": "Rutgers University",
+    "institution_id": "6d575bbb-8410-4109-b1d5-6be60efe207b",
+    "program_id": "d89f69af-6734-40dc-8590-10fc3a255022"
+  },
+  "extraction_date": "2026-01-30",
+  "graduates": [
+    {"name": "Onome Ighoavodha", "graduation_year": 2018, "placement": {"position": "Faculty", "institution": "Nicholls State University"}, "advisor": "Geraldine Henderson"}
+  ]
+}

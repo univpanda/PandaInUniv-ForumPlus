@@ -1,0 +1,18 @@
+{
+  "source": {
+    "url": "https://business.wisc.edu/phd/placements/",
+    "program_name": "Operations and Information Management",
+    "degree": "PhD",
+    "institution": "University of Wisconsin-Madison",
+    "institution_id": "111cc032-e0b1-43e9-8f4a-d9cb0d7d9aa3",
+    "program_id": "6a775b03-d8ab-47da-97dc-4c5964d1dcfd"
+  },
+  "extraction_date": "2026-01-30",
+  "graduates": [
+    {"name": "Yumeng Miao", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "University of Texas at Arlington"}},
+    {"name": "Shihe Pan", "graduation_year": 2022, "placement": {"position": "Assistant Professor", "institution": "Tianjin University"}},
+    {"name": "Mohamad Soltani", "graduation_year": 2020, "placement": {"position": "Assistant Professor", "institution": "University of Alberta"}},
+    {"name": "Jungwon Kuem", "graduation_year": 2018, "placement": {"position": "Assistant Professor", "institution": "University of Albany-SUNY"}},
+    {"name": "Keehyung Kim", "graduation_year": 2016, "placement": {"position": "Assistant Professor", "institution": "Chinese University of Hong Kong"}}
+  ]
+}

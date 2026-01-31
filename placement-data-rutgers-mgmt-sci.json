@@ -1,0 +1,17 @@
+{
+  "source": {
+    "url": "https://www.business.rutgers.edu/phd/alumni",
+    "program_name": "Management Science",
+    "degree": "PhD",
+    "institution": "Rutgers University",
+    "institution_id": "6d575bbb-8410-4109-b1d5-6be60efe207b",
+    "program_id": "8f4bf024-7c8c-4d34-9523-6aa16bef3d44"
+  },
+  "extraction_date": "2026-01-30",
+  "graduates": [
+    {"name": "Deniz Seyed Eskandani", "graduation_year": 2020, "advisor": "Jonathan Eckstein"},
+    {"name": "Tingting Zhou", "graduation_year": 2018, "placement": {"position": "Visiting Professor", "institution": "College of Charleston"}, "advisor": "Michael Katehakis, Jian Yang"},
+    {"name": "Meng Qu", "graduation_year": 2017, "placement": {"position": "Faculty", "institution": "Rutgers University"}, "advisor": "Hui Xiong"},
+    {"name": "Nilofar Varzgani", "graduation_year": 2017, "placement": {"position": "Faculty", "institution": "La Salle University"}, "advisor": "Michael Katehakis, Suresh Govindaraj"}
+  ]
+}

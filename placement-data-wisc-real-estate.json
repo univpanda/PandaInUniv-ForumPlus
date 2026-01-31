@@ -1,0 +1,16 @@
+{
+  "source": {
+    "url": "https://business.wisc.edu/phd/placements/",
+    "program_name": "Real Estate and Urban Economics",
+    "degree": "PhD",
+    "institution": "University of Wisconsin-Madison",
+    "institution_id": "111cc032-e0b1-43e9-8f4a-d9cb0d7d9aa3",
+    "program_id": "24a0ae7b-8454-45c7-be1d-6458186d30cc"
+  },
+  "extraction_date": "2026-01-30",
+  "graduates": [
+    {"name": "Congyan Han", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "Shanghai University of Finance and Economics"}},
+    {"name": "Da Li", "graduation_year": 2025, "placement": {"position": "Assistant Professor", "institution": "University of Cincinnati"}},
+    {"name": "Shengwei Guo", "graduation_year": 2024, "placement": {"position": "Assistant Professor", "institution": "University of Hong Kong"}}
+  ]
+}
