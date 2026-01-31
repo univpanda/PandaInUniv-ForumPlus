@@ -390,7 +390,7 @@ function AppContent() {
 
           {showTerms && (
             <div className="tab-content">
-              <Terms onBack={() => setShowTerms(false)} />
+              <Terms  />
             </div>
           )}
         </div>

@@ -3,11 +3,9 @@ import { useAuth } from '../hooks/useAuth'
 import { useDeleteOwnAccount } from '../hooks'
 import { ButtonSpinner } from '../components/ui/LoadingSpinner'
 
-interface TermsProps {
-  onBack: () => void
-}
 
-export function Terms({ onBack }: TermsProps) {
+
+export function Terms() {
   const { user } = useAuth()
   const deleteAccount = useDeleteOwnAccount()
   const [confirmDelete, setConfirmDelete] = useState(false)
