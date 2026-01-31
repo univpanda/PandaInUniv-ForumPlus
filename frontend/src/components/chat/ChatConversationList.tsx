@@ -51,9 +51,11 @@ export function ChatConversationList({
             Shushed {ignoredCount > 0 && <span className="chat-tab-count">{ignoredCount}</span>}
           </button>
         </div>
+        
         <SearchInput
           value={searchQuery}
           onChange={onSearchChange}
+         iconSize={16} 
           placeholder={activeTab === 'ignored' ? 'Forage for shushed...' : 'Forage for whispers...'}
           className="chat-search"
           showHelp
@@ -84,15 +86,15 @@ export function ChatConversationList({
         searchQuery.trim() ? (
           <EmptyState
             icon={Search}
-            description={activeTab === 'ignored' ? 'No shushed pandas match your search.' : 'No whispers match your search.'}
+            description={
+              activeTab === 'ignored'
+                ? 'No shushed pandas match your search.'
+                : 'No whispers match your search.'
+            }
             className="chat-empty"
           />
         ) : activeTab === 'ignored' ? (
-          <EmptyState
-            icon={UserX}
-            description="No shushed pandas."
-            className="chat-empty"
-          />
+          <EmptyState icon={UserX} description="No shushed pandas." className="chat-empty" />
         ) : (
           <EmptyState
             icon={MessageSquare}
@@ -109,7 +111,14 @@ export function ChatConversationList({
               onClick={() => onOpenConversation(conv)}
             >
               <div className="chat-conv-avatar">
-                <img src={getAvatarUrl(conv.partner_avatar, conv.partner_username, conv.partner_avatar_path)} alt="" />
+                <img
+                  src={getAvatarUrl(
+                    conv.partner_avatar,
+                    conv.partner_username,
+                    conv.partner_avatar_path
+                  )}
+                  alt=""
+                />
               </div>
               <div className="chat-conv-content">
                 <div className="chat-conv-header">
@@ -117,9 +126,7 @@ export function ChatConversationList({
                   <span className="chat-conv-time">{formatTime(conv.last_message_at)}</span>
                 </div>
                 <p className="chat-conv-preview">
-                  {conv.last_message_is_from_me && (
-                    <span className="chat-conv-you">You: </span>
-                  )}
+                  {conv.last_message_is_from_me && <span className="chat-conv-you">You: </span>}
                   {conv.last_message}
                 </p>
               </div>
