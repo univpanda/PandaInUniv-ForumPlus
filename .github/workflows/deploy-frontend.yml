@@ -10,15 +10,14 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    # 🔑 This selects GitHub Environment
+    # Select GitHub Environment
     environment: ${{ github.ref_name == 'main' && 'Prod' || 'Test' }}
 
     steps:
-      #  Checkout repo
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      # 1️⃣ Checkout code
+      - uses: actions/checkout@v4
 
-      #  Configure AWS credentials
+      # 2️⃣ Configure AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -26,7 +25,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1   # change if needed
 
-      #  Inject env vars into Amplify (JSON is REQUIRED)
+      # 3️⃣ Update Amplify environment variables
       - name: Update Amplify environment variables
         run: |
           aws amplify update-app \
@@ -36,10 +35,44 @@ jobs:
               \"VITE_SUPABASE_ANON_KEY\":\"${{ secrets.VITE_SUPABASE_ANON_KEY }}\"
             }"
 
-      #  Trigger Amplify build & deploy
-      - name: Trigger Amplify deployment
+      # 4️⃣ Start Amplify build
+      - name: Start Amplify build
+        id: start_build
         run: |
-          aws amplify start-job \
+          JOB_ID=$(aws amplify start-job \
             --app-id "${{ secrets.AMPLIFY_APP_ID }}" \
             --branch-name "${{ github.ref_name }}" \
-            --job-type RELEASE
+            --job-type RELEASE \
+            --query "jobSummary.jobId" \
+            --output text)
+
+          echo "JOB_ID=$JOB_ID" >> $GITHUB_ENV
+          echo "Started Amplify job: $JOB_ID"
+
+      # 5️⃣ Wait for Amplify build to finish
+      - name: Wait for Amplify build
+        run: |
+          echo "Waiting for Amplify job $JOB_ID..."
+
+          while true; do
+            STATUS=$(aws amplify get-job \
+              --app-id "${{ secrets.AMPLIFY_APP_ID }}" \
+              --branch-name "${{ github.ref_name }}" \
+              --job-id "$JOB_ID" \
+              --query "job.summary.status" \
+              --output text)
+
+            echo "Current status: $STATUS"
+
+            if [ "$STATUS" = "SUCCEED" ]; then
+              echo "Amplify deployment succeeded"
+              exit 0
+            fi
+
+            if [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CANCELLED" ]; then
+              echo "Amplify deployment failed"
+              exit 1
+            fi
+
+            sleep 20
+          done
