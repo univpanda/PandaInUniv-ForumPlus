@@ -33,8 +33,7 @@ ipo_filings/
 # Local config with credentials
 config.local.yml
 scraper/
-
-
+parsed_data/
 
 
 
