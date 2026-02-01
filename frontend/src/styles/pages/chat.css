@@ -95,6 +95,16 @@
 }
 
 /* Chat Search Bar - matches Discussion page */
+.chat-header .search-input-with-help {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.chat-header .search-input-with-help .search-box {
+  flex: 1;
+}
+
 .chat-search.search-box {
   display: flex;
   align-items: center;
@@ -104,12 +114,16 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   flex-shrink: 0;
+  height: 38px;
+  width: clamp(200px, 26vw, 320px);
   transition: var(--transition-fast);
 }
 
-.chat-search.search-box:focus-within {
+.chat-search.search-box:focus-within,
+.chat-search.search-box:has(input:not(:placeholder-shown)) {
   border-color: var(--color-primary);
   box-shadow: var(--shadow-focus);
+  width: clamp(220px, 32vw, 380px);
 }
 
 .chat-search.search-box svg {
@@ -118,7 +132,7 @@
 
 .chat-search.search-box input {
   flex: 1;
-  width: 80px;
+  min-width: 0;
   border: none;
   outline: none;
   font-size: 0.875rem;
@@ -628,8 +642,8 @@
     gap: 0.75rem;
   }
 
-  .chat-search.search-box input {
-    width: 100px;
+  .chat-search.search-box {
+    width: 100%;
   }
 
   .chat-message {

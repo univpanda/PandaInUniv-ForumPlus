@@ -274,3 +274,8 @@ export function getSearchHelpText(isLoggedIn: boolean, isAdmin: boolean): string
 // Legacy exports for backwards compatibility
 export const SEARCH_HELP_TEXT = SEARCH_HELP_TEXT_USER
 export const DISCUSSION_SEARCH_HELP_TEXT = SEARCH_HELP_TEXT_ADMIN
+
+/**
+ * Chat search help text (simple username filter)
+ */
+export const CHAT_SEARCH_HELP_TEXT = `• Type to filter by username`

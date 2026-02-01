@@ -1,5 +1,6 @@
 import { MessageSquare, Search, UserX } from 'lucide-react'
 import { formatTime, getAvatarUrl } from '../../utils/format'
+import { CHAT_SEARCH_HELP_TEXT } from '../../utils/search'
 import type { UserConversation } from '../../types'
 import type { ChatTab } from '../../hooks/useChatConversations'
 import { LoadingSpinner, EmptyState, SearchInput } from '../ui'
@@ -55,10 +56,12 @@ export function ChatConversationList({
         <SearchInput
           value={searchQuery}
           onChange={onSearchChange}
-         iconSize={16} 
+          iconSize={16}
           placeholder={activeTab === 'ignored' ? 'Forage for shushed...' : 'Forage for whispers...'}
           className="chat-search"
           showHelp
+          helpText={CHAT_SEARCH_HELP_TEXT}
+          helpPlacement="outside"
         />
         {isAdmin && onPageSizeInputChange && onPageSizeBlur && (
           <input
