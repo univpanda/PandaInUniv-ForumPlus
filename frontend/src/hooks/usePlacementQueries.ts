@@ -17,7 +17,7 @@ export interface Country {
   university_count?: number
 }
 
-// University type from pt_university table
+// University type from pt_institute table
 export interface University {
   id: string
   university: string
@@ -108,32 +108,50 @@ export function usePlacementFilters() {
   })
 }
 
-// Fetch all universities from pt_university table with school count
+// Fetch all universities from pt_institute table with school count
 export function useUniversities() {
   return useQuery({
     queryKey: placementKeys.universities(),
     queryFn: async (): Promise<University[]> => {
-      const { data, error } = await supabase
-        .from('pt_university')
-        .select(
-          `
-          *,
-          country:pt_country(id, name, code),
-          pt_school(count)
-        `
-        )
-        .order('university', { ascending: true })
+      // Fetch universities (institutions that are universities or have no parent)
+      const { data: universities, error: uniError } = await supabase
+        .from('pt_institute')
+        .select('id, official_name, english_name, url, country_id, us_news_2025_rank, updated_at')
+        .or('type.eq.university,parent_institution_id.is.null')
+        .order('official_name', { ascending: true })
 
-      if (error) throw error
-      return (data || []).map((u: Record<string, unknown>) => ({
-        id: u.id as string,
-        university: u.university as string,
-        url: u.url as string | null,
-        country_id: u.country_id as string | null,
-        country: u.country as Country | null,
-        us_news_2025_rank: u.us_news_2025_rank as number | null,
-        updated_at: u.updated_at as string,
-        school_count: (u.pt_school as { count: number }[])?.[0]?.count || 0,
+      if (uniError) throw uniError
+
+      // Fetch countries for mapping
+      const { data: countries, error: countryError } = await supabase
+        .from('pt_country')
+        .select('id, name, code')
+
+      if (countryError) throw countryError
+
+      const countryMap = new Map(countries?.map((c) => [c.id, c]) || [])
+
+      // Fetch school counts per institution
+      const { data: schools, error: schoolError } = await supabase
+        .from('pt_school')
+        .select('institution_id')
+
+      if (schoolError) throw schoolError
+
+      const schoolCountMap = new Map<string, number>()
+      for (const s of schools || []) {
+        schoolCountMap.set(s.institution_id, (schoolCountMap.get(s.institution_id) || 0) + 1)
+      }
+
+      return (universities || []).map((u) => ({
+        id: u.id,
+        university: u.english_name || u.official_name || u.id,
+        url: u.url,
+        country_id: u.country_id,
+        country: countryMap.get(u.country_id) || null,
+        us_news_2025_rank: u.us_news_2025_rank,
+        updated_at: u.updated_at,
+        school_count: schoolCountMap.get(u.id) || 0,
       }))
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -145,20 +163,34 @@ export function useCountries() {
   return useQuery({
     queryKey: placementKeys.countries(),
     queryFn: async (): Promise<Country[]> => {
-      const { data, error } = await supabase
+      // Fetch countries
+      const { data: countries, error: countryError } = await supabase
         .from('pt_country')
-        .select('*, pt_university(count)')
+        .select('id, name, code')
         .order('name', { ascending: true })
 
-      if (error) throw error
-      return (data || []).map(
-        (c: { id: string; name: string; code: string; pt_university: { count: number }[] }) => ({
-          id: c.id,
-          name: c.name,
-          code: c.code,
-          university_count: c.pt_university?.[0]?.count || 0,
-        })
-      )
+      if (countryError) throw countryError
+
+      // Fetch university counts per country from pt_institute (the actual table)
+      const { data: counts, error: countError } = await supabase
+        .from('pt_institute')
+        .select('country_id')
+        .or('type.eq.university,parent_institution_id.is.null')
+
+      if (countError) throw countError
+
+      // Count universities per country
+      const countMap = new Map<string, number>()
+      for (const row of counts || []) {
+        countMap.set(row.country_id, (countMap.get(row.country_id) || 0) + 1)
+      }
+
+      return (countries || []).map((c: { id: string; name: string; code: string }) => ({
+        id: c.id,
+        name: c.name,
+        code: c.code,
+        university_count: countMap.get(c.id) || 0,
+      }))
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
@@ -296,19 +328,45 @@ export function useCreateUniversity() {
       us_news_2025_rank?: number | null
       url?: string | null
     }): Promise<University> => {
+      // Insert into pt_institute (the actual table)
       const { data, error } = await supabase
-        .from('pt_university')
-        .insert(newUniversity)
-        .select(
-          `
-          *,
-          country:pt_country(id, name, code)
-        `
-        )
+        .from('pt_institute')
+        .insert({
+          id: newUniversity.university.toLowerCase().replace(/\s+/g, '-'),
+          official_name: newUniversity.university,
+          english_name: newUniversity.university,
+          lowercase_name: newUniversity.university.toLowerCase(),
+          country_id: newUniversity.country_id || '',
+          us_news_2025_rank: newUniversity.us_news_2025_rank,
+          url: newUniversity.url || '',
+          type: 'university',
+        })
+        .select('id, official_name, english_name, url, country_id, us_news_2025_rank, updated_at')
         .single()
 
       if (error) throw error
-      return data
+
+      // Fetch country info
+      let country = null
+      if (data.country_id) {
+        const { data: countryData } = await supabase
+          .from('pt_country')
+          .select('id, name, code')
+          .eq('id', data.country_id)
+          .single()
+        country = countryData
+      }
+
+      return {
+        id: data.id,
+        university: data.english_name || data.official_name || data.id,
+        url: data.url,
+        country_id: data.country_id,
+        country,
+        us_news_2025_rank: data.us_news_2025_rank,
+        updated_at: data.updated_at,
+        school_count: 0,
+      }
     },
     onMutate: async (newUniversity) => {
       await queryClient.cancelQueries({ queryKey: placementKeys.universities() })
@@ -359,7 +417,8 @@ export function useDeleteUniversity() {
 
   return useMutation({
     mutationFn: async (universityId: string): Promise<void> => {
-      const { error } = await supabase.from('pt_university').delete().eq('id', universityId)
+      // Delete from pt_institute (the actual table)
+      const { error } = await supabase.from('pt_institute').delete().eq('id', universityId)
 
       if (error) throw error
     },
@@ -383,24 +442,43 @@ export function useUpdateUniversity() {
       country_id: string | null
       us_news_2025_rank: number | null
     }): Promise<University> => {
+      // Update pt_institute (the actual table)
       const { data, error } = await supabase
-        .from('pt_university')
+        .from('pt_institute')
         .update({
-          university: updates.university,
-          country_id: updates.country_id,
+          official_name: updates.university,
+          english_name: updates.university,
+          lowercase_name: updates.university.toLowerCase(),
+          country_id: updates.country_id || '',
           us_news_2025_rank: updates.us_news_2025_rank,
         })
         .eq('id', updates.id)
-        .select(
-          `
-          *,
-          country:pt_country(id, name, code)
-        `
-        )
+        .select('id, official_name, english_name, url, country_id, us_news_2025_rank, updated_at')
         .single()
 
       if (error) throw error
-      return data
+
+      // Fetch country info
+      let country = null
+      if (data.country_id) {
+        const { data: countryData } = await supabase
+          .from('pt_country')
+          .select('id, name, code')
+          .eq('id', data.country_id)
+          .single()
+        country = countryData
+      }
+
+      return {
+        id: data.id,
+        university: data.english_name || data.official_name || data.id,
+        url: data.url,
+        country_id: data.country_id,
+        country,
+        us_news_2025_rank: data.us_news_2025_rank,
+        updated_at: data.updated_at,
+        school_count: 0,
+      }
     },
     onMutate: async (updates) => {
       await queryClient.cancelQueries({ queryKey: placementKeys.universities() })
@@ -447,22 +525,47 @@ export function useSchoolsByUniversity(universityId: string | null) {
     queryKey: placementKeys.schoolsByUniversity(universityId || ''),
     queryFn: async (): Promise<School[]> => {
       if (!universityId) return []
-      const { data, error } = await supabase
+
+      // Fetch schools for this institution
+      const { data: schools, error: schoolError } = await supabase
         .from('pt_school')
-        .select(
-          `
-          *,
-          university:pt_university(id, university, url, country_id, us_news_2025_rank, updated_at),
-          pt_department(count)
-        `
-        )
-        .eq('university_id', universityId)
+        .select('*')
+        .eq('institution_id', universityId)
         .order('school', { ascending: true })
 
-      if (error) throw error
-      return (data || []).map((s: Record<string, unknown>) => ({
+      if (schoolError) throw schoolError
+
+      // Fetch university info
+      const { data: university } = await supabase
+        .from('pt_institute')
+        .select('id, official_name, english_name, url, country_id, us_news_2025_rank, updated_at')
+        .eq('id', universityId)
+        .single()
+
+      // Fetch department counts
+      const { data: deptCounts } = await supabase
+        .from('pt_department')
+        .select('school_id')
+
+      const deptCountMap = new Map<string, number>()
+      for (const d of deptCounts || []) {
+        deptCountMap.set(d.school_id, (deptCountMap.get(d.school_id) || 0) + 1)
+      }
+
+      return (schools || []).map((s) => ({
         ...s,
-        department_count: (s.pt_department as Array<{ count: number }> | null)?.[0]?.count || 0,
+        university_id: s.institution_id,
+        university: university
+          ? {
+              id: university.id,
+              university: university.english_name || university.official_name || university.id,
+              url: university.url,
+              country_id: university.country_id,
+              us_news_2025_rank: university.us_news_2025_rank,
+              updated_at: university.updated_at,
+            }
+          : null,
+        department_count: deptCountMap.get(s.id) || 0,
       })) as School[]
     },
     enabled: !!universityId,
@@ -481,19 +584,27 @@ export function useCreateSchool() {
       url?: string | null
       type?: SchoolType
     }): Promise<School> => {
+      // Insert using institution_id (actual column name)
       const { data, error } = await supabase
         .from('pt_school')
-        .insert(newSchool)
-        .select(
-          `
-          *,
-          university:pt_university(id, university, url, country_id, us_news_2025_rank, updated_at)
-        `
-        )
+        .insert({
+          school: newSchool.school,
+          institution_id: newSchool.university_id,
+          url: newSchool.url,
+          type: newSchool.type,
+        })
+        .select('*')
         .single()
 
       if (error) throw error
-      return data
+
+      // Return with university_id alias for frontend compatibility
+      return {
+        ...data,
+        university_id: data.institution_id,
+        university: null,
+        department_count: 0,
+      } as School
     },
     onMutate: async (newSchool) => {
       const queryKey = placementKeys.schoolsByUniversity(newSchool.university_id)
@@ -574,16 +685,17 @@ export function useUpdateSchool(universityId: string | null) {
           type: updates.type,
         })
         .eq('id', updates.id)
-        .select(
-          `
-          *,
-          university:pt_university(id, university, url, country_id, us_news_2025_rank, updated_at)
-        `
-        )
+        .select('*')
         .single()
 
       if (error) throw error
-      return data
+
+      // Return with university_id alias for frontend compatibility
+      return {
+        ...data,
+        university_id: data.institution_id,
+        university: null,
+      } as School
     },
     onMutate: async (updates) => {
       if (!universityId) return { previousSchools: null }
