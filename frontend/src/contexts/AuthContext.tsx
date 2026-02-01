@@ -151,6 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Refs to prevent race conditions
   const isInitialized = useRef(false)
   const processingUserId = useRef<string | null>(null)
+  const hasInvalidatedOnLogin = useRef(false)
 
   const clearAuthError = useCallback(() => setAuthError(null), [])
 
@@ -202,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!newSession?.user) {
         if (isActive()) {
           processingUserId.current = null // Reset on sign out
+          hasInvalidatedOnLogin.current = false // Allow invalidation on next login
           clearLocalAuthCache()
           if (!isAuthCallbackUrl()) {
             clearSupabaseAuthStorage()
@@ -308,6 +310,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const updateLoginInfo = async (userId: string, authToken?: string) => {
+    // Prevent duplicate invalidation in StrictMode (effects run twice in dev)
+    if (hasInvalidatedOnLogin.current) return
+    hasInvalidatedOnLogin.current = true
+
     try {
       if (authToken) {
         const cached = await updateLoginMetadata(authToken)
