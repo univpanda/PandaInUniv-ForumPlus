@@ -85,6 +85,7 @@ interface PostCardActionsProps {
   post: Post
   variant: 'original' | 'reply' | 'parent'
   displayReplyCount?: number
+  hideReplyCount?: boolean
   onReplyClick?: (e: React.MouseEvent) => void
   // Thread bookmark props (original posts)
   threadId?: number
@@ -103,6 +104,7 @@ export const PostCardActions = memo(function PostCardActions({
   post,
   variant,
   displayReplyCount: displayReplyCountProp,
+  hideReplyCount = false,
   onReplyClick,
   threadId,
   threadTitle,
@@ -161,12 +163,14 @@ export const PostCardActions = memo(function PostCardActions({
         </button>
       </div>
 
-      {/* Reply count - always show for design consistency */}
-      <ReplyCount
-        count={displayReplyCount}
-        onClick={onReplyClick && user && !isDeleted ? onReplyClick : undefined}
-        disabled={!user || isDeleted || !onReplyClick}
-      />
+      {/* Reply count - hide for sub-replies since they can't have further replies */}
+      {!hideReplyCount && (
+        <ReplyCount
+          count={displayReplyCount}
+          onClick={onReplyClick && user && !isDeleted ? onReplyClick : undefined}
+          disabled={!user || isDeleted || !onReplyClick}
+        />
+      )}
 
       {/* Bookmark button - thread bookmark for original, post bookmark for replies */}
       {user && variant === 'original' && threadId && onBookmarkToggle && (

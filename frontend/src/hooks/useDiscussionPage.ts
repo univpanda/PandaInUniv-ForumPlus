@@ -121,7 +121,7 @@ export function useDiscussionPage({ resetToList }: UseDiscussionPageProps) {
     openThreadById: navigation.openThreadById,
     openReplies: actions.openReplies,
     openRepliesById: navigation.openRepliesById,
-    goToThreadFromTitle: navigation.goToThreadFromReplies,
+    goToThreadFromTitle: navigation.goToList,
     goToThread: goToThreadWithScroll,
     goToList: navigation.goToList,
     triggerHighlightPost: scrollEffects.triggerHighlightPost,

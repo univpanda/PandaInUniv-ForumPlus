@@ -35,6 +35,7 @@ interface PostCardProps {
   post: Post
   variant?: 'original' | 'reply' | 'parent'
   replyCount?: number // Override for original post to show thread reply count
+  hideReplyCount?: boolean // Hide reply count entirely (e.g., for sub-replies)
   onClick?: (post: Post) => void
   onReplyClick?: (post: Post, e: React.MouseEvent) => void
   showSubReplyPreview?: boolean
@@ -56,6 +57,7 @@ export const PostCard = memo(function PostCard({
   post,
   variant = 'reply',
   replyCount,
+  hideReplyCount = false,
   onClick,
   onReplyClick,
   showSubReplyPreview = false,
@@ -228,12 +230,13 @@ export const PostCard = memo(function PostCard({
         <PostCardActions
           post={post}
           variant={variant}
-          displayReplyCount={displayReplyCount}
+          displayReplyCount={hideReplyCount ? undefined : displayReplyCount}
           onReplyClick={handleReplyClick}
           threadId={threadId}
           threadTitle={threadTitle}
           isBookmarked={isBookmarked}
           user={userProp}
+          hideReplyCount={hideReplyCount}
         />
       </div>
 

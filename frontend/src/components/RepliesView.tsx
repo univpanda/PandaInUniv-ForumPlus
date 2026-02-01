@@ -82,7 +82,7 @@ export function RepliesView() {
         <p className="no-replies">No replies yet</p>
       ) : (
         sortedSubReplies.map((post) => (
-          <PostCard key={post.id} post={post} variant="reply" threadId={thread.id} />
+          <PostCard key={post.id} post={post} variant="reply" threadId={thread.id} hideReplyCount />
         ))
       )}
 
