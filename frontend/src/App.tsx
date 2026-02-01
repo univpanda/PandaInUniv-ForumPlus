@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { QueryClient, QueryClientProvider, focusManager, useQueryClient } from '@tanstack/react-query'
-import { handleMutationError } from './lib/blockedUserHandler'
+import { focusManager, useQueryClient } from '@tanstack/react-query'
 import { Header, type Tab } from './components/Header'
 import { Footer } from './components/Footer'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -41,23 +40,6 @@ focusManager.setEventListener((handleFocus) => {
     window.removeEventListener('focus', onFocus)
     window.removeEventListener('blur', onBlur)
   }
-})
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30 * 1000, // 30 seconds
-      gcTime: 10 * 60 * 1000, // 10 minutes - increased for better cache retention
-      refetchOnWindowFocus: false,
-      retry: 2, // Limit retries to prevent excessive requests
-    },
-    mutations: {
-      // Global mutation error handler - check if user is blocked on RLS errors
-      onError: (error: Error) => {
-        handleMutationError(error)
-      },
-    },
-  },
 })
 
 const TAB_STORAGE_KEY = 'activeTab'
@@ -409,12 +391,10 @@ function AppContent() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <AppContent />
-        <ToastContainer />
-      </ToastProvider>
-    </QueryClientProvider>
+    <ToastProvider>
+      <AppContent />
+      <ToastContainer />
+    </ToastProvider>
   )
 }
 

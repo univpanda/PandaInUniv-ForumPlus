@@ -84,7 +84,9 @@ export function RepliesView() {
         />
       )}
 
-      {sortedSubReplies.length === 0 && !subRepliesLoading ? (
+      {subRepliesLoading ? (
+        <p className="no-replies">Loading replies...</p>
+      ) : sortedSubReplies.length === 0 ? (
         <p className="no-replies">No replies yet</p>
       ) : (
         sortedSubReplies.map((post) => (
