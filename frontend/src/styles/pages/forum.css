@@ -163,17 +163,23 @@
 .discussion-toolbar-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
-  flex-wrap: wrap;
 }
 
-.discussion-utilities {
+/* Left side: Sort + Take a bite */
+.discussion-toolbar-left {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
   gap: 0.75rem;
-  width: 100%;
-  flex: 1 1 520px;
+}
+
+/* Right side: Search + Admin controls */
+.discussion-toolbar-right {
+  display: flex;
+  flex-direction: row-reverse; /* Search expands leftward */
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .discussion-utility {
@@ -183,13 +189,6 @@
 
 .discussion-utility-search {
   flex: 0 0 auto;
-  min-width: 200px;
-}
-
-.discussion-utility-actions {
-  position: relative;
-  right: auto;
-  gap: 0.5rem;
 }
 
 .take-bite-btn {
@@ -227,17 +226,26 @@
   color: var(--color-text-muted);
 }
 
-.discussion-utility-search .search-box {
-  width: clamp(220px, 26vw, 340px);
-  transition:
-    width 0.2s ease,
-    opacity 0.2s ease;
+/* Grove search - compact by default, expands on focus */
+.grove-search.search-box {
+  width: 220px;
+  transition: width 0.2s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.discussion-utility-search .search-box:focus-within,
-.discussion-utility-search .search-box:has(input:not(:placeholder-shown)),
-.discussion-utility-search .header-search.has-value {
-  width: clamp(240px, 32vw, 420px);
+.grove-search.search-box:focus-within,
+.grove-search.search-box:has(input:not(:placeholder-shown)),
+.grove-search.search-box.has-value {
+  width: clamp(300px, 40vw, 500px);
+}
+
+/* Override search-input-with-help defaults for grove toolbar */
+.discussion-toolbar-right .search-input-with-help {
+  flex-direction: row-reverse;
+  width: auto;
+}
+
+.discussion-toolbar-right .search-input-with-help .grove-search.search-box {
+  flex: 0 0 auto;
 }
 
 .discussion-container .search-box:focus-within,

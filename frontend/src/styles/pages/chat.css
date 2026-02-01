@@ -30,21 +30,15 @@
 .chat-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 2rem;
+  gap: 1rem;
   margin-bottom: 1rem;
 }
 
-.chat-header h2 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--color-text-muted);
-}
-
+/* Tabs stay on left */
 .chat-tabs {
   display: flex;
   gap: 0.25rem;
+  flex-shrink: 0;
 }
 
 .chat-tab {
@@ -88,21 +82,18 @@
   background: #64748b;
 }
 
-.chat-subtitle {
-  font-size: 0.875rem;
-  color: var(--color-text-muted);
-  margin: 0;
-}
-
-/* Chat Search Bar - matches Discussion page */
+/* Search pushed to right edge, expands leftward */
 .chat-header .search-input-with-help {
   display: flex;
+  flex-direction: row-reverse; /* Reverses order so search expands left */
   align-items: center;
   gap: 0.35rem;
+  margin-left: auto;
 }
 
-.chat-header .search-input-with-help .search-box {
-  flex: 1;
+/* Override forum.css flex:1 rule */
+.chat-header .search-input-with-help .chat-search.search-box {
+  flex: 0 0 auto;
 }
 
 .chat-search.search-box {
@@ -113,21 +104,21 @@
   background: white;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  flex-shrink: 0;
   height: 38px;
-  width: clamp(200px, 26vw, 320px);
-  transition: var(--transition-fast);
+  width: 220px;
+  transition: width 0.2s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .chat-search.search-box:focus-within,
 .chat-search.search-box:has(input:not(:placeholder-shown)) {
   border-color: var(--color-primary);
   box-shadow: var(--shadow-focus);
-  width: clamp(220px, 32vw, 380px);
+  width: clamp(300px, 40vw, 500px);
 }
 
 .chat-search.search-box svg {
   color: var(--color-text-light);
+  flex-shrink: 0;
 }
 
 .chat-search.search-box input {
