@@ -147,12 +147,14 @@ export const PostCard = memo(function PostCard({
         <div className="post-content deleted-content">
           <em>This post has been deleted.</em>
         </div>
-        {/* Footer with reply count */}
-        <div className="post-footer">
-          <div className="post-actions">
-            <ReplyCount count={displayReplyCount} />
+        {/* Footer with reply count - respect hideReplyCount for sub-replies */}
+        {!hideReplyCount && (
+          <div className="post-footer">
+            <div className="post-actions">
+              <ReplyCount count={displayReplyCount} />
+            </div>
           </div>
-        </div>
+        )}
       </div>
     )
   }

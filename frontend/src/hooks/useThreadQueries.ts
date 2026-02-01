@@ -39,7 +39,8 @@ export function usePaginatedThreads(
     ),
     networkMode: 'always',
     queryFn: async (): Promise<GetPaginatedThreadsResponse> => {
-      const isCachedEligible = !isAdmin && !isDeleted && !isFlagged && isCacheEnabled()
+      const isCachedEligible =
+        !session?.access_token && !isAdmin && !isDeleted && !isFlagged && isCacheEnabled()
 
       if (isCachedEligible) {
         const cached = await getCachedThreads({

@@ -95,15 +95,15 @@ export function usePostViewData({
   // ============ REPLIES VIEW: Sub-replies + OP lookup ============
 
   // Sub-replies query for replies view - server-side sorted
-  // Only check reply_count if we have a full Post (not a stub)
-  const hasSubReplies = view === 'replies' && isFullPost(selectedPost) && selectedPost.reply_count > 0
+  const subRepliesEnabled = view === 'replies' && threadId !== null && !!selectedPost?.id
   const paginatedSubRepliesQuery = usePaginatedPosts(
     threadId ?? 0,
     selectedPost?.id ?? 0,
     subRepliesPage,
     PAGE_SIZE.POSTS,
     replySortBy,
-    view === 'replies' && threadId !== null && !!hasSubReplies
+    subRepliesEnabled,
+    false
   )
 
   // Root posts query for replies view (to show OP)
@@ -242,8 +242,11 @@ export function usePostViewData({
   // Sub-replies for replies view
   const sortedSubReplies = useMemo(() => {
     if (view !== 'replies') return []
-    return paginatedSubRepliesQuery.data?.posts ?? []
-  }, [paginatedSubRepliesQuery.data, view])
+    const posts = paginatedSubRepliesQuery.data?.posts ?? []
+    if (!selectedPost?.id || posts.length === 0) return []
+    if (posts[0].parent_id !== selectedPost.id) return []
+    return posts
+  }, [paginatedSubRepliesQuery.data, view, selectedPost?.id])
 
   // Posts search data
   const postsSearchData = paginatedPostsSearchQuery.data?.posts ?? []
@@ -271,13 +274,13 @@ export function usePostViewData({
   // Replies view: loading if sub-replies loading OR we need OP and it's loading
   const isRepliesViewLoading =
     view === 'replies' &&
-    ((hasSubReplies && paginatedSubRepliesQuery.isLoading) || needsRootPostsLoading || needsLevel1RepliesLoading)
+    (paginatedSubRepliesQuery.isLoading || needsRootPostsLoading || needsLevel1RepliesLoading)
 
   const isLoading = isThreadViewLoading || isRepliesViewLoading
 
   const isRepliesViewFetching =
     view === 'replies' &&
-    ((hasSubReplies && paginatedSubRepliesQuery.isFetching) ||
+    (paginatedSubRepliesQuery.isFetching ||
       (needsOpFetch && threadRootPostsQuery.isFetching) ||
       (isSelectedPostStub && selectedPostQuery.isFetching))
 
@@ -286,7 +289,7 @@ export function usePostViewData({
   const isThreadViewError = view === 'thread' && threadViewQuery.isError
   const isRepliesViewError =
     view === 'replies' &&
-    ((hasSubReplies && paginatedSubRepliesQuery.isError) ||
+    (paginatedSubRepliesQuery.isError ||
       (needsOpFetch && threadRootPostsQuery.isError) ||
       (isSelectedPostStub && selectedPostQuery.isError))
 

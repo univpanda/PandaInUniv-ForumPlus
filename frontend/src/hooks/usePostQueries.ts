@@ -42,7 +42,8 @@ export function usePaginatedPosts(
   page: number,
   pageSize: number = PAGE_SIZE.POSTS,
   sort: 'popular' | 'new' = 'popular',
-  enabled: boolean = true
+  enabled: boolean = true,
+  keepPreviousData: boolean = true
 ) {
   const { session } = useAuth()
   const client = session?.access_token ? supabase : supabasePublic
@@ -64,7 +65,7 @@ export function usePaginatedPosts(
     },
     enabled,
     staleTime: STALE_TIME.SHORT,
-    placeholderData: (prev) => prev,
+    placeholderData: keepPreviousData ? (prev) => prev : undefined,
   })
 }
 
@@ -92,7 +93,7 @@ export function useThreadView(
     queryFn: async (): Promise<ThreadViewResponse> => {
       let rows: Array<Post & { is_op: boolean; total_count: number }> = []
 
-      if (!isAdmin && isCacheEnabled()) {
+      if (!session?.access_token && !isAdmin && isCacheEnabled()) {
         const cached = await getCachedThreadView(threadId, pageSize, (page - 1) * pageSize, sort)
         if (cached) {
           rows = cached as Array<Post & { is_op: boolean; total_count: number }>

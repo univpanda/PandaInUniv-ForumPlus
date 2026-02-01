@@ -45,7 +45,12 @@ export function RepliesView() {
         onClick={() => onGoToThread(selectedPost.id)}
         title="Go back to thread at this post"
       >
-        <PostCard post={selectedPost} variant="parent" threadId={thread.id} />
+        <PostCard
+          post={selectedPost}
+          variant="parent"
+          threadId={thread.id}
+          replyCount={subRepliesPagination?.totalCount ?? selectedPost.reply_count}
+        />
       </div>
 
       {/* Reply Input - for adding level 2 replies */}
@@ -84,6 +89,17 @@ export function RepliesView() {
         sortedSubReplies.map((post) => (
           <PostCard key={post.id} post={post} variant="reply" threadId={thread.id} hideReplyCount />
         ))
+      )}
+
+      {/* Bottom Reply Input - for adding level 2 replies */}
+      {user && (
+        <ReplyInput
+          value={replyContent}
+          onChange={onReplyContentChange}
+          onSubmit={() => onAddReply(thread.id, selectedPost.id)}
+          placeholder={`Reply to ${selectedPost.author_name}... (Shift + Enter to submit)`}
+          submitting={submitting}
+        />
       )}
 
       {/* Bottom Pagination */}
