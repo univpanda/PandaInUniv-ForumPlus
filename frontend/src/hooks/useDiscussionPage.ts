@@ -28,15 +28,19 @@ export function useDiscussionPage({ resetToList }: UseDiscussionPageProps) {
   // @deleted and @flagged only work for admins
   const { authorUsername, searchText, isDeleted, isFlagged, postType } = useMemo(() => {
     if (!filters.deferredSearchQuery.trim()) {
-      return { authorUsername: null, searchText: null, isDeleted: false, isFlagged: false, postType: 'all' as const }
+      return {
+        authorUsername: null,
+        searchText: null,
+        isDeleted: false,
+        isFlagged: false,
+        postType: 'all' as const,
+      }
     }
 
     if (!user) {
       // Non-logged-in users can't use @username filters; drop leading @token.
       const raw = filters.deferredSearchQuery.trim()
-      const sanitized = raw.startsWith('@')
-        ? raw.replace(/^@\S+\s*/, '').trim()
-        : raw
+      const sanitized = raw.startsWith('@') ? raw.replace(/^@\S+\s*/, '').trim() : raw
       return {
         authorUsername: null,
         searchText: sanitized || null,
@@ -178,6 +182,7 @@ export function useDiscussionPage({ resetToList }: UseDiscussionPageProps) {
     resolvedSelectedPost: postsData.resolvedSelectedPost,
     replies: postsData.replies,
     sortedSubReplies: postsData.sortedSubReplies,
+    subRepliesLoading: postsData.subRepliesLoading,
     postsSearchData: postsData.postsSearchData,
     pagination: postsData.pagination,
     pageSizeControl: postsData.pageSizeControl,
