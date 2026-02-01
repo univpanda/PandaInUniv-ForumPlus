@@ -117,7 +117,7 @@ export function useUniversities() {
       const { data: universities, error: uniError } = await supabase
         .from('pt_institute')
         .select('id, official_name, english_name, url, country_id, us_news_2025_rank, updated_at')
-        .or('type.eq.university,parent_institution_id.is.null')
+        .is('parent_institution_id', null)
         .order('official_name', { ascending: true })
 
       if (uniError) throw uniError
@@ -175,7 +175,7 @@ export function useCountries() {
       const { data: counts, error: countError } = await supabase
         .from('pt_institute')
         .select('country_id')
-        .or('type.eq.university,parent_institution_id.is.null')
+        .is('parent_institution_id', null)
 
       if (countError) throw countError
 
@@ -747,14 +747,20 @@ export function useDepartmentsBySchool(schoolId: string | null) {
         .select(
           `
           *,
-          school:pt_school(id, school, url, type, university_id)
+          school:pt_school(id, school, url, type, institution_id)
         `
         )
         .eq('school_id', schoolId)
         .order('department', { ascending: true })
 
       if (error) throw error
-      return data || []
+      // Map institution_id to university_id for frontend compatibility
+      return (data || []).map((d) => ({
+        ...d,
+        school: d.school
+          ? { ...d.school, university_id: d.school.institution_id }
+          : null,
+      }))
     },
     enabled: !!schoolId,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -777,13 +783,19 @@ export function useCreateDepartment(schoolId: string | null) {
         .select(
           `
           *,
-          school:pt_school(id, school, url, type, university_id)
+          school:pt_school(id, school, url, type, institution_id)
         `
         )
         .single()
 
       if (error) throw error
-      return data
+      // Map institution_id to university_id for frontend compatibility
+      return {
+        ...data,
+        school: data.school
+          ? { ...data.school, university_id: data.school.institution_id }
+          : null,
+      }
     },
     onMutate: async (newDepartment) => {
       if (!schoolId) return { previousDepartments: null }
@@ -871,13 +883,19 @@ export function useUpdateDepartment(schoolId: string | null) {
         .select(
           `
           *,
-          school:pt_school(id, school, url, type, university_id)
+          school:pt_school(id, school, url, type, institution_id)
         `
         )
         .single()
 
       if (error) throw error
-      return data
+      // Map institution_id to university_id for frontend compatibility
+      return {
+        ...data,
+        school: data.school
+          ? { ...data.school, university_id: data.school.institution_id }
+          : null,
+      }
     },
     onMutate: async (updates) => {
       if (!schoolId) return { previousDepartments: null }

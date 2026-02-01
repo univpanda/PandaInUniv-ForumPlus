@@ -112,7 +112,7 @@ export function Admin({ isActive = true }: AdminProps) {
           className={`admin-tab ${subTab === 'university' ? 'active' : ''}`}
           onClick={() => setSubTab('university')}
         >
-          University
+          Institute
         </button>
         <button
           className={`admin-tab ${subTab === 'school' ? 'active' : ''}`}
@@ -483,7 +483,7 @@ function CountryTab({ state, setState }: CountryTabProps) {
                     Code {sortColumn === 'code' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
                   <th className="sortable" onClick={() => handleSort('university_count')}>
-                    Universities{' '}
+                    Institutes{' '}
                     {sortColumn === 'university_count' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
                   <th className="table-header-action-cell">
@@ -703,7 +703,7 @@ function UniversityTab({ state, setState }: UniversityTabProps) {
     if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return
     deleteUniversity.mutate(universityId, {
       onSuccess: () => {
-        toast.showSuccess('University deleted')
+        toast.showSuccess('Institute deleted')
         setPinnedUniversityIds((prev) => prev.filter((id) => id !== universityId))
       },
       onError: () => {
@@ -727,7 +727,7 @@ function UniversityTab({ state, setState }: UniversityTabProps) {
             setNewCountryId('')
             setNewRank('')
             setPinnedUniversityIds((prev) => [...prev, university.id])
-            toast.showSuccess('University added')
+            toast.showSuccess('Institute added')
           },
           onError: (error: { code?: string; message?: string }) => {
             const message = error?.message?.toLowerCase() || ''
@@ -736,7 +736,7 @@ function UniversityTab({ state, setState }: UniversityTabProps) {
               message.includes('duplicate') ||
               message.includes('unique')
             ) {
-              toast.showError('University already exists in this country')
+              toast.showError('Institute already exists in this country')
               return
             }
             toast.showError('Failed to add university')
@@ -845,7 +845,7 @@ function UniversityTab({ state, setState }: UniversityTabProps) {
 
     const trimmedName = editingUniversity.university.trim()
     if (!trimmedName) {
-      toast.showError('University name cannot be empty.')
+      toast.showError('Institute name cannot be empty.')
       return
     }
 
@@ -878,7 +878,7 @@ function UniversityTab({ state, setState }: UniversityTabProps) {
       },
       {
         onSuccess: () => {
-          toast.showSuccess('University updated.')
+          toast.showSuccess('Institute updated.')
           setEditingUniversity(null)
         },
         onError: () => {
@@ -904,21 +904,21 @@ function UniversityTab({ state, setState }: UniversityTabProps) {
       <div className="admin-section university-tab-content">
         <div className="admin-toolbar">
           <p className="admin-description">
-            {sortedUniversities.length} of {universities.length} universities
+            {sortedUniversities.length} of {universities.length} institutes
           </p>
           <SearchInput
             value={searchQuery}
             onChange={setSearchQuery}
-            placeholder="Search universities..."
+            placeholder="Search institutes..."
             className="admin-search-input"
           />
         </div>
 
-        {isLoading && <div className="admin-placeholder">Loading universities...</div>}
+        {isLoading && <div className="admin-placeholder">Loading institutes...</div>}
 
         {error && (
           <div className="admin-placeholder" style={{ color: 'var(--color-error)' }}>
-            Failed to load universities.
+            Failed to load institutes.
           </div>
         )}
 
@@ -929,7 +929,7 @@ function UniversityTab({ state, setState }: UniversityTabProps) {
                 <tr>
                   <th>#</th>
                   <th className="sortable" onClick={() => handleSort('university')}>
-                    University{' '}
+                    Institute{' '}
                     {sortColumn === 'university' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
                   <th className="sortable" onClick={() => handleSort('country')}>
@@ -967,7 +967,7 @@ function UniversityTab({ state, setState }: UniversityTabProps) {
                         value={newUniversity}
                         onChange={(e) => setNewUniversity(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="University name"
+                        placeholder="Institute name"
                         className="inline-input"
                       />
                     </td>
@@ -1132,7 +1132,7 @@ function UniversityTab({ state, setState }: UniversityTabProps) {
 
         {!isLoading && !error && sortedUniversities.length === 0 && !isAdding && (
           <div className="admin-placeholder">
-            {searchQuery ? 'No universities match your search.' : 'No universities found.'}
+            {searchQuery ? 'No institutes match your search.' : 'No institutes found.'}
           </div>
         )}
       </div>
@@ -1462,7 +1462,7 @@ function SchoolTab({ state, setState }: SchoolTabProps) {
             <table className="university-table">
               <thead>
                 <tr>
-                  <th>University</th>
+                  <th>Institute</th>
                   <th>Country</th>
                 </tr>
               </thead>
@@ -2043,7 +2043,7 @@ function DepartmentTab({ state, setState }: DepartmentTabProps) {
             <table className="university-table">
               <thead>
                 <tr>
-                  <th>University</th>
+                  <th>Institute</th>
                   <th>Country</th>
                 </tr>
               </thead>
