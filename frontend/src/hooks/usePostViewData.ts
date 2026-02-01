@@ -244,7 +244,7 @@ export function usePostViewData({
     if (view !== 'replies') return []
     const posts = paginatedSubRepliesQuery.data?.posts ?? []
     if (!selectedPost?.id || posts.length === 0) return []
-    if (posts[0].parent_id !== selectedPost.id) return []
+    if (!posts.every((post) => post.parent_id === selectedPost.id)) return []
     return posts
   }, [paginatedSubRepliesQuery.data, view, selectedPost?.id])
 
