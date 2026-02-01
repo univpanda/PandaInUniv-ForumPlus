@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { UserManagement } from './UserManagement'
 import {
   useUniversities,
@@ -671,9 +671,12 @@ function UniversityTab({ state, setState }: UniversityTabProps) {
     setState((prev) => ({ ...prev, searchQuery: query, page: 1 }))
   }
 
-  const setPage = (newPage: number) => {
-    setState((prev) => ({ ...prev, page: newPage }))
-  }
+  const setPage = useCallback(
+    (newPage: number) => {
+      setState((prev) => ({ ...prev, page: newPage }))
+    },
+    [setState]
+  )
 
   const handleSort = (column: UniversitySortColumn) => {
     setState((prev) => {
@@ -929,8 +932,7 @@ function UniversityTab({ state, setState }: UniversityTabProps) {
                 <tr>
                   <th>#</th>
                   <th className="sortable" onClick={() => handleSort('university')}>
-                    Institute{' '}
-                    {sortColumn === 'university' && (sortDirection === 'asc' ? '▲' : '▼')}
+                    Institute {sortColumn === 'university' && (sortDirection === 'asc' ? '▲' : '▼')}
                   </th>
                   <th className="sortable" onClick={() => handleSort('country')}>
                     Country {sortColumn === 'country' && (sortDirection === 'asc' ? '▲' : '▼')}
@@ -1205,9 +1207,12 @@ function SchoolTab({ state, setState }: SchoolTabProps) {
     setState((prev) => ({ ...prev, searchQuery: query, page: 1 }))
   }
 
-  const setPage = (newPage: number) => {
-    setState((prev) => ({ ...prev, page: newPage }))
-  }
+  const setPage = useCallback(
+    (newPage: number) => {
+      setState((prev) => ({ ...prev, page: newPage }))
+    },
+    [setState]
+  )
 
   const handleSort = (column: SchoolSortColumn) => {
     setState((prev) => {
@@ -1768,9 +1773,12 @@ function DepartmentTab({ state, setState }: DepartmentTabProps) {
     setState((prev) => ({ ...prev, searchQuery: query, page: 1 }))
   }
 
-  const setPage = (newPage: number) => {
-    setState((prev) => ({ ...prev, page: newPage }))
-  }
+  const setPage = useCallback(
+    (newPage: number) => {
+      setState((prev) => ({ ...prev, page: newPage }))
+    },
+    [setState]
+  )
 
   const handleSort = (column: DepartmentSortColumn) => {
     setState((prev) => {

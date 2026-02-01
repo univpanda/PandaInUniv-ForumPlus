@@ -7,11 +7,7 @@ import { useDiscussionPage } from '../hooks/useDiscussionPage'
 import { DiscussionProvider } from '../contexts/DiscussionContext'
 import { ThreadView } from '../components/ThreadView'
 import { RepliesView } from '../components/RepliesView'
-import {
-  LoadingSpinner,
-  QueryErrorBanner,
-  EmptyState,
-} from '../components/ui'
+import { LoadingSpinner, QueryErrorBanner, EmptyState } from '../components/ui'
 import {
   EditModal,
   DeleteModal,
@@ -63,12 +59,7 @@ export function Discussion({
     handleRetry,
   } = useDiscussionPage({ resetToList })
 
-  const {
-    goToList,
-    openThreadById,
-    openRepliesById,
-    triggerHighlightPost,
-  } = nav
+  const { goToList, openThreadById, openRepliesById, triggerHighlightPost } = nav
   const { setSearchQuery } = search
 
   // Apply initial search when provided from external navigation
@@ -224,12 +215,7 @@ export function Discussion({
       onReplySortChange: sort.setReplySortBy,
       onGoToThread: nav.goToThread,
     }),
-    [
-      replyForm.setReplyContent,
-      replyForm.addReply,
-      sort.setReplySortBy,
-      nav.goToThread,
-    ]
+    [replyForm.setReplyContent, replyForm.addReply, sort.setReplySortBy, nav.goToThread]
   )
 
   const newThreadComposerRef = useRef<HTMLDivElement | null>(null)
@@ -253,7 +239,7 @@ export function Discussion({
     if (!isActive && threadForm.showNewThread) {
       threadForm.setShowNewThread(false)
     }
-  }, [isActive, threadForm.showNewThread, threadForm.setShowNewThread])
+  }, [isActive, threadForm])
 
   useEffect(() => {
     if (!threadForm.showNewThread) return
@@ -266,7 +252,7 @@ export function Discussion({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [threadForm.showNewThread, threadForm.setShowNewThread])
+  }, [threadForm])
 
   return (
     <div className="discussion-container no-sidebar">
@@ -396,9 +382,7 @@ export function Discussion({
         {status.loading && <LoadingSpinner className="discussion-loading" />}
 
         {/* Background fetching indicator - subtle, doesn't block content */}
-        {status.isFetching && !status.loading && (
-          <div className="discussion-fetching-indicator" />
-        )}
+        {status.isFetching && !status.loading && <div className="discussion-fetching-indicator" />}
 
         {/* Query Error */}
         {status.queryError && !status.loading && (
@@ -421,16 +405,21 @@ export function Discussion({
         )}
 
         {/* Thread List View (normal mode, not bookmarks) */}
-        {nav.view === 'list' && !status.loading && !status.queryError && !status.isPostsSearchView && !status.isSearchingPrivateUser && !status.isBookmarksView && (
-          <ThreadListView
-            threads={data.threads}
-            bookmarks={data.bookmarks}
-            user={auth.user}
-            threadsPagination={data.pagination.threads}
-            onOpenThread={nav.openThread}
-            onToggleBookmark={postActions.toggleBookmark}
-          />
-        )}
+        {nav.view === 'list' &&
+          !status.loading &&
+          !status.queryError &&
+          !status.isPostsSearchView &&
+          !status.isSearchingPrivateUser &&
+          !status.isBookmarksView && (
+            <ThreadListView
+              threads={data.threads}
+              bookmarks={data.bookmarks}
+              user={auth.user}
+              threadsPagination={data.pagination.threads}
+              onOpenThread={nav.openThread}
+              onToggleBookmark={postActions.toggleBookmark}
+            />
+          )}
 
         {/* Bookmarked Posts View */}
         {nav.view === 'list' && !status.loading && !status.queryError && status.isBookmarksView && (

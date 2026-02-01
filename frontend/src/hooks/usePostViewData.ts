@@ -1,8 +1,14 @@
 import { useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { usePostById, usePaginatedPosts, usePaginatedAuthorPosts, useThreadView, forumKeys } from './useForumQueries'
+import {
+  usePostById,
+  usePaginatedPosts,
+  usePaginatedAuthorPosts,
+  useThreadView,
+  forumKeys,
+} from './useForumQueries'
 import { PAGE_SIZE } from '../utils/constants'
-import { isPostStub, isFullPost } from '../types'
+import { isPostStub } from '../types'
 import type { View, SelectedThread, SelectedPost } from './useDiscussionNavigation'
 import type { ReplySortBy } from './useDiscussionFilters'
 import type { Post, AuthorPost, GetPaginatedPostsResponse } from '../types'
@@ -123,25 +129,7 @@ export function usePostViewData({
 
   // Only fetch if we don't have OP from any cache
   const needsOpFetch = view === 'replies' && threadId !== null && !cachedOp && !cachedRootPosts
-  const threadRootPostsQuery = usePaginatedPosts(
-    threadId ?? 0,
-    null,
-    1,
-    1,
-    'new',
-    needsOpFetch
-  )
-
-  // Get OP ID for replies view (needed to fetch level-1 replies where selectedPost lives)
-  const repliesViewOpId = useMemo(() => {
-    if (view !== 'replies') return null
-    // Try cached OP first
-    if (cachedOp) return cachedOp.id
-    // Then legacy cache
-    const rootPosts = cachedRootPosts ?? threadRootPostsQuery.data?.posts ?? []
-    const op = rootPosts.find((p) => p.parent_id === null)
-    return op?.id ?? null
-  }, [view, cachedOp, cachedRootPosts, threadRootPostsQuery.data])
+  const threadRootPostsQuery = usePaginatedPosts(threadId ?? 0, null, 1, 1, 'new', needsOpFetch)
 
   // Check if selectedPost is a stub (only has id, missing content)
   const isSelectedPostStub = view === 'replies' && isPostStub(selectedPost)
@@ -215,7 +203,8 @@ export function usePostViewData({
         }
         if ('originalPost' in data && 'replies' in data) {
           const threadView = data as ThreadViewResponse
-          const opMatch = threadView.originalPost?.id === targetId ? threadView.originalPost : undefined
+          const opMatch =
+            threadView.originalPost?.id === targetId ? threadView.originalPost : undefined
           if (opMatch) return opMatch
           return threadView.replies.find((p: Post) => p.id === targetId)
         }
@@ -238,7 +227,7 @@ export function usePostViewData({
 
     // Fallback to original selected post (stub or full)
     return isPostStub(selectedPost) ? undefined : selectedPost
-  }, [queryClient, repliesViewOpId, selectedPost, threadId, view, selectedPostQuery.data])
+  }, [queryClient, selectedPost, threadId, view, selectedPostQuery.data])
 
   // Sub-replies for replies view
   const sortedSubReplies = useMemo(() => {
@@ -247,7 +236,7 @@ export function usePostViewData({
     if (!selectedPost?.id || posts.length === 0) return []
     if (!posts.every((post) => post.parent_id === selectedPost.id)) return []
     return posts
-  }, [paginatedSubRepliesQuery.data, view, selectedPost?.id])
+  }, [paginatedSubRepliesQuery.data, view, selectedPost])
 
   // Posts search data
   const postsSearchData = paginatedPostsSearchQuery.data?.posts ?? []

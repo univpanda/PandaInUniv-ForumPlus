@@ -12,9 +12,30 @@ import 'katex/dist/katex.min.css'
 
 // Common emojis for quick access
 const EMOJI_LIST = [
-  '😀', '😂', '😊', '🥰', '😎', '🤔', '😢', '😡',
-  '👍', '👎', '👏', '🙏', '💪', '🎉', '❤️', '🔥',
-  '✅', '❌', '⚠️', '💡', '📈', '📉', '💰', '🚀',
+  '😀',
+  '😂',
+  '😊',
+  '🥰',
+  '😎',
+  '🤔',
+  '😢',
+  '😡',
+  '👍',
+  '👎',
+  '👏',
+  '🙏',
+  '💪',
+  '🎉',
+  '❤️',
+  '🔥',
+  '✅',
+  '❌',
+  '⚠️',
+  '💡',
+  '📈',
+  '📉',
+  '💰',
+  '🚀',
 ]
 
 // Convert HTML to Markdown
@@ -118,15 +139,15 @@ export const ReplyInput = memo(function ReplyInput({
         onChange(markdown)
       }
       // Force re-render to update button states on content changes
-      setForceUpdate(n => n + 1)
+      setForceUpdate((n) => n + 1)
     },
     onSelectionUpdate: () => {
       // Force re-render to update button states (bold/italic/link active state)
-      setForceUpdate(n => n + 1)
+      setForceUpdate((n) => n + 1)
     },
     onTransaction: ({ transaction }) => {
       if (transaction.docChanged || transaction.selectionSet || transaction.storedMarks) {
-        setForceUpdate(n => n + 1)
+        setForceUpdate((n) => n + 1)
       }
     },
   })
@@ -152,11 +173,14 @@ export const ReplyInput = memo(function ReplyInput({
     editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
   }, [editor])
 
-  const insertEmoji = useCallback((emoji: string) => {
-    if (!editor) return
-    editor.chain().focus().insertContent(emoji).run()
-    setShowEmojiPicker(false)
-  }, [editor])
+  const insertEmoji = useCallback(
+    (emoji: string) => {
+      if (!editor) return
+      editor.chain().focus().insertContent(emoji).run()
+      setShowEmojiPicker(false)
+    },
+    [editor]
+  )
 
   const insertLatex = useCallback(() => {
     if (!editor) return
@@ -183,12 +207,6 @@ export const ReplyInput = memo(function ReplyInput({
       document.addEventListener('mousedown', handleClickOutside)
     }
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isExpanded])
-
-  useEffect(() => {
-    if (!isExpanded) {
-      setShowEmojiPicker(false)
-    }
   }, [isExpanded])
 
   // Expand when editor is focused
@@ -248,7 +266,7 @@ export const ReplyInput = memo(function ReplyInput({
             >
               <Smile size={14} />
             </button>
-            {showEmojiPicker && (
+            {showEmojiPicker && isExpanded && (
               <div className="emoji-picker">
                 {EMOJI_LIST.map((emoji) => (
                   <button
