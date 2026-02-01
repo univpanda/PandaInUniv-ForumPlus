@@ -48,6 +48,7 @@ export interface PostViewDataReturn {
   isLoading: boolean
   isFetching: boolean
   isError: boolean
+  subRepliesLoading: boolean
 
   // Pagination totals
   repliesTotalCount: number
@@ -294,6 +295,7 @@ export function usePostViewData({
       (isSelectedPostStub && selectedPostQuery.isError))
 
   const isError = isThreadViewError || isRepliesViewError
+  const subRepliesLoading = view === 'replies' && paginatedSubRepliesQuery.isLoading
 
   return {
     rawPosts,
@@ -310,6 +312,7 @@ export function usePostViewData({
     isLoading,
     isFetching,
     isError,
+    subRepliesLoading,
     repliesTotalCount: threadViewQuery.data?.totalCount ?? 0,
     subRepliesTotalCount: paginatedSubRepliesQuery.data?.totalCount ?? 0,
     refetchPosts: threadViewQuery.refetch,

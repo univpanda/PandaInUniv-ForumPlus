@@ -18,6 +18,7 @@ export function RepliesView() {
     replyContent,
     submitting,
     subRepliesPagination,
+    subRepliesLoading,
   } = useDiscussionView()
   const { onReplyContentChange, onAddReply, onReplySortChange, onGoToThread } = useDiscussionViewActions()
 
@@ -83,7 +84,7 @@ export function RepliesView() {
         />
       )}
 
-      {sortedSubReplies.length === 0 ? (
+      {sortedSubReplies.length === 0 && !subRepliesLoading ? (
         <p className="no-replies">No replies yet</p>
       ) : (
         sortedSubReplies.map((post) => (

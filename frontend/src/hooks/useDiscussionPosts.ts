@@ -187,6 +187,7 @@ export function useDiscussionPosts({
     resolvedSelectedPost: postViewData.resolvedSelectedPost,
     replies: postViewData.replies,
     sortedSubReplies: postViewData.sortedSubReplies,
+    subRepliesLoading: postViewData.subRepliesLoading,
     postsSearchData: postViewData.postsSearchData,
     postsSearchLoading: postViewData.postsSearchLoading,
     postsSearchIsPrivate: postViewData.postsSearchIsPrivate,

@@ -49,6 +49,7 @@ export interface DiscussionViewDataProps {
   submitting: boolean
   repliesPagination?: PaginationState | null
   subRepliesPagination?: PaginationState | null
+  subRepliesLoading?: boolean
 }
 
 /** View-specific action callbacks */
@@ -92,6 +93,7 @@ export interface DiscussionViewContextType {
   submitting: boolean
   repliesPagination: PaginationState | null
   subRepliesPagination: PaginationState | null
+  subRepliesLoading: boolean
   // Actions
   onReplyContentChange: (content: string) => void
   onInlineReplyContentChange: (content: string) => void
@@ -194,6 +196,7 @@ export function DiscussionProvider({
       submitting: viewData.submitting,
       repliesPagination: viewData.repliesPagination ?? null,
       subRepliesPagination: viewData.subRepliesPagination ?? null,
+      subRepliesLoading: viewData.subRepliesLoading ?? false,
       // Actions
       onReplyContentChange: viewActions.onReplyContentChange,
       onInlineReplyContentChange: viewActions.onInlineReplyContentChange ?? (() => {}),
