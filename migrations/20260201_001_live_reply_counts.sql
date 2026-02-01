@@ -7,6 +7,35 @@
 -- UP MIGRATION
 -- =============================================================================
 
+-- Helper function: Count visible replies to a specific post
+CREATE OR REPLACE FUNCTION public.count_visible_replies(p_post_id integer, p_is_admin boolean DEFAULT false)
+RETURNS bigint
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+  SELECT COUNT(*)
+  FROM forum_posts p
+  WHERE p.parent_id = p_post_id
+    AND (p_is_admin OR COALESCE(p.is_deleted, FALSE) = FALSE);
+$$;
+
+-- Helper function: Count visible replies in a thread (excludes OP)
+CREATE OR REPLACE FUNCTION public.count_visible_thread_replies(p_thread_id integer, p_is_admin boolean DEFAULT false)
+RETURNS bigint
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+  SELECT COUNT(*)
+  FROM forum_posts p
+  WHERE p.thread_id = p_thread_id
+    AND p.parent_id IS NOT NULL
+    AND (p_is_admin OR COALESCE(p.is_deleted, FALSE) = FALSE);
+$$;
+
 CREATE OR REPLACE FUNCTION public.get_bookmarked_posts(p_user_id uuid, p_limit integer DEFAULT 20, p_offset integer DEFAULT 0, p_search_text text DEFAULT NULL::text) RETURNS json
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
