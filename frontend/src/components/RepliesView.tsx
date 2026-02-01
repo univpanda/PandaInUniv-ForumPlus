@@ -1,3 +1,4 @@
+import { Loader2 } from 'lucide-react'
 import { PostCard } from './PostCard'
 import { Pagination } from './Pagination'
 import { ReplyInput, ReplySortOptions } from './discussion'
@@ -85,7 +86,10 @@ export function RepliesView() {
       )}
 
       {subRepliesLoading ? (
-        <p className="no-replies">Loading replies...</p>
+        <div className="loading-replies">
+          <Loader2 className="spinner" size={20} />
+          <span>Loading replies...</span>
+        </div>
       ) : sortedSubReplies.length === 0 ? (
         <p className="no-replies">No replies yet</p>
       ) : (
