@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, focusManager, useQueryClient } from '@tanstack/react-query'
 import { handleMutationError } from './lib/blockedUserHandler'
 import { Header, type Tab } from './components/Header'
 import { Footer } from './components/Footer'
@@ -86,6 +86,7 @@ const INITIAL_TAB = getStoredTab()
 // Inner component that uses hooks (must be inside QueryClientProvider)
 function AppContent() {
   const { user, isAdmin, loading: authLoading, authError, clearAuthError } = useAuth()
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<Tab>(INITIAL_TAB)
   const [discussionResetKey, setDiscussionResetKey] = useState(0)
   const [chatResetKey, setChatResetKey] = useState(0)
@@ -121,6 +122,11 @@ function AppContent() {
       prefetchUserData(user.id)
     }
   }, [user?.id, prefetchUserData])
+
+  useEffect(() => {
+    // Auth changes can alter visibility/vote/bookmark overlays; refresh forum queries.
+    queryClient.invalidateQueries({ queryKey: ['forum'] })
+  }, [queryClient, user?.id, isAdmin])
 
   // Listen for chat start events from username hover
   const handleStartChatEvent = useCallback((e: Event) => {
